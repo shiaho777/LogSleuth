@@ -5,6 +5,14 @@
 
 [简体中文](README.zh-CN.md)
 
+## Screenshots
+
+| Live logcat stream | Filters & Presets | Crash & ANR detection |
+| :---: | :---: | :---: |
+| ![Live Stream](docs/screenshots/01-live-stream.png) | ![Filters](docs/screenshots/02-filters.png) | ![Crashes](docs/screenshots/03-crashes.png) |
+| **Recording sessions** | **Session replay** | **Embedded SDK sample** |
+| ![Recording](docs/screenshots/04-sessions.png) | ![Replay](docs/screenshots/05-session-replay.png) | ![SDK Sample](docs/screenshots/06-sdk-sample.png) |
+
 ## What is LogSleuth?
 
 LogSleuth is an open-source (Apache-2.0) Android logging toolkit with two modes:
@@ -52,7 +60,7 @@ applies to every logcat app):
 1. **Shizuku (recommended)** — no root, no PC needed on Android 11+ via Wireless Debugging. Install [Shizuku](https://shizuku.rikka.app/), start it once, and authorize LogSleuth.
 2. **ADB one-time grant** — with a PC, run once (persists until uninstall):
    ```bash
-   adb shell pm grant io.github.logsleuth.app android.permission.READ_LOGS
+   adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
    ```
 
 The **embedded SDK mode needs nothing at all** — an app can always read its own logs.

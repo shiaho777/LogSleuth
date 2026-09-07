@@ -12,7 +12,7 @@ users share a log zip in two taps.
 
 Reading other apps' logs requires a one-time grant: either Shizuku (no root;
 on Android 11+ it can be activated on-device via Wireless Debugging) or a
-one-time ADB command: adb shell pm grant io.github.logsleuth.app
+one-time ADB command: adb shell pm grant io.github.shiaho777.logsleuth.app
 android.permission.READ_LOGS. The embedded SDK mode needs no grant at all.
 
 Open source (Apache-2.0). No ads, no tracking, no network permission.

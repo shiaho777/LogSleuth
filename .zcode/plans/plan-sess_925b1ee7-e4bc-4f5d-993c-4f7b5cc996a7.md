@@ -4,7 +4,7 @@
 - **模式一(查看器)**:完整 logcat 查看器,经 Shizuku 或 ADB 一次性授权读取全设备日志(对标并超越 LogFox)
 - **模式二(内嵌 SDK)**:开发者把 `logsleuth-sdk` 集成进自己的 App,真正零权限记录日志/闪退/ANR,用户一键导出上报
 
-包名 `io.github.logsleuth.app`(正式发布前可换成你的 GitHub 用户名,F-Droid 要求 applicationId 稳定)。minSdk 26,targetSdk 最新。
+包名 `io.github.shiaho777.logsleuth.app`(正式发布前可换成你的 GitHub 用户名,F-Droid 要求 applicationId 稳定)。minSdk 26,targetSdk 最新。
 
 ---
 
@@ -28,7 +28,7 @@ LogSleuth/
 
 **采集路径(自动探测 + 引导设置)**:
 1. **Shizuku 路径**(优先推荐):检测 Shizuku 存活与授权 → 以 shell(uid 2000)身份运行 `logcat`,支持 `logcat --uid <uid>` 服务端过滤,可用 `ps` 做 PID→包名映射
-2. **ADB 授权路径**:检测 `READ_LOGS` 是否已授予;未授予则在引导页展示可复制的一键命令 `adb shell pm grant io.github.logsleuth.app android.permission.READ_LOGS`,授予后 App 自身进程直接跑 `logcat`
+2. **ADB 授权路径**:检测 `READ_LOGS` 是否已授予;未授予则在引导页展示可复制的一键命令 `adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS`,授予后 App 自身进程直接跑 `logcat`
 3. 两者都没有 → 引导页逐步教学(无线调试激活 Shizuku 图解 / ADB 命令页),这是免 root 下的平台限制,与 LogFox 等产品一致
 
 **解析与流式管道**:`logcat -v threadtime` 逐行解析(日期/时间/PID/TID/级别/Tag/多行消息),容错处理异常行;Flow + Channel 缓冲,背压安全;内存环形缓冲(默认 10 万行,可配);录制时同步落盘。

@@ -8,7 +8,7 @@ LogSleuth 是一个免 Root 的安卓日志工具,包含两种模式。
 日志、崩溃与 ANR,用户两下点击即可把日志 zip 分享给开发者。
 
 读取其他应用的日志需要一次性授权:Shizuku(免 Root,Android 11+ 可在手机上通过无线调试激活),
-或执行一次 ADB 命令:adb shell pm grant io.github.logsleuth.app android.permission.READ_LOGS。
+或执行一次 ADB 命令:adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS。
 内嵌 SDK 模式则完全不需要授权。
 
 开源(Apache-2.0),无广告、无跟踪、不申请网络权限。

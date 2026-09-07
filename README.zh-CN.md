@@ -51,7 +51,7 @@ LogSleuth 查看器 App 可以直接打开并渲染 SDK 导出的日志包。
 1. **Shizuku(推荐)**——无需 Root,Android 11+ 可通过“无线调试”在手机上直接激活,无需电脑。安装 [Shizuku](https://shizuku.rikka.app/),启动一次,授权 LogSleuth 即可。
 2. **ADB 一次性授权**——有电脑的话,执行一次即可(卸载前一直有效):
    ```bash
-   adb shell pm grant io.github.logsleuth.app android.permission.READ_LOGS
+   adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
    ```
 
 **内嵌 SDK 模式什么都不需要**——App 永远可以读取自己的日志。

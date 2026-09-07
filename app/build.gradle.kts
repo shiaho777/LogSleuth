@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.logsleuth.app"
+    namespace = "io.github.shiaho777.logsleuth.app"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.logsleuth.app"
+        applicationId = "io.github.shiaho777.logsleuth.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.logsleuth.sdk"
+    namespace = "io.github.shiaho777.logsleuth.sdk"
     compileSdk = 35
 
     defaultConfig {
