@@ -1,7 +1,7 @@
 # LogSleuth
 
 **A powerful, root-free logcat viewer & embedded logging SDK for Android.**
-擅长把“用户说 App 出问题了，但你复现不了”这件事变得可以定位。
+On a mission to be the easiest and most delightful logging tool on Android.
 
 [简体中文](README.zh-CN.md)
 
