@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "io.github.shiaho777.logsleuth.sample"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.shiaho777.logsleuth.sample"

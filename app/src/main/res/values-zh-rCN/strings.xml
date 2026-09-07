@@ -104,4 +104,31 @@
     <string name="save">保存</string>
     <string name="cancel">取消</string>
     <string name="delete">删除</string>
+
+    <!-- 底部导航 -->
+    <string name="nav_stream">日志</string>
+    <string name="nav_sessions">会话</string>
+    <string name="nav_crashes">崩溃</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- 录制横幅 -->
+    <string name="recording_banner">录制中 · %1$d 行</string>
+    <string name="recording_banner_stop">停止</string>
+
+    <!-- 引擎状态 -->
+    <string name="engine_streaming">采集中</string>
+    <string name="engine_connecting">连接中…</string>
+    <string name="engine_stopped">已停止</string>
+    <string name="engine_error">流出错</string>
+
+    <!-- 日志详情 -->
+    <string name="entry_detail">日志详情</string>
+    <string name="copy_message">复制消息</string>
+    <string name="copy_raw">复制原始行</string>
+    <string name="copied">已复制</string>
+
+    <!-- 导入 -->
+    <string name="import_logs">导入</string>
+    <string name="import_success">已导入为新会话</string>
+    <string name="import_failed">无法导入此文件</string>
 </resources>

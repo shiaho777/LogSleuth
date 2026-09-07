@@ -104,4 +104,31 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_stream">Logs</string>
+    <string name="nav_sessions">Sessions</string>
+    <string name="nav_crashes">Crashes</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Recording banner -->
+    <string name="recording_banner">Recording · %1$d lines</string>
+    <string name="recording_banner_stop">Stop</string>
+
+    <!-- Engine status -->
+    <string name="engine_streaming">Streaming</string>
+    <string name="engine_connecting">Connecting…</string>
+    <string name="engine_stopped">Stopped</string>
+    <string name="engine_error">Stream error</string>
+
+    <!-- Entry detail -->
+    <string name="entry_detail">Log entry</string>
+    <string name="copy_message">Copy message</string>
+    <string name="copy_raw">Copy raw line</string>
+    <string name="copied">Copied</string>
+
+    <!-- Import -->
+    <string name="import_logs">Import</string>
+    <string name="import_success">Imported as a new session</string>
+    <string name="import_failed">Could not import this file</string>
 </resources>

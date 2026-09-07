@@ -1,18 +1,27 @@
 package io.github.shiaho777.logsleuth.app.ui.stream
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -25,6 +34,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,9 +45,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,10 +62,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
@@ -70,6 +88,7 @@ fun StreamScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -102,20 +121,34 @@ fun StreamScreen(
                 StreamTopBar(
                     paused = ui.paused,
                     recording = ui.recording.isRecording,
-                    onPauseToggle = { viewModel.setPaused(!ui.paused) },
+                    onPauseToggle = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                        viewModel.setPaused(!ui.paused)
+                    },
                     onSearch = { viewModel.setSearching(true) },
-                    onRecordToggle = viewModel::toggleRecording,
+                    onRecordToggle = {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        viewModel.toggleRecording()
+                    },
                     onClear = viewModel::clear,
                     onNavigate = onNavigate,
                 )
             }
         },
         floatingActionButton = {
-            androidx.compose.animation.AnimatedVisibility(visible = !isAtBottom && ui.entries.isNotEmpty()) {
-                FloatingActionButton(onClick = {
-                    scope.launch { listState.animateScrollToItem(ui.entries.lastIndex) }
-                }) {
-                    androidx.compose.material3.BadgedBox(badge = {
+            AnimatedVisibility(
+                visible = !isAtBottom && ui.entries.isNotEmpty(),
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        scope.launch { listState.animateScrollToItem(ui.entries.lastIndex) }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ) {
+                    BadgedBox(badge = {
                         if (ui.pausedIncoming > 0) Badge { Text("+${ui.pausedIncoming}") }
                     }) {
                         Icon(
@@ -134,6 +167,18 @@ fun StreamScreen(
                 .padding(padding)
                 .imePadding(),
         ) {
+            // Recording status banner — appears with a slide-down animation
+            AnimatedVisibility(
+                visible = ui.recording.isRecording,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                RecordingBanner(
+                    lineCount = ui.recording.lineCount,
+                    onStop = viewModel::toggleRecording,
+                )
+            }
+
             FilterBar(
                 filter = ui.filter,
                 regexInvalid = ui.regexInvalid,
@@ -161,6 +206,14 @@ fun StreamScreen(
                         currentHit = ui.searchHits.getOrNull(ui.searchHitIndex),
                     )
                 }
+
+                // Engine status chip (connecting / streaming / stopped)
+                EngineStatusChip(
+                    state = ui.engineState,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                )
             }
         }
     }
@@ -169,6 +222,75 @@ fun StreamScreen(
     LaunchedEffect(ui.searchHitIndex) {
         val target = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
         listState.animateScrollToItem(target)
+    }
+}
+
+/** Slim banner shown while a recording is active. */
+@Composable
+private fun RecordingBanner(lineCount: Long, onStop: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.error),
+            )
+            Spacer(Modifier.size(10.dp))
+            Text(
+                text = stringResource(R.string.recording_banner, lineCount),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onStop) {
+                Icon(
+                    Icons.Default.Stop,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(stringResource(R.string.recording_banner_stop))
+            }
+        }
+    }
+}
+
+/** Small pill showing the engine state at the top-right of the list. */
+@Composable
+private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Modifier) {
+    val (label, color) = when (state) {
+        LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to Color(0xFF30D158)
+        LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to Color(0xFFFF9F0A)
+        LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to Color(0xFF8E8E93)
+        LogcatEngine.State.ERROR -> stringResource(R.string.engine_error) to Color(0xFFFF453A)
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        shape = MaterialTheme.shapes.small,
+        shadowElevation = 2.dp,
+        modifier = modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        ) {
+            Box(
+                Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(color),
+            )
+            Spacer(Modifier.size(5.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 
@@ -186,22 +308,29 @@ private fun StreamTopBar(
     var menuOpen by remember { mutableStateOf(false) }
     TopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
         actions = {
             IconButton(onClick = onPauseToggle) {
                 Icon(
                     if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
                     contentDescription = stringResource(if (paused) R.string.resume else R.string.pause),
-                    tint = if (paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    tint = if (paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onSearch) {
-                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = stringResource(R.string.search_hint),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             IconButton(onClick = onRecordToggle) {
                 Icon(
                     if (recording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
                     contentDescription = stringResource(if (recording) R.string.record_stop else R.string.record_start),
-                    tint = if (recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    tint = MaterialTheme.colorScheme.error,
                 )
             }
             IconButton(onClick = { menuOpen = true }) {
@@ -281,7 +410,11 @@ private fun LogList(
     searchQuery: String,
     currentHit: Int?,
 ) {
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
         items(
             count = ui.entries.size,
             key = { index -> ui.entries[index].seq },

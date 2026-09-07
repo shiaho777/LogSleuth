@@ -1,15 +1,22 @@
 package io.github.shiaho777.logsleuth.app.ui.crashes
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material3.AlertDialog
@@ -20,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -33,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -42,8 +49,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
-import java.text.DateFormat
-import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,14 +60,7 @@ fun CrashesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.crashes_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
+            TopAppBar(title = { Text(stringResource(R.string.crashes_title)) })
         },
     ) { padding ->
         if (crashes.isEmpty()) {
@@ -73,11 +71,15 @@ fun CrashesScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(crashes.size, key = { crashes[it].id }) { i ->
-                    CrashCard(crash = crashes[i], onDelete = { viewModel.delete(crashes[i].id) })
+                    CrashCard(
+                        crash = crashes[i],
+                        onDelete = { viewModel.delete(crashes[i].id) },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
         }
@@ -85,30 +87,40 @@ fun CrashesScreen(
 }
 
 @Composable
-fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?) {
+fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val isAnr = crash.type == "ANR"
 
     Card(
         onClick = { expanded = true },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
         ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                if (crash.type == "ANR") Icons.Default.HourglassTop else Icons.Default.BugReport,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-            )
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    if (isAnr) Icons.Default.HourglassTop else Icons.Default.BugReport,
+                    contentDescription = crash.type,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
                     crash.packageName ?: stringResource(R.string.unknown_app),
                     style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
                 )
                 Text(
                     crash.firstLine,
@@ -117,15 +129,22 @@ fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM)
-                        .format(Date(crash.time)),
+                    DateUtils.getRelativeTimeSpanString(
+                        crash.time,
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS,
+                    ).toString(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
             if (onDelete != null) {
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -144,7 +163,15 @@ fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?) {
                 TextButton(onClick = {
                     clipboard.setText(AnnotatedString(crash.snippet))
                     expanded = false
-                }) { Text(stringResource(R.string.copy)) }
+                }) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.copy))
+                }
             },
             dismissButton = {
                 TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.close)) }

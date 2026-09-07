@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "io.github.shiaho777.logsleuth.sdk"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

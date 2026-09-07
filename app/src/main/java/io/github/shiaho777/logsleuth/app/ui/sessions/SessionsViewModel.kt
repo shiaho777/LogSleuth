@@ -1,9 +1,11 @@
 package io.github.shiaho777.logsleuth.app.ui.sessions
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
+import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
@@ -23,6 +25,7 @@ class SessionsViewModel @Inject constructor(
     private val crashEventDao: CrashEventDao,
     private val bookmarkDao: BookmarkDao,
     private val exporter: SessionExporter,
+    private val importer: LogImporter,
 ) : ViewModel() {
 
     val sessions: StateFlow<List<SessionEntity>> = sessionDao.observeAll()
@@ -40,8 +43,18 @@ class SessionsViewModel @Inject constructor(
     fun share(session: SessionEntity, format: SessionExporter.Format) {
         viewModelScope.launch {
             exporter.export(session.id, format).onSuccess { file ->
-                exporter.share(file, if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain")
+                exporter.share(
+                    file,
+                    if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain",
+                )
             }
+        }
+    }
+
+    /** Imports an externally shared log file or SDK export zip. */
+    fun import(uri: Uri, onResult: (Result<Long>) -> Unit) {
+        viewModelScope.launch {
+            onResult(importer.import(uri))
         }
     }
 }
