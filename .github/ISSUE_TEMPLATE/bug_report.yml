@@ -1,0 +1,35 @@
+name: Bug report
+description: Report a problem with LogSleuth
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device & Android version
+      placeholder: e.g. Pixel 7, Android 14
+    validations:
+      required: true
+  - type: dropdown
+    id: access
+    attributes:
+      label: Log access method
+      options:
+        - Shizuku
+        - ADB READ_LOGS grant
+        - SDK mode (embedded in my app)
+        - Not applicable
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: If LogSleuth itself crashed, please attach the stack trace.
+      render: text

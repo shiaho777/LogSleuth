@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LogSleuth</string>
+
+    <!-- 引导 -->
+    <string name="setup_title">设置日志访问</string>
+    <string name="setup_explainer">从 Android 4.1 开始,应用无法读取其他 App 的日志,需要一次性授权。请从下面两条免 Root 路径中选一条。</string>
+    <string name="setup_shizuku_title">Shizuku(推荐)</string>
+    <string name="setup_shizuku_desc">免 Root,Android 11+ 可通过无线调试在手机上直接激活。支持按应用过滤,日志流最稳定。</string>
+    <string name="setup_shizuku_not_installed">未安装 Shizuku</string>
+    <string name="setup_shizuku_not_running">已安装 Shizuku,但未运行</string>
+    <string name="setup_shizuku_needs_permission">Shizuku 运行中,需要授权</string>
+    <string name="setup_shizuku_ready">Shizuku 已就绪</string>
+    <string name="setup_get_shizuku">获取 Shizuku</string>
+    <string name="setup_open_shizuku">打开 Shizuku</string>
+    <string name="setup_grant_shizuku">授权</string>
+    <string name="setup_adb_title">ADB 一次性授权</string>
+    <string name="setup_adb_desc">有电脑时执行一次下面的命令即可,卸载前一直有效。</string>
+    <string name="setup_copy_command">复制命令</string>
+    <string name="setup_recheck">我已执行,重新检测</string>
+    <string name="setup_adb_granted">已授予 READ_LOGS</string>
+    <string name="setup_skip">暂时跳过</string>
+
+    <!-- 实时流 -->
+    <string name="pause">暂停</string>
+    <string name="resume">继续</string>
+    <string name="clear">清空</string>
+    <string name="search_hint">搜索日志…</string>
+    <string name="record_start">开始录制</string>
+    <string name="record_stop">停止录制</string>
+    <string name="scroll_bottom">回到底部</string>
+    <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
+    <string name="no_access_title">还没有日志访问权限</string>
+    <string name="no_access_desc">LogSleuth 需要 Shizuku 或一次性 ADB 授权才能读取设备日志。</string>
+    <string name="no_access_action">去设置</string>
+
+    <!-- 过滤器 -->
+    <string name="filters_title">过滤器预设</string>
+    <string name="filters_empty">还没有保存的预设。可以在日志流页保存,或在这里新建。</string>
+    <string name="filter_add">新建预设</string>
+    <string name="filter_edit">编辑预设</string>
+    <string name="filter_query">包含(Tag 或消息)</string>
+    <string name="filter_tag">Tag</string>
+    <string name="filter_exclude">排除</string>
+    <string name="filter_regex">使用正则表达式</string>
+    <string name="filter_save_preset">保存为预设</string>
+    <string name="filter_preset_name">预设名称</string>
+    <string name="app_filter_all">全部应用</string>
+    <string name="app_filter_title">按应用过滤</string>
+    <string name="level_verbose">Verbose</string>
+    <string name="level_debug">Debug</string>
+    <string name="level_info">Info</string>
+    <string name="level_warn">Warn</string>
+    <string name="level_error">Error</string>
+    <string name="level_fatal">Fatal</string>
+
+    <!-- 会话 -->
+    <string name="sessions_title">录制会话</string>
+    <string name="sessions_empty">还没有录制。在日志流页点录制按钮,或用快捷设置磁贴。</string>
+    <string name="session_file_missing">该会话的日志文件已丢失。</string>
+    <string name="tab_logs">日志 (%1$d)</string>
+    <string name="tab_crashes">崩溃 (%1$d)</string>
+    <string name="tab_bookmarks">书签 (%1$d)</string>
+    <string name="share_logs">分享日志</string>
+    <string name="export_format_prompt">选择导出格式。ZIP 会附带设备信息。</string>
+    <string name="bookmarks_empty">此会话没有书签。</string>
+
+    <!-- 崩溃 -->
+    <string name="crashes_title">崩溃与 ANR</string>
+    <string name="crashes_empty">还没有侦测到崩溃。LogSleuth 会在流式查看或录制时标记 FATAL EXCEPTION 与 ANR 事件。</string>
+    <string name="unknown_app">未知应用</string>
+    <string name="copy">复制</string>
+    <string name="close">关闭</string>
+
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_buffer_size">缓冲区大小</string>
+    <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
+    <string name="settings_crash_notifications">崩溃通知</string>
+    <string name="settings_bubble">悬浮气泡</string>
+    <string name="settings_bubble_desc">点按记录书签,长按开始/停止录制。需要悬浮窗权限。</string>
+    <string name="settings_theme">主题</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_version">LogSleuth %1$s · 开源(Apache-2.0)</string>
+
+    <!-- 通知与服务 -->
+    <string name="notif_channel_recording">录制</string>
+    <string name="notif_channel_crashes">崩溃与 ANR</string>
+    <string name="notif_recording_title">正在录制日志</string>
+    <string name="notif_recording_text">已捕获 %1$d 行</string>
+    <string name="notif_action_stop">停止</string>
+    <string name="notif_action_bookmark">书签</string>
+    <string name="notif_crash_title">崩溃:%1$s</string>
+    <string name="notif_anr_title">ANR:%1$s</string>
+    <string name="tile_record">录制日志</string>
+    <string name="tile_recording">录制中 · %1$d</string>
+    <string name="bookmark_added">已添加书签</string>
+    <string name="not_recording">未在录制,长按开始</string>
+
+    <!-- 通用 -->
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Intentionally no permissions: the SDK must stay permission-free. -->
+    <application>
+        <provider
+            android:name=".internal.SleuthFileProvider"
+            android:authorities="${applicationId}.sleuth.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/sleuth_file_paths" />
+        </provider>
+    </application>
+</manifest>

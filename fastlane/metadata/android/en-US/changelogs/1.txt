@@ -1,0 +1,1 @@
+First release: live logcat viewer (Shizuku / ADB grant), filters, recording sessions, crash & ANR detection, floating bookmarks, export, and the embeddable zero-permission logsleuth-sdk.

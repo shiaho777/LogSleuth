@@ -1,0 +1,1 @@
+首个版本:实时 logcat 查看器(Shizuku / ADB 授权)、过滤器、录制会话、崩溃与 ANR 侦测、悬浮书签、导出分享,以及零权限内嵌 logsleuth-sdk。

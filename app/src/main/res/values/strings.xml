@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LogSleuth</string>
+
+    <!-- Setup -->
+    <string name="setup_title">Set up log access</string>
+    <string name="setup_explainer">Since Android 4.1, apps cannot read other apps\' logs without a one-time grant. Pick one of the two root-free paths below.</string>
+    <string name="setup_shizuku_title">Shizuku (recommended)</string>
+    <string name="setup_shizuku_desc">No root, no PC on Android 11+ via Wireless Debugging. Enables per-app filtering and the most reliable stream.</string>
+    <string name="setup_shizuku_not_installed">Shizuku is not installed</string>
+    <string name="setup_shizuku_not_running">Shizuku is installed but not running</string>
+    <string name="setup_shizuku_needs_permission">Shizuku is running — permission needed</string>
+    <string name="setup_shizuku_ready">Shizuku is ready</string>
+    <string name="setup_get_shizuku">Get Shizuku</string>
+    <string name="setup_open_shizuku">Open Shizuku</string>
+    <string name="setup_grant_shizuku">Grant permission</string>
+    <string name="setup_adb_title">ADB one-time grant</string>
+    <string name="setup_adb_desc">With a computer, run this command once. It stays valid until the app is uninstalled.</string>
+    <string name="setup_copy_command">Copy command</string>
+    <string name="setup_recheck">I ran it — re-check</string>
+    <string name="setup_adb_granted">READ_LOGS granted</string>
+    <string name="setup_skip">Skip for now</string>
+
+    <!-- Stream -->
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="clear">Clear</string>
+    <string name="search_hint">Search logs…</string>
+    <string name="record_start">Start recording</string>
+    <string name="record_stop">Stop recording</string>
+    <string name="scroll_bottom">Scroll to bottom</string>
+    <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
+    <string name="no_access_title">No log access yet</string>
+    <string name="no_access_desc">LogSleuth needs either Shizuku or a one-time ADB grant to read device logs.</string>
+    <string name="no_access_action">Open setup</string>
+
+    <!-- Filters -->
+    <string name="filters_title">Filter presets</string>
+    <string name="filters_empty">No saved presets yet. Save one from the stream screen or create it here.</string>
+    <string name="filter_add">New preset</string>
+    <string name="filter_edit">Edit preset</string>
+    <string name="filter_query">Include (tag or message)</string>
+    <string name="filter_tag">Tag</string>
+    <string name="filter_exclude">Exclude</string>
+    <string name="filter_regex">Regular expressions</string>
+    <string name="filter_save_preset">Save as preset</string>
+    <string name="filter_preset_name">Preset name</string>
+    <string name="app_filter_all">All apps</string>
+    <string name="app_filter_title">Filter by app</string>
+    <string name="level_verbose">Verbose</string>
+    <string name="level_debug">Debug</string>
+    <string name="level_info">Info</string>
+    <string name="level_warn">Warn</string>
+    <string name="level_error">Error</string>
+    <string name="level_fatal">Fatal</string>
+
+    <!-- Sessions -->
+    <string name="sessions_title">Sessions</string>
+    <string name="sessions_empty">No recordings yet. Tap the record button on the stream screen, or use the quick-settings tile.</string>
+    <string name="session_file_missing">The log file for this session is missing.</string>
+    <string name="tab_logs">Logs (%1$d)</string>
+    <string name="tab_crashes">Crashes (%1$d)</string>
+    <string name="tab_bookmarks">Bookmarks (%1$d)</string>
+    <string name="share_logs">Share logs</string>
+    <string name="export_format_prompt">Choose the export format. ZIP includes device info.</string>
+    <string name="bookmarks_empty">No bookmarks in this session.</string>
+
+    <!-- Crashes -->
+    <string name="crashes_title">Crashes &amp; ANRs</string>
+    <string name="crashes_empty">No crashes detected. LogSleuth flags FATAL EXCEPTION and ANR events while streaming or recording.</string>
+    <string name="unknown_app">Unknown app</string>
+    <string name="copy">Copy</string>
+    <string name="close">Close</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_buffer_size">Buffer size</string>
+    <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
+    <string name="settings_crash_notifications">Crash notifications</string>
+    <string name="settings_bubble">Floating bubble</string>
+    <string name="settings_bubble_desc">Tap to bookmark a moment, long-press to toggle recording. Needs the overlay permission.</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">LogSleuth %1$s · open source (Apache-2.0)</string>
+
+    <!-- Notifications & services -->
+    <string name="notif_channel_recording">Recording</string>
+    <string name="notif_channel_crashes">Crashes &amp; ANRs</string>
+    <string name="notif_recording_title">Recording logs</string>
+    <string name="notif_recording_text">%1$d lines captured</string>
+    <string name="notif_action_stop">Stop</string>
+    <string name="notif_action_bookmark">Bookmark</string>
+    <string name="notif_crash_title">Crash: %1$s</string>
+    <string name="notif_anr_title">ANR: %1$s</string>
+    <string name="tile_record">Record logs</string>
+    <string name="tile_recording">Recording · %1$d</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="not_recording">Not recording — long-press to start</string>
+
+    <!-- Common -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+</resources>
