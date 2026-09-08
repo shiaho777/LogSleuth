@@ -131,4 +131,43 @@
     <string name="import_logs">导入</string>
     <string name="import_success">已导入为新会话</string>
     <string name="import_failed">无法导入此文件</string>
+
+    <!-- 上报向导 -->
+    <string name="nav_report">上报</string>
+    <string name="report_step1_title">哪个应用出了问题?</string>
+    <string name="report_step1_hint">选择你要抓取日志的应用。</string>
+    <string name="report_step2_title">重现问题</string>
+    <string name="report_step2_hint">开始录制后切到那个应用,把问题操作出来。我们会在后台持续捕获。</string>
+    <string name="report_step3_title">发送报告</string>
+    <string name="report_step3_hint">日志已抓好了,分享给开发者即可;也可以先保存在会话里。</string>
+    <string name="report_search_apps">搜索应用…</string>
+    <string name="report_start_recording">开始录制</string>
+    <string name="report_stop_share">停止并分享</string>
+    <string name="report_recording_active">录制中 · %1$d 行</string>
+    <string name="report_crash_caught">已捕获 %1$s 的崩溃</string>
+    <string name="report_keep">保存在会话里</string>
+    <string name="report_back">上一步</string>
+    <string name="report_next">下一步</string>
+    <string name="step_counter">第 %1$d / 3 步</string>
+
+    <!-- 录制完成提示 -->
+    <string name="recording_saved">录制已保存</string>
+    <string name="recording_saved_lines">已捕获 %1$d 行</string>
+    <string name="share_now">立即分享</string>
+    <string name="later">稍后</string>
+
+    <!-- 暂停横幅 -->
+    <string name="paused_banner">已暂停 · 有 %1$d 行新日志</string>
+    <string name="paused_resume">继续</string>
+
+    <!-- 崩溃分享 -->
+    <string name="crash_share">分享</string>
+
+    <!-- 引导下一步 -->
+    <string name="setup_next_title">下一步</string>
+    <string name="setup_next_install_shizuku">安装 Shizuku,启动一次,然后回来授权。</string>
+    <string name="setup_next_start_shizuku">打开 Shizuku 并启动服务(Android 11+ 用无线调试)。</string>
+    <string name="setup_next_grant_shizuku">点击下方 Shizuku 卡片里的"授权"。</string>
+    <string name="setup_next_adb">或用电脑:复制下方 ADB 命令执行一次,然后点"重新检测"。</string>
+    <string name="setup_next_done">都准备好了,正在进入实时日志流…</string>
 </resources>

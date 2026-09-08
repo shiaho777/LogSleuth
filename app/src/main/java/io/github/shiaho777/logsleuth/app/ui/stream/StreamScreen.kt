@@ -179,6 +179,18 @@ fun StreamScreen(
                 )
             }
 
+            // Paused banner — tells the user new lines are being buffered.
+            AnimatedVisibility(
+                visible = ui.paused,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                PausedBanner(
+                    incoming = ui.pausedIncoming,
+                    onResume = { viewModel.setPaused(false) },
+                )
+            }
+
             FilterBar(
                 filter = ui.filter,
                 regexInvalid = ui.regexInvalid,
@@ -222,6 +234,15 @@ fun StreamScreen(
     LaunchedEffect(ui.searchHitIndex) {
         val target = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
         listState.animateScrollToItem(target)
+    }
+
+    // Recording finished → offer to share immediately.
+    ui.finishedSession?.let { session ->
+        RecordingSavedSheet(
+            session = session,
+            onShare = { viewModel.shareFinishedSession(it) },
+            onDismiss = viewModel::dismissFinishedSession,
+        )
     }
 }
 
@@ -425,6 +446,93 @@ private fun LogList(
                 highlight = searchQuery.takeIf { it.isNotBlank() },
                 isCurrentHit = currentHit == index,
             )
+        }
+    }
+}
+
+
+/** Slim banner shown while the stream is paused. */
+@Composable
+private fun PausedBanner(incoming: Int, onResume: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Default.Pause,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.size(10.dp))
+            Text(
+                text = stringResource(R.string.paused_banner, incoming),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onResume) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(stringResource(R.string.paused_resume))
+            }
+        }
+    }
+}
+
+/** Bottom sheet shown right after a recording stops — one-tap share. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecordingSavedSheet(
+    session: io.github.shiaho777.logsleuth.app.data.db.SessionEntity,
+    onShare: (io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                Icons.Default.FiberManualRecord,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.recording_saved),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                stringResource(R.string.recording_saved_lines, session.lineCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.Button(
+                    onClick = { onShare(io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format.ZIP) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("ZIP") }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { onShare(io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format.TXT) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("TXT") }
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 8.dp)) {
+                Text(stringResource(R.string.later))
+            }
         }
     }
 }

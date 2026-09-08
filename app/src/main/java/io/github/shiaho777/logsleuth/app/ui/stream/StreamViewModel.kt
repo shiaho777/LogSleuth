@@ -52,6 +52,8 @@ data class StreamUiState(
     /** Indices into [entries] that match the search query. */
     val searchHits: List<Int> = emptyList(),
     val searchHitIndex: Int = -1,
+    /** Session just finished — prompt the user to share it. */
+    val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
 )
 
 @HiltViewModel
@@ -61,6 +63,8 @@ class StreamViewModel @Inject constructor(
     private val recordingManager: RecordingManager,
     private val filterDao: FilterDao,
     private val settingsRepository: SettingsRepository,
+    private val sessionDao: io.github.shiaho777.logsleuth.app.data.db.SessionDao,
+    private val exporter: io.github.shiaho777.logsleuth.app.core.export.SessionExporter,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(StreamUiState())
@@ -83,7 +87,21 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch { engine.access.collect { a -> _ui.update { it.copy(access = a) } } }
         viewModelScope.launch { engine.state.collect { s -> _ui.update { it.copy(engineState = s) } } }
         viewModelScope.launch {
-            recordingManager.state.collect { r -> _ui.update { it.copy(recording = r) } }
+            var wasRecording = false
+            var lastSessionId: Long? = null
+            recordingManager.state.collect { r ->
+                if (r.isRecording) lastSessionId = r.sessionId
+                _ui.update { it.copy(recording = r) }
+                if (wasRecording && !r.isRecording && lastSessionId != null) {
+                    val id = lastSessionId
+                    lastSessionId = null
+                    // Session row finalizes asynchronously; fetch after a beat.
+                    kotlinx.coroutines.delay(400)
+                    val session = sessionDao.getById(id!!)
+                    _ui.update { it.copy(finishedSession = session) }
+                }
+                wasRecording = r.isRecording
+            }
         }
         viewModelScope.launch {
             filterDao.observeAll().collect { list ->
@@ -296,6 +314,27 @@ class StreamViewModel @Inject constructor(
         return runCatching {
             context.packageManager.getApplicationInfo(packageName, 0).uid
         }.getOrNull()
+    }
+
+    fun shareFinishedSession(format: io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) {
+        val session = _ui.value.finishedSession ?: return
+        _ui.update { it.copy(finishedSession = null) }
+        viewModelScope.launch {
+            exporter.export(session.id, format).onSuccess { file ->
+                exporter.share(
+                    file,
+                    if (format == io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format.ZIP) {
+                        "application/zip"
+                    } else {
+                        "text/plain"
+                    },
+                )
+            }
+        }
+    }
+
+    fun dismissFinishedSession() {
+        _ui.update { it.copy(finishedSession = null) }
     }
 
     override fun onCleared() {

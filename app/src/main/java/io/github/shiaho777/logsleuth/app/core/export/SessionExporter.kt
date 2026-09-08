@@ -65,6 +65,17 @@ class SessionExporter @Inject constructor(
         }
     }
 
+    /** Shares an arbitrary text payload (e.g. a crash snippet) as a file. */
+    suspend fun shareSnippet(name: String, content: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+                val file = File(dir, name)
+                file.writeText(content)
+                share(file, "text/plain")
+            }
+        }
+
     /** Launches the system share sheet for an exported file. */
     fun share(file: File, mime: String) {
         val uri = FileProvider.getUriForFile(

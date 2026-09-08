@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +80,7 @@ fun CrashesScreen(
                         crash = crashes[i],
                         onDelete = { viewModel.delete(crashes[i].id) },
                         modifier = Modifier.animateItem(),
+                        onShare = { viewModel.share(it) },
                     )
                 }
             }
@@ -87,7 +89,12 @@ fun CrashesScreen(
 }
 
 @Composable
-fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun CrashCard(
+    crash: CrashEventEntity,
+    onDelete: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    onShare: ((CrashEventEntity) -> Unit)? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val isAnr = crash.type == "ANR"
@@ -160,17 +167,33 @@ fun CrashCard(crash: CrashEventEntity, onDelete: (() -> Unit)?, modifier: Modifi
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    clipboard.setText(AnnotatedString(crash.snippet))
-                    expanded = false
-                }) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.copy))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onShare != null) {
+                        TextButton(onClick = {
+                            onShare(crash)
+                            expanded = false
+                        }) {
+                            Icon(
+                                Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.crash_share))
+                        }
+                    }
+                    TextButton(onClick = {
+                        clipboard.setText(AnnotatedString(crash.snippet))
+                        expanded = false
+                    }) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.copy))
+                    }
                 }
             },
             dismissButton = {

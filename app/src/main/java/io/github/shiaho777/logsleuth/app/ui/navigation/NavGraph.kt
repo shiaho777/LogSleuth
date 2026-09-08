@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -28,6 +29,7 @@ import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
+import io.github.shiaho777.logsleuth.app.ui.report.ReportScreen
 import io.github.shiaho777.logsleuth.app.ui.sessiondetail.SessionDetailScreen
 import io.github.shiaho777.logsleuth.app.ui.sessions.SessionsScreen
 import io.github.shiaho777.logsleuth.app.ui.settings.SettingsScreen
@@ -39,6 +41,7 @@ object Routes {
     const val STREAM = "stream"
     const val SESSIONS = "sessions"
     const val SESSION_DETAIL = "session/{sessionId}"
+    const val REPORT = "report"
     const val CRASHES = "crashes"
     const val FILTERS = "filters"
     const val SETTINGS = "settings"
@@ -55,6 +58,7 @@ private data class TopLevelDestination(
 private val topLevelDestinations = listOf(
     TopLevelDestination(Routes.STREAM, R.string.nav_stream, Icons.Filled.Article),
     TopLevelDestination(Routes.SESSIONS, R.string.nav_sessions, Icons.Filled.History),
+    TopLevelDestination(Routes.REPORT, R.string.nav_report, Icons.Filled.Flag),
     TopLevelDestination(Routes.CRASHES, R.string.nav_crashes, Icons.Filled.BugReport),
     TopLevelDestination(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
 )
@@ -128,6 +132,12 @@ fun LogSleuthNavHost(
                 arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
             ) {
                 SessionDetailScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.REPORT) {
+                ReportScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenSessions = { navController.navigate(Routes.SESSIONS) },
+                )
             }
             composable(Routes.CRASHES) {
                 CrashesScreen(onBack = { navController.popBackStack() })

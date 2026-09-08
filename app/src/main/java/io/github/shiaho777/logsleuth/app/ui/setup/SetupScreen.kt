@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -60,11 +61,37 @@ fun SetupScreen(
             text = stringResource(R.string.setup_title),
             style = MaterialTheme.typography.headlineMedium,
         )
-        Text(
-            text = stringResource(R.string.setup_explainer),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // Dynamic "Next step" banner — tells the user exactly what to do right now.
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    text = stringResource(R.string.setup_next_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = when {
+                        state.granted -> stringResource(R.string.setup_next_done)
+                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.PERMISSION_REQUIRED ->
+                            stringResource(R.string.setup_next_grant_shizuku)
+                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.NOT_RUNNING ->
+                            stringResource(R.string.setup_next_start_shizuku)
+                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.NOT_INSTALLED ->
+                            stringResource(R.string.setup_next_install_shizuku)
+                        else -> stringResource(R.string.setup_next_adb)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
 
         // --- Shizuku path ---
         Card(modifier = Modifier.fillMaxWidth()) {

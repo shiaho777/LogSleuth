@@ -131,4 +131,43 @@
     <string name="import_logs">Import</string>
     <string name="import_success">Imported as a new session</string>
     <string name="import_failed">Could not import this file</string>
+
+    <!-- Report wizard -->
+    <string name="nav_report">Report</string>
+    <string name="report_step1_title">Which app is misbehaving?</string>
+    <string name="report_step1_hint">Pick the app you want to capture logs for.</string>
+    <string name="report_step2_title">Reproduce the problem</string>
+    <string name="report_step2_hint">Start recording, switch to the app, and do what triggers the problem. We\'ll keep capturing in the background.</string>
+    <string name="report_step3_title">Send the report</string>
+    <string name="report_step3_hint">Everything is captured. Share it with the developer — or keep it in Sessions.</string>
+    <string name="report_search_apps">Search apps…</string>
+    <string name="report_start_recording">Start recording</string>
+    <string name="report_stop_share">Stop &amp; share</string>
+    <string name="report_recording_active">Recording · %1$d lines</string>
+    <string name="report_crash_caught">Crash detected in %1$s — captured automatically</string>
+    <string name="report_keep">Keep in Sessions</string>
+    <string name="report_back">Back</string>
+    <string name="report_next">Next</string>
+    <string name="step_counter">Step %1$d of 3</string>
+
+    <!-- Recording done prompt -->
+    <string name="recording_saved">Recording saved</string>
+    <string name="recording_saved_lines">%1$d lines captured</string>
+    <string name="share_now">Share now</string>
+    <string name="later">Later</string>
+
+    <!-- Paused banner -->
+    <string name="paused_banner">Paused · %1$d new lines waiting</string>
+    <string name="paused_resume">Resume</string>
+
+    <!-- Crash share -->
+    <string name="crash_share">Share</string>
+
+    <!-- Setup next step -->
+    <string name="setup_next_title">Your next step</string>
+    <string name="setup_next_install_shizuku">Install Shizuku, start it once, then come back and grant access.</string>
+    <string name="setup_next_start_shizuku">Open Shizuku and start its service (Wireless debugging on Android 11+).</string>
+    <string name="setup_next_grant_shizuku">Tap "Grant permission" on the Shizuku card below.</string>
+    <string name="setup_next_adb">Or use a computer: copy the ADB command below and run it once, then tap re-check.</string>
+    <string name="setup_next_done">All set — taking you to the live stream…</string>
 </resources>
