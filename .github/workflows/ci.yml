@@ -1,40 +1,75 @@
+# CI is the merge gate for pull requests into main.
+# It does NOT close issues — issues close via "Fixes #N" on merged PRs only.
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Per ref + event: routine pushes to the same branch cancel their superseded
+  # runs; a workflow_dispatch run is never cancelled by a push landing mid-build.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 30
 
-      - name: Set up JDK 21
+    steps:
+      - name: Download code
+        uses: actions/checkout@v4
+
+      - name: Prepare Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
 
-      - name: Setup Android SDK
+      - name: Prepare Android tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: ""
 
-      - name: Gradle cache
+      - name: Install needed SDK components
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0"
+
+      - name: Prepare Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Fast-fail gate: bilingual strings must stay in parity before anything
+      # expensive runs. Local equivalent: python3 scripts/check_string_parity.py
+      - name: String parity gate (values vs values-zh-rCN)
+        run: python3 scripts/check_string_parity.py
+
       - name: Unit tests
-        run: ./gradlew test
+        run: ./gradlew test --no-daemon
 
       - name: Lint
-        run: ./gradlew lint
+        run: ./gradlew lint --no-daemon
 
-      - name: Assemble debug
-        run: ./gradlew assembleDebug
+      - name: Assemble debug (all modules)
+        run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      # Debug-signed — never distribute these artifacts; releases are cut
+      # from tags with the release workflow.
+      - name: Upload debug APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-debug-DEBUG-SIGNED-do-not-distribute-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            sample/build/outputs/apk/debug/sample-debug.apk
+          if-no-files-found: error
           retention-days: 14
