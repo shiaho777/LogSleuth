@@ -64,6 +64,33 @@ sdk/      logsleuth-sdk —— 可内嵌的零权限日志库
 sample/   演示 SDK 集成的示例 App
 ```
 
+## 架构
+
+```text
+LogcatSource(本机 READ_LOGS / Shizuku shell)
+  → LogcatEngine(唯一的 logcat 进程持有者,断线自动重连)
+      ├→ 实时日志流 UI(级别着色、过滤、搜索、暂停缓冲)
+      ├→ RecordingManager(前台服务 → 会话文件 + Room)
+      └→ CrashDetector(FATAL EXCEPTION / ANR → 事件 + 通知)
+
+logsleuth-sdk(内嵌在宿主 App——零权限、零网络):
+  Sleuth.init → 自进程日志捕获 + 崩溃接管 + ANR 看门狗
+              → 环形日志文件(带密钥脱敏)
+              → 一键 zip 分享(查看器可直接打开回放)
+```
+
+## 从源码构建
+
+需要 JDK 17+ 和 Android SDK platform 36。
+
+```bash
+git clone https://github.com/shiaho777/LogSleuth.git
+cd LogSleuth
+./gradlew assembleDebug          # app + sdk + sample
+./gradlew test                   # 单元测试
+python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
+```
+
 ## 构建
 
 要求:JDK 17+,Android SDK 35。

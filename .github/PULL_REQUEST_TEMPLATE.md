@@ -1,14 +1,18 @@
-## What & why
+## Summary
 
-<!-- Describe the change and link the issue, e.g. Fixes #123 -->
+<!-- What does this PR change, and why? Link the issue with Fixes #N / Closes #N. -->
 
-## How to test
+Fixes #
 
-<!-- Steps or `./gradlew` tasks to verify -->
+## Test plan
 
-## Checklist
+<!-- How you verified: commands run, screens checked, edge cases. -->
 
-- [ ] `./gradlew test` passes
-- [ ] `./gradlew lint` passes
-- [ ] Strings updated in both `values/` and `values-zh-rCN/`
-- [ ] README updated if behavior changed
+- [ ] `python3 scripts/check_string_parity.py`
+- [ ] `./gradlew test`
+- [ ] `./gradlew lint`
+- [ ] `./gradlew assembleDebug`
+
+## Notes for reviewers
+
+<!-- Anything non-obvious: trade-offs, follow-ups, screenshots. -->

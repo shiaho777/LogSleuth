@@ -5,6 +5,10 @@ On a mission to be the easiest and most delightful logging tool on Android.
 
 [简体中文](README.zh-CN.md)
 
+[![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 ## Screenshots
 
 | Live logcat stream | Filters & Presets | Crash & ANR detection |
@@ -71,6 +75,33 @@ The **embedded SDK mode needs nothing at all** — an app can always read its ow
 app/      The LogSleuth viewer app (Kotlin + Jetpack Compose, Material 3)
 sdk/      logsleuth-sdk — the embeddable, zero-permission logging library
 sample/   Demo app showing SDK integration
+```
+
+## Architecture
+
+```text
+LogcatSource (local READ_LOGS / Shizuku shell)
+  → LogcatEngine (single owner of the logcat process, auto-reconnect)
+      ├→ Stream UI (level colors, filters, search, pause/buffering)
+      ├→ RecordingManager (foreground service → session files + Room)
+      └→ CrashDetector (FATAL EXCEPTION / ANR → events + notifications)
+
+logsleuth-sdk (embedded in a host app — zero permissions, zero network):
+  Sleuth.init → own-process logcat capture + crash handler + ANR watchdog
+              → ring-buffered log files (with secret redaction)
+              → one-tap zip share (opens in the viewer for replay)
+```
+
+## Build from source
+
+Requires JDK 17+ and Android SDK platform 36.
+
+```bash
+git clone https://github.com/shiaho777/LogSleuth.git
+cd LogSleuth
+./gradlew assembleDebug          # app + sdk + sample
+./gradlew test                   # unit tests
+python3 scripts/check_string_parity.py   # bilingual string gate (runs in CI)
 ```
 
 ## Building
