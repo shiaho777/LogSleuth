@@ -166,6 +166,9 @@ class StreamViewModel @Inject constructor(
                     addedVisible++
                 }
             }
+            // Paused entries are bounded too: without this, pausing during a
+            // log storm grows `pending` without limit.
+            while (pending.size > bufferCap) pending.removeAt(0)
             trimLocked()
             if (!pausedNow && addedVisible > 0) publishLocked()
         }
@@ -233,9 +236,18 @@ class StreamViewModel @Inject constructor(
 
     fun toggleRecording() {
         val recording = _ui.value.recording.isRecording
+        val f = _ui.value.filter
         val intent = Intent(context, RecordService::class.java).apply {
             action = if (recording) RecordService.ACTION_STOP else RecordService.ACTION_START
-            if (!recording) putExtra(RecordService.EXTRA_FILTER_PACKAGE, _ui.value.filter.packageName)
+            if (!recording) {
+                // Record what the user currently sees, filters included.
+                putExtra(RecordService.EXTRA_FILTER_PACKAGE, f.packageName)
+                putExtra(RecordService.EXTRA_FILTER_LEVEL, f.minLevel.name)
+                putExtra(RecordService.EXTRA_FILTER_QUERY, f.query)
+                putExtra(RecordService.EXTRA_FILTER_TAG, f.tagQuery)
+                putExtra(RecordService.EXTRA_FILTER_EXCLUDE, f.excludeQuery)
+                putExtra(RecordService.EXTRA_FILTER_REGEX, f.useRegex)
+            }
         }
         if (recording) context.startService(intent)
         else androidx.core.content.ContextCompat.startForegroundService(context, intent)

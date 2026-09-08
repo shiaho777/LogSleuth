@@ -28,6 +28,11 @@ class RecordService : Service() {
         const val ACTION_STOP = "io.github.shiaho777.logsleuth.app.action.STOP_RECORDING"
         const val ACTION_BOOKMARK = "io.github.shiaho777.logsleuth.app.action.BOOKMARK"
         const val EXTRA_FILTER_PACKAGE = "extra_filter_package"
+        const val EXTRA_FILTER_LEVEL = "extra_filter_level"
+        const val EXTRA_FILTER_QUERY = "extra_filter_query"
+        const val EXTRA_FILTER_TAG = "extra_filter_tag"
+        const val EXTRA_FILTER_EXCLUDE = "extra_filter_exclude"
+        const val EXTRA_FILTER_REGEX = "extra_filter_regex"
     }
 
     @Inject lateinit var recordingManager: RecordingManager
@@ -40,14 +45,21 @@ class RecordService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val pkg = intent.getStringExtra(EXTRA_FILTER_PACKAGE)
+                // Tile/bubble/wizard pass only a package; the stream screen
+                // passes its full active filter so recordings match what the
+                // user currently sees.
+                val filter = LogFilter(
+                    packageName = intent.getStringExtra(EXTRA_FILTER_PACKAGE),
+                    minLevel = intent.getStringExtra(EXTRA_FILTER_LEVEL)
+                        ?.let { runCatching { io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.valueOf(it) }.getOrNull() }
+                        ?: io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.V,
+                    query = intent.getStringExtra(EXTRA_FILTER_QUERY).orEmpty(),
+                    tagQuery = intent.getStringExtra(EXTRA_FILTER_TAG).orEmpty(),
+                    excludeQuery = intent.getStringExtra(EXTRA_FILTER_EXCLUDE).orEmpty(),
+                    useRegex = intent.getBooleanExtra(EXTRA_FILTER_REGEX, false),
+                )
                 scope.launch {
-                    // The tile/bubble start without filter context: use the
-                    // package only; text filters are a stream-screen concern.
-                    recordingManager.start(
-                        name = null,
-                        filter = LogFilter(packageName = pkg),
-                    )
+                    recordingManager.start(name = null, filter = filter)
                     startForegroundWithNotification()
                     observeRecording()
                 }

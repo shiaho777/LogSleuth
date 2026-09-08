@@ -40,6 +40,11 @@ internal object LogSharer {
         }
         val chooser = Intent.createChooser(send, "Share logs")
         if (context !is android.app.Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(chooser)
+
+        // startActivity must be called from the main thread; the SDK's writer
+        // executor is a background thread. Hop over via the main looper.
+        val appContext = context.applicationContext
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        main.post { appContext.startActivity(chooser) }
     }
 }

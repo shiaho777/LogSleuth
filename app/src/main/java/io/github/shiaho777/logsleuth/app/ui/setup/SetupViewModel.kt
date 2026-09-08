@@ -47,9 +47,11 @@ class SetupViewModel @Inject constructor(
                 )
             }
         }
-        // Poll READ_LOGS: the grant arrives from adb while we may be showing this screen.
+        // Poll READ_LOGS: the grant arrives from adb while we may be showing
+        // this screen. Bounded to the ViewModel's lifetime so it stops when
+        // the setup screen is left for good.
         viewModelScope.launch {
-            while (true) {
+            repeat(150) { // ~5 min at 2s interval
                 refresh()
                 delay(2_000)
             }

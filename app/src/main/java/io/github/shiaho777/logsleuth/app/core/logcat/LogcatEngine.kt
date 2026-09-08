@@ -11,10 +11,12 @@ import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.NotificationHelper
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,6 +32,9 @@ import kotlinx.coroutines.sync.withLock
  * service) attach/detach; the process runs while at least one consumer is
  * attached. Entries fan out via [entries]; a ring [snapshot] gives late
  * consumers recent history.
+ *
+ * If the process dies (Shizuku restart, logd hiccup), the stream retries
+ * with exponential backoff while consumers remain attached.
  */
 @Singleton
 class LogcatEngine @Inject constructor(
@@ -69,12 +74,35 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var bufferCap = 20_000
 
+    @Volatile
+    private var crashNotifications = true
+
     private var streamJob: Job? = null
+    private var reconnectJob: Job? = null
     private var consumers = 0
+
+    /** Backoff for stream retries; reset after a successful (re)connection. */
+    @Volatile
+    private var backoffMs = 1_000L
 
     init {
         scope.launch {
-            settingsRepository.settings.collect { bufferCap = it.bufferSize }
+            settingsRepository.settings.collect {
+                bufferCap = it.bufferSize
+                crashNotifications = it.crashNotifications
+            }
+        }
+        // When Shizuku (re)connects or gets granted, pick it up live: refresh
+        // access and restart a dead stream immediately instead of waiting out
+        // the backoff timer.
+        scope.launch {
+            var lastGranted = _access.value.granted
+            shizukuManager.status.collect {
+                refreshAccess()
+                val granted = _access.value.granted
+                if (granted && !lastGranted) resetBackoffAndRestart()
+                lastGranted = granted
+            }
         }
     }
 
@@ -86,7 +114,7 @@ class LogcatEngine @Inject constructor(
     @Synchronized
     fun acquireClient() {
         consumers++
-        if (streamJob == null) startStreamLocked()
+        if (streamJob == null && reconnectJob == null) startStreamLocked()
     }
 
     @Synchronized
@@ -110,13 +138,10 @@ class LogcatEngine @Inject constructor(
     }
 
     private fun startStreamLocked() {
-        val accessState = _access.value
-        if (!accessState.granted) {
-            refreshAccess()
-            if (!_access.value.granted) {
-                _state.value = State.ERROR
-                return
-            }
+        refreshAccess()
+        if (!_access.value.granted) {
+            _state.value = State.ERROR
+            return
         }
 
         val source: LogcatSource = when (_access.value.kind) {
@@ -130,13 +155,23 @@ class LogcatEngine @Inject constructor(
             val crashDetector = CrashDetector()
             try {
                 source.stream().collect { line ->
-                    _state.compareAndSet(State.STARTING, State.RUNNING)
+                    if (_state.compareAndSet(State.STARTING, State.RUNNING)) {
+                        backoffMs = 1_000L
+                    }
                     for (entry in assembler.onLine(line)) {
                         dispatch(entry, crashDetector)
                     }
                 }
+                // Clean EOF (shouldn't normally happen for logcat) — treat as
+                // a lost process and retry.
+                if (consumers > 0) scheduleReconnect()
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
-                _state.value = State.ERROR
+                if (consumers > 0) {
+                    _state.value = State.ERROR
+                    scheduleReconnect()
+                }
             } finally {
                 assembler.flush()?.let { dispatch(it, crashDetector) }
                 crashDetector.flush()?.let { onCrash(it) }
@@ -145,10 +180,37 @@ class LogcatEngine @Inject constructor(
         }
     }
 
+    /** Retries the stream after [backoffMs]; single pending retry at a time. */
+    private fun scheduleReconnect() {
+        if (reconnectJob?.isActive == true) return
+        reconnectJob = scope.launch {
+            delay(backoffMs)
+            backoffMs = (backoffMs * 2).coerceAtMost(15_000L)
+            synchronized(this@LogcatEngine) {
+                reconnectJob = null
+                if (consumers > 0 && streamJob == null) {
+                    startStreamLocked()
+                }
+            }
+        }
+    }
+
+    /** Access just became available — retry immediately, no backoff wait. */
+    private fun resetBackoffAndRestart() {
+        synchronized(this@LogcatEngine) {
+            backoffMs = 1_000L
+            reconnectJob?.cancel()
+            reconnectJob = null
+            if (consumers > 0 && streamJob == null) startStreamLocked()
+        }
+    }
+
     @Synchronized
     private fun stopStream() {
         streamJob?.cancel()
         streamJob = null
+        reconnectJob?.cancel()
+        reconnectJob = null
         _state.value = State.STOPPED
     }
 
@@ -174,7 +236,9 @@ class LogcatEngine @Inject constructor(
                     snippet = signal.snippet,
                 ),
             )
-            notificationHelper.notifyCrash(signal)
+            if (crashNotifications) {
+                notificationHelper.notifyCrash(signal)
+            }
             _crashes.emit(signal)
         }
     }

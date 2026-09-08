@@ -31,6 +31,10 @@ data class RecordingState(
 /**
  * Writes the live stream to a session file. Controlled by [RecordService],
  * the quick-settings tile and the floating bubble.
+ *
+ * UI state ([state]) is published in batches (every [STATE_BATCH] lines) —
+ * at high log volume a per-line StateFlow write is pure waste; the exact
+ * final count is persisted on stop via [finalLines].
  */
 @Singleton
 class RecordingManager @Inject constructor(
@@ -42,6 +46,10 @@ class RecordingManager @Inject constructor(
 
     private val _state = MutableStateFlow(RecordingState())
     val state: StateFlow<RecordingState> = _state.asStateFlow()
+
+    /** Exact line count; the published [RecordingState.lineCount] may lag briefly. */
+    @Volatile
+    private var finalLines = 0L
 
     private var collectJob: Job? = null
     private var writer: BufferedWriter? = null
@@ -80,33 +88,38 @@ class RecordingManager @Inject constructor(
             engine.activeSessionId = sessionId
 
             // Include recent history so the session has context before start.
-            val snapshot = engine.snapshot()
+            val matched = engine.snapshot().filter(compiled::matches)
             writeMutex.withLock {
-                snapshot.filter(compiled::matches).forEach { w.appendLine(it.raw) }
+                matched.forEach { w.appendLine(it.raw) }
                 w.flush()
             }
 
-            var count = snapshot.count(compiled::matches).toLong()
-            collectJob = scope.launch {
-                engine.entries.collect { entry ->
-                    if (compiled.matches(entry)) {
-                        writeMutex.withLock {
-                            w.appendLine(entry.raw)
-                            count++
-                            if (count % 64 == 0L) w.flush()
-                        }
-                        _state.value = _state.value.copy(lineCount = count)
-                    }
-                }
-            }
-
-            engine.acquireClient()
+            var count = matched.size.toLong()
+            finalLines = count
             _state.value = RecordingState(
                 isRecording = true,
                 sessionId = sessionId,
                 lineCount = count,
                 startedAt = System.currentTimeMillis(),
             )
+
+            collectJob = scope.launch {
+                engine.entries.collect { entry ->
+                    if (compiled.matches(entry)) {
+                        writeMutex.withLock {
+                            w.appendLine(entry.raw)
+                            count++
+                            finalLines = count
+                            if (count % FLUSH_BATCH == 0L) w.flush()
+                        }
+                        if (count % STATE_BATCH == 0L) {
+                            _state.value = _state.value.copy(lineCount = count)
+                        }
+                    }
+                }
+            }
+
+            engine.acquireClient()
             sessionId
         }.onFailure {
             runCatching { writer?.close() }
@@ -136,7 +149,7 @@ class RecordingManager @Inject constructor(
             }
             writer = null
         }
-        s.sessionId?.let { sessionDao.finish(it, System.currentTimeMillis(), s.lineCount) }
+        s.sessionId?.let { sessionDao.finish(it, System.currentTimeMillis(), finalLines) }
         _state.value = RecordingState()
     }
 
@@ -150,5 +163,10 @@ class RecordingManager @Inject constructor(
         return runCatching {
             context.packageManager.getApplicationInfo(packageName, 0).uid
         }.getOrNull()
+    }
+
+    companion object {
+        private const val FLUSH_BATCH = 64L
+        private const val STATE_BATCH = 64L
     }
 }

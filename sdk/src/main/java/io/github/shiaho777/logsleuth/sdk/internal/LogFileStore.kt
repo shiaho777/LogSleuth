@@ -33,7 +33,18 @@ internal class LogFileStore(
 
     @Synchronized
     fun appendBlock(text: String) {
-        text.split('\n').forEach { append(it) }
+        // Keep line breaks: crash stack traces are unreadable on one line.
+        // Redaction is applied per-line via append().
+        text.split('\n').forEachIndexed { i, line ->
+            if (i > 0) appendRaw("\n")
+            if (line.isNotEmpty()) append(line)
+        }
+    }
+
+    private fun appendRaw(s: String) {
+        val bytes = s.toByteArray(Charsets.UTF_8)
+        currentFile?.appendBytes(bytes)
+        currentSize += bytes.size
     }
 
     private fun redact(line: String): String {
@@ -51,15 +62,11 @@ internal class LogFileStore(
             return existing
         }
 
-        val files = logFiles().sortedBy { it.name }
-        val index = if (files.isEmpty()) 0 else (files.last().indexOf() + 1) % config.maxFiles
+        val files = logFiles()
+        // Numeric index comparison — lexicographic would put log_10 before log_2
+        // and delete the wrong files once the ring wraps past 10 slots.
+        val index = if (files.isEmpty()) 0 else (files.maxOf { it.indexOf() } + 1) % config.maxFiles
         val file = File(dir, "log_%d.log".format(index))
-
-        // Overwrite semantics: keep only the newest (maxFiles) files.
-        val all = (files + file).distinct().sortedBy { it.name }
-        if (all.size > config.maxFiles) {
-            all.dropLast(config.maxFiles).forEach { it.delete() }
-        }
 
         file.writeText("")
         currentFile = file
@@ -72,7 +79,7 @@ internal class LogFileStore(
 
     fun logFiles(): List<File> =
         dir.listFiles { f -> f.name.startsWith("log_") && f.name.endsWith(".log") }
-            ?.toList()
+            ?.sortedBy { it.indexOf() }
             .orEmpty()
 
     fun crashFile(): File = File(dir, "last_crash.txt")

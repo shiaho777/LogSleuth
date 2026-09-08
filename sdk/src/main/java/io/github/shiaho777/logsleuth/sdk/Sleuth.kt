@@ -110,10 +110,11 @@ object Sleuth {
      */
     fun shareLogs(context: Context) {
         check(initialized) { "Call Sleuth.init() first" }
-        // Flush pending writes before zipping.
+        // submit+get: execute the zip build on the single writer thread so it
+        // happens strictly after all pending log writes have flushed.
         writer.submit {
             val zip = LogSharer.buildZip(context.applicationContext, store)
             LogSharer.share(context, zip)
-        }
+        }.get()
     }
 }
