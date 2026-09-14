@@ -45,17 +45,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
+import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScope
 import java.io.File
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionsScreen(
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onOpenSession: (Long) -> Unit,
     onBack: () -> Unit,
     viewModel: SessionsViewModel = hiltViewModel(),
@@ -115,6 +118,7 @@ fun SessionsScreen(
                     val session = sessions[i]
                     SessionCard(
                         session = session,
+                        animatedVisibilityScope = animatedVisibilityScope,
                         onOpen = { onOpenSession(session.id) },
                         onShare = { shareTarget = session },
                         onDelete = { viewModel.delete(session) },
@@ -149,14 +153,29 @@ fun SessionsScreen(
 @Composable
 private fun SessionCard(
     session: SessionEntity,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onOpen: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sharedScope = LocalSharedTransitionScope.current
     Card(
         onClick = onOpen,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (sharedScope != null) {
+                    with(sharedScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState("session-${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),

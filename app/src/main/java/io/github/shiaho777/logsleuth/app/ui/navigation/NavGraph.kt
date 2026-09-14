@@ -1,7 +1,11 @@
 package io.github.shiaho777.logsleuth.app.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
@@ -15,6 +19,8 @@ import androidx.compose.material3.ShortNavigationBar
 import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +71,9 @@ private val topLevelDestinations = listOf(
 
 private val topLevelRoutes = topLevelDestinations.map { it.route }.toSet()
 
+/** Shared-element scope from the [SharedTransitionLayout] wrapping the NavHost. */
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+
 @Composable
 fun LogSleuthNavHost(
     navController: NavHostController,
@@ -102,51 +111,68 @@ fun LogSleuthNavHost(
             }
         },
     ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(padding),
-            enterTransition = { fadeIn() },
-            exitTransition = { fadeOut() },
-            popEnterTransition = { fadeIn() },
-            popExitTransition = { fadeOut() },
-        ) {
-            composable(Routes.SETUP) {
-                SetupScreen(onDone = {
-                    navController.navigate(Routes.STREAM) {
-                        popUpTo(Routes.SETUP) { inclusive = true }
+        SharedTransitionLayout {
+            CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                NavHost(
+                    navController = navController,
+                    startDestination = startDestination,
+                    modifier = Modifier.padding(padding),
+                    enterTransition = {
+                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start) + fadeIn()
+                    },
+                    exitTransition = {
+                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start) + fadeOut()
+                    },
+                    popEnterTransition = {
+                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End) + fadeIn()
+                    },
+                    popExitTransition = {
+                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End) + fadeOut()
+                    },
+                ) {
+                    composable(Routes.SETUP) {
+                        SetupScreen(onDone = {
+                            navController.navigate(Routes.STREAM) {
+                                popUpTo(Routes.SETUP) { inclusive = true }
+                            }
+                        })
                     }
-                })
-            }
-            composable(Routes.STREAM) {
-                StreamScreen(onNavigate = { route -> navController.navigate(route) })
-            }
-            composable(Routes.SESSIONS) {
-                SessionsScreen(
-                    onOpenSession = { id -> navController.navigate(Routes.sessionDetail(id)) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                Routes.SESSION_DETAIL,
-                arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
-            ) {
-                SessionDetailScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.REPORT) {
-                ReportScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenSessions = { navController.navigate(Routes.SESSIONS) },
-                )
-            }
-            composable(Routes.CRASHES) {
-                CrashesScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.FILTERS) {
-                FiltersScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.SETTINGS) {
-                SettingsScreen(onBack = { navController.popBackStack() })
+                    composable(Routes.STREAM) {
+                        StreamScreen(onNavigate = { route -> navController.navigate(route) })
+                    }
+                    composable(Routes.SESSIONS) {
+                        SessionsScreen(
+                            animatedVisibilityScope = this,
+                            onOpenSession = { id -> navController.navigate(Routes.sessionDetail(id)) },
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(
+                        Routes.SESSION_DETAIL,
+                        arguments = listOf(navArgument("sessionId") { type = NavType.LongType }),
+                    ) { entry ->
+                        SessionDetailScreen(
+                            sessionId = entry.arguments?.getLong("sessionId") ?: -1L,
+                            animatedVisibilityScope = this,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
+                    composable(Routes.REPORT) {
+                        ReportScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenSessions = { navController.navigate(Routes.SESSIONS) },
+                        )
+                    }
+                    composable(Routes.CRASHES) {
+                        CrashesScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Routes.FILTERS) {
+                        FiltersScreen(onBack = { navController.popBackStack() })
+                    }
+                    composable(Routes.SETTINGS) {
+                        SettingsScreen(onBack = { navController.popBackStack() })
+                    }
+                }
             }
         }
     }

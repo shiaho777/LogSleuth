@@ -68,6 +68,7 @@ private val compactTimeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 @Composable
 fun LogRow(
     entry: LogcatEntry,
+    modifier: Modifier = Modifier,
     highlight: String? = null,
     isCurrentHit: Boolean = false,
 ) {
@@ -87,7 +88,7 @@ fun LogRow(
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(rowBg)
