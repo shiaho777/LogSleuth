@@ -37,6 +37,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setTheme(value)
     }
 
+    fun setLogTextScale(value: Int) = viewModelScope.launch {
+        settingsRepository.setLogTextScale(value)
+    }
+
     /** Toggles the floating bubble; returns false when the overlay permission
      * is still missing (caller should open the system settings page). */
     fun setBubbleEnabled(value: Boolean): Boolean {

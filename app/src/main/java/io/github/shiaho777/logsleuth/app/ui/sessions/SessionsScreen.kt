@@ -4,6 +4,7 @@ import android.text.format.DateUtils
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,11 +31,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,27 +51,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
+import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScope
 import java.io.File
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionsScreen(
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onOpenSession: (Long) -> Unit,
     onBack: () -> Unit,
     viewModel: SessionsViewModel = hiltViewModel(),
 ) {
     val sessions by viewModel.sessions.collectAsState()
+    val pendingDelete by viewModel.pendingDelete.collectAsState()
+    val shown = sessions.filter { it.id != pendingDelete?.id }
     var shareTarget by remember { mutableStateOf<SessionEntity?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     val importFailed = stringResource(R.string.import_failed)
+    val deletedMessage = stringResource(R.string.session_deleted)
+    val undoLabel = stringResource(R.string.undo)
+
+    LaunchedEffect(pendingDelete) {
+        if (pendingDelete == null) return@LaunchedEffect
+        val result = snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -100,7 +119,7 @@ fun SessionsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        if (sessions.isEmpty()) {
+        if (shown.isEmpty()) {
             EmptyState(
                 text = stringResource(R.string.sessions_empty),
                 modifier = Modifier.padding(padding),
@@ -111,15 +130,44 @@ fun SessionsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(sessions.size, key = { sessions[it].id }) { i ->
-                    val session = sessions[i]
-                    SessionCard(
-                        session = session,
-                        onOpen = { onOpenSession(session.id) },
-                        onShare = { shareTarget = session },
-                        onDelete = { viewModel.delete(session) },
-                        modifier = Modifier.animateItem(),
+                items(shown.size, key = { shown[it].id }) { i ->
+                    val session = shown[i]
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart },
                     )
+                    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                        LaunchedEffect(session.id) {
+                            viewModel.requestDelete(session)
+                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                        }
+                    }
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = 20.dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        SessionCard(
+                            session = session,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onOpen = { onOpenSession(session.id) },
+                            onShare = { shareTarget = session },
+                            onDelete = { viewModel.requestDelete(session) },
+                        )
+                    }
                 }
             }
         }
@@ -149,14 +197,29 @@ fun SessionsScreen(
 @Composable
 private fun SessionCard(
     session: SessionEntity,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onOpen: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sharedScope = LocalSharedTransitionScope.current
     Card(
         onClick = onOpen,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (sharedScope != null) {
+                    with(sharedScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState("session-${session.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope,
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),

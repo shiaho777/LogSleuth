@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.ui.crashes
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,11 +29,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,13 +66,26 @@ fun CrashesScreen(
     viewModel: CrashesViewModel = hiltViewModel(),
 ) {
     val crashes by viewModel.crashes.collectAsState()
+    val pendingDelete by viewModel.pendingDelete.collectAsState()
+    val shown = crashes.filter { it.id != pendingDelete?.id }
+    val snackbar = remember { SnackbarHostState() }
+
+    val deletedMessage = stringResource(R.string.crash_deleted)
+    val undoLabel = stringResource(R.string.undo)
+
+    LaunchedEffect(pendingDelete) {
+        if (pendingDelete == null) return@LaunchedEffect
+        val result = snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel)
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(title = { Text(stringResource(R.string.crashes_title)) })
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        if (crashes.isEmpty()) {
+        if (shown.isEmpty()) {
             EmptyState(
                 text = stringResource(R.string.crashes_empty),
                 modifier = Modifier.padding(padding),
@@ -75,13 +96,42 @@ fun CrashesScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(crashes.size, key = { crashes[it].id }) { i ->
-                    CrashCard(
-                        crash = crashes[i],
-                        onDelete = { viewModel.delete(crashes[i].id) },
-                        modifier = Modifier.animateItem(),
-                        onShare = { viewModel.share(it) },
+                items(shown.size, key = { shown[it].id }) { i ->
+                    val crash = shown[i]
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart },
                     )
+                    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                        LaunchedEffect(crash.id) {
+                            viewModel.requestDelete(crash)
+                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                        }
+                    }
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = 20.dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        CrashCard(
+                            crash = crash,
+                            onDelete = { viewModel.requestDelete(crash) },
+                            onShare = { viewModel.share(it) },
+                        )
+                    }
                 }
             }
         }

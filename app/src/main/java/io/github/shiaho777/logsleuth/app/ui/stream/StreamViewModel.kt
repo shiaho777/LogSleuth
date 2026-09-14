@@ -21,6 +21,7 @@ import io.github.shiaho777.logsleuth.app.service.RecordingManager
 import io.github.shiaho777.logsleuth.app.service.RecordingState
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -174,16 +175,15 @@ class StreamViewModel @Inject constructor(
         }
         if (pausedNow) {
             _ui.update { it.copy(pausedIncoming = it.pausedIncoming + batch.size) }
+        } else if (addedVisible > 0) {
+            // Keep hit indices fresh while the search bar is open — the stream
+            // keeps appending, so a one-shot scan goes stale within seconds.
+            val s = _ui.value
+            if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
         }
     }
 
-    private fun trimLocked() {
-        while (all.size > bufferCap) {
-            val removed = all.removeAt(0)
-            val idx = visible.indexOfFirst { it.seq == removed.seq }
-            if (idx >= 0) visible.removeAt(idx)
-        }
-    }
+    private fun trimLocked() = evictOverflow(all, visible, bufferCap)
 
     /** Call with [listMutex] held. */
     private fun publishLocked() {
@@ -270,20 +270,37 @@ class StreamViewModel @Inject constructor(
         _ui.update { it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1) }
     }
 
+    private var searchJob: Job? = null
+
     fun setSearchQuery(query: String) {
         _ui.update { it.copy(searchQuery = query) }
-        viewModelScope.launch(Dispatchers.Default) {
-            val hits = if (query.isBlank()) {
-                emptyList()
-            } else {
-                listMutex.withLock {
-                    visible.mapIndexedNotNull { index, uiEntry ->
-                        val e = uiEntry.entry
-                        if (e.tag.contains(query, true) || e.message.contains(query, true)) index else null
-                    }
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch(Dispatchers.Default) {
+            delay(250)
+            recomputeHits(query, resetIndex = true)
+        }
+    }
+
+    private suspend fun recomputeHits(query: String, resetIndex: Boolean = false) {
+        val hits = if (query.isBlank()) {
+            emptyList()
+        } else {
+            listMutex.withLock {
+                visible.mapIndexedNotNull { index, uiEntry ->
+                    val e = uiEntry.entry
+                    if (e.tag.contains(query, true) || e.message.contains(query, true)) index else null
                 }
             }
-            _ui.update { it.copy(searchHits = hits, searchHitIndex = if (hits.isEmpty()) -1 else 0) }
+        }
+        _ui.update {
+            it.copy(
+                searchHits = hits,
+                searchHitIndex = when {
+                    hits.isEmpty() -> -1
+                    resetIndex -> 0
+                    else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
+                },
+            )
         }
     }
 
@@ -375,4 +392,23 @@ class StreamViewModel @Inject constructor(
         useRegex = e.useRegex,
         packageName = e.packageName,
     )
+}
+
+/**
+ * Drops the oldest `all.size - cap` entries. `visible` is a seq-ordered
+ * subsequence of `all`, so evicted entries form a prefix of it — O(overflow)
+ * instead of a per-entry indexOfFirst scan.
+ */
+internal fun evictOverflow(
+    all: MutableList<UiLogEntry>,
+    visible: MutableList<UiLogEntry>,
+    cap: Int,
+) {
+    val overflow = all.size - cap
+    if (overflow <= 0) return
+    val lastEvictedSeq = all[overflow - 1].seq
+    repeat(overflow) { all.removeAt(0) }
+    var drop = 0
+    while (drop < visible.size && visible[drop].seq <= lastEvictedSeq) drop++
+    repeat(drop) { visible.removeAt(0) }
 }

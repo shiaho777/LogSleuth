@@ -83,6 +83,13 @@
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
+    <string name="settings_log_text_size">日志字号</string>
+    <string name="text_size_compact">紧凑</string>
+    <string name="text_size_default">默认</string>
+    <string name="text_size_comfortable">舒适</string>
+    <string name="undo">撤销</string>
+    <string name="session_deleted">会话已删除</string>
+    <string name="crash_deleted">崩溃事件已删除</string>
     <string name="settings_about">关于</string>
     <string name="settings_version">LogSleuth %1$s · 开源(Apache-2.0)</string>
 

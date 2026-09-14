@@ -1,10 +1,17 @@
 package io.github.shiaho777.logsleuth.app.ui.stream
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +70,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -138,8 +147,8 @@ fun StreamScreen(
         floatingActionButton = {
             AnimatedVisibility(
                 visible = !isAtBottom && ui.entries.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = scaleIn(),
+                exit = scaleOut(),
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -216,6 +225,7 @@ fun StreamScreen(
                         listState = listState,
                         searchQuery = ui.searchQuery,
                         currentHit = ui.searchHits.getOrNull(ui.searchHitIndex),
+                        snackbar = snackbar,
                     )
                 }
 
@@ -293,6 +303,16 @@ private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Mod
         LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to Color(0xFF8E8E93)
         LogcatEngine.State.ERROR -> stringResource(R.string.engine_error) to Color(0xFFFF453A)
     }
+    val dotAlpha by if (state == LogcatEngine.State.STARTING) {
+        rememberInfiniteTransition(label = "engine").animateFloat(
+            initialValue = 0.3f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+            label = "engineDot",
+        )
+    } else {
+        remember { mutableStateOf(1f) }
+    }
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
         shape = MaterialTheme.shapes.small,
@@ -307,7 +327,7 @@ private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Mod
                 Modifier
                     .size(7.dp)
                     .clip(CircleShape)
-                    .background(color),
+                    .background(color.copy(alpha = dotAlpha)),
             )
             Spacer(Modifier.size(5.dp))
             Text(label, style = MaterialTheme.typography.labelSmall)
@@ -395,6 +415,8 @@ private fun SearchTopBar(
     onNext: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     TopAppBar(
         title = {
             TextField(
@@ -402,7 +424,7 @@ private fun SearchTopBar(
                 onValueChange = onQueryChange,
                 placeholder = { Text(stringResource(R.string.search_hint)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
         },
         actions = {
@@ -430,6 +452,7 @@ private fun LogList(
     listState: LazyListState,
     searchQuery: String,
     currentHit: Int?,
+    snackbar: SnackbarHostState,
 ) {
     LazyColumn(
         state = listState,
@@ -445,6 +468,7 @@ private fun LogList(
                 entry = uiEntry.entry,
                 highlight = searchQuery.takeIf { it.isNotBlank() },
                 isCurrentHit = currentHit == index,
+                snackbar = snackbar,
             )
         }
     }

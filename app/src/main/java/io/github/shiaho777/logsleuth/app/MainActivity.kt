@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.ui.navigation.LogSleuthNavHost
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
+import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
 import io.github.shiaho777.logsleuth.app.ui.theme.LogSleuthTheme
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -58,13 +60,20 @@ class MainActivity : ComponentActivity() {
             }
 
             LogSleuthTheme(themeSetting = settings?.theme ?: "system") {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    val start = when {
-                        settings?.setupCompleted != true -> Routes.SETUP
-                        intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
-                        else -> Routes.STREAM
+                val logScale = when (settings?.logTextScale ?: 1) {
+                    0 -> 0.85f
+                    2 -> 1.15f
+                    else -> 1f
+                }
+                CompositionLocalProvider(LocalLogTextScale provides logScale) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        val start = when {
+                            settings?.setupCompleted != true -> Routes.SETUP
+                            intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
+                            else -> Routes.STREAM
+                        }
+                        LogSleuthNavHost(navController = navController, startDestination = start)
                     }
-                    LogSleuthNavHost(navController = navController, startDestination = start)
                 }
             }
         }
