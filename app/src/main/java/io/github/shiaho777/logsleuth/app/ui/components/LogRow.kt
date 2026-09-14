@@ -22,11 +22,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +52,9 @@ import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
+import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,20 +68,28 @@ fun levelColor(level: LogLevel): Color = when (level) {
     LogLevel.F -> LevelColors.F
 }
 
-private val compactTimeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
-
 @Composable
 fun LogRow(
     entry: LogcatEntry,
     modifier: Modifier = Modifier,
     highlight: String? = null,
     isCurrentHit: Boolean = false,
+    snackbar: SnackbarHostState? = null,
 ) {
     var showDetail by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val copiedMessage = stringResource(R.string.copied)
+
+    val scale = LocalLogTextScale.current
+    val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
+    val timeText = remember(entry.timestampMillis) {
+        timeFormat.format(Date(entry.timestampMillis))
+    }
+    val tagText = remember(entry.tag, highlight) { highlighted(entry.tag, highlight) }
+    val messageText = remember(entry.message, highlight) { highlighted(entry.message, highlight) }
 
     val levelTint = levelColor(entry.level)
     val isError = entry.level.priority >= LogLevel.E.priority
@@ -97,7 +110,7 @@ fun LogRow(
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     clipboard.setText(AnnotatedString(entry.raw))
-                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                    notifyCopied(snackbar, scope, context, copiedMessage)
                 },
             )
             .padding(vertical = 2.dp),
@@ -116,19 +129,19 @@ fun LogRow(
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = compactTimeFormat.format(Date(entry.timestampMillis)),
-                    style = LogMetaStyle,
+                    text = timeText,
+                    style = logMetaStyle(scale),
                     color = MaterialTheme.colorScheme.outline,
                 )
                 Text(
                     text = "  ${entry.pid}-${entry.tid}  ",
-                    style = LogMetaStyle,
+                    style = logMetaStyle(scale),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
                 )
                 if (entry.tag.isNotEmpty()) {
                     Text(
-                        text = highlighted(entry.tag, highlight),
-                        style = LogMetaStyle,
+                        text = tagText,
+                        style = logMetaStyle(scale),
                         color = levelTint.copy(alpha = 0.95f),
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -137,8 +150,8 @@ fun LogRow(
                 }
             }
             Text(
-                text = highlighted(entry.message, highlight),
-                style = LogMessageStyle,
+                text = messageText,
+                style = logMessageStyle(scale),
                 color = if (isError) {
                     MaterialTheme.colorScheme.onErrorContainer
                 } else {
@@ -149,15 +162,30 @@ fun LogRow(
     }
 
     if (showDetail) {
-        EntryDetailSheet(entry = entry, onDismiss = { showDetail = false })
+        EntryDetailSheet(entry = entry, snackbar = snackbar, onDismiss = { showDetail = false })
     }
+}
+
+private fun notifyCopied(
+    snackbar: SnackbarHostState?,
+    scope: CoroutineScope,
+    context: android.content.Context,
+    message: String,
+) {
+    if (snackbar != null) scope.launch { snackbar.showSnackbar(message) }
+    else Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EntryDetailSheet(entry: LogcatEntry, onDismiss: () -> Unit) {
+private fun EntryDetailSheet(
+    entry: LogcatEntry,
+    snackbar: SnackbarHostState?,
+    onDismiss: () -> Unit,
+) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val copiedMessage = stringResource(R.string.copied)
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -196,8 +224,8 @@ private fun EntryDetailSheet(entry: LogcatEntry, onDismiss: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     clipboard.setText(AnnotatedString(entry.message))
-                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     onDismiss()
+                    notifyCopied(snackbar, scope, context, copiedMessage)
                 }) {
                     Icon(
                         Icons.Default.ContentCopy,
@@ -209,8 +237,8 @@ private fun EntryDetailSheet(entry: LogcatEntry, onDismiss: () -> Unit) {
                 }
                 OutlinedButton(onClick = {
                     clipboard.setText(AnnotatedString(entry.raw))
-                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                     onDismiss()
+                    notifyCopied(snackbar, scope, context, copiedMessage)
                 }) {
                     Icon(
                         Icons.Default.ContentCopy,
@@ -225,19 +253,19 @@ private fun EntryDetailSheet(entry: LogcatEntry, onDismiss: () -> Unit) {
     }
 }
 
-private val LogMetaStyle
-    @Composable get() = MaterialTheme.typography.bodySmall.copy(
-        fontFamily = FontFamily.Monospace,
-        fontSize = 10.5.sp,
-        lineHeight = 13.sp,
-    )
+@Composable
+private fun logMetaStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
+    fontFamily = FontFamily.Monospace,
+    fontSize = 10.5.sp * scale,
+    lineHeight = 13.sp * scale,
+)
 
-private val LogMessageStyle
-    @Composable get() = MaterialTheme.typography.bodySmall.copy(
-        fontFamily = FontFamily.Monospace,
-        fontSize = 11.5.sp,
-        lineHeight = 15.sp,
-    )
+@Composable
+private fun logMessageStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
+    fontFamily = FontFamily.Monospace,
+    fontSize = 11.5.sp * scale,
+    lineHeight = 15.sp * scale,
+)
 
 @Composable
 fun LevelBadge(level: LogLevel) {

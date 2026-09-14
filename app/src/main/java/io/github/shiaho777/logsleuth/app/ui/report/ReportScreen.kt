@@ -28,6 +28,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -155,22 +158,19 @@ private fun androidx.compose.foundation.layout.ColumnScope.StepPickApp(
         items(filtered.size, key = { filtered[it].packageName }) { i ->
             val app = filtered[i]
             val selected = app.packageName == ui.selectedApp?.packageName
-            Surface(
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surface
+            ListItem(
+                headlineContent = {
+                    Text(app.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
                 },
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 2.dp)
-                    .clickable { onSelect(app) },
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                ) {
+                supportingContent = {
+                    Text(
+                        app.packageName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                },
+                leadingContent = {
                     Icon(
                         if (selected) Icons.Default.CheckCircle else Icons.Default.Apps,
                         contentDescription = null,
@@ -181,18 +181,21 @@ private fun androidx.compose.foundation.layout.ColumnScope.StepPickApp(
                         },
                         modifier = Modifier.size(22.dp),
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(app.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-                        Text(
-                            app.packageName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
+                },
+                colors = ListItemDefaults.colors(
+                    containerColor = if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    },
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable { onSelect(app) }
+                    .animateItem(),
+            )
         }
     }
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.End) {

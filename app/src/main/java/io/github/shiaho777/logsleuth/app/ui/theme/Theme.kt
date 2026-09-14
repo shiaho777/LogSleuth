@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -23,6 +24,9 @@ private val DarkColors = darkColorScheme(
     secondary = Color(0xFFB0CCC8),
     tertiary = Color(0xFFB0C9E8),
 )
+
+/** Multiplier applied to log row text sizes (compact 0.85 / default 1 / comfortable 1.15). */
+val LocalLogTextScale = compositionLocalOf { 1f }
 
 /** Level colors shared across light/dark themes. */
 object LevelColors {

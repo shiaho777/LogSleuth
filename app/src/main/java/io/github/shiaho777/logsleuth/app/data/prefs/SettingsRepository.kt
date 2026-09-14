@@ -18,6 +18,8 @@ data class Settings(
     val bubbleEnabled: Boolean = false,
     /** "system" | "light" | "dark" */
     val theme: String = "system",
+    /** Log row text scale preset: 0 compact, 1 default, 2 comfortable. */
+    val logTextScale: Int = 1,
     /** Show the setup wizard until the user has granted some access once. */
     val setupCompleted: Boolean = false,
 )
@@ -29,6 +31,7 @@ class SettingsRepository(private val context: Context) {
         val CRASH_NOTIFICATIONS = booleanPreferencesKey("crash_notifications")
         val BUBBLE_ENABLED = booleanPreferencesKey("bubble_enabled")
         val THEME = stringPreferencesKey("theme")
+        val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
     }
 
@@ -38,6 +41,7 @@ class SettingsRepository(private val context: Context) {
             crashNotifications = p[Keys.CRASH_NOTIFICATIONS] ?: true,
             bubbleEnabled = p[Keys.BUBBLE_ENABLED] ?: false,
             theme = p[Keys.THEME] ?: "system",
+            logTextScale = p[Keys.LOG_TEXT_SCALE] ?: 1,
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
         )
     }
@@ -53,6 +57,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setTheme(value: String) =
         context.dataStore.edit { it[Keys.THEME] = value }
+
+    suspend fun setLogTextScale(value: Int) =
+        context.dataStore.edit { it[Keys.LOG_TEXT_SCALE] = value.coerceIn(0, 2) }
 
     suspend fun setSetupCompleted(value: Boolean) =
         context.dataStore.edit { it[Keys.SETUP_COMPLETED] = value }

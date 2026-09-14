@@ -1,5 +1,12 @@
 package io.github.shiaho777.logsleuth.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -23,6 +29,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
@@ -97,14 +105,23 @@ fun FilterBar(
                     }
                 }
                 IconButton(onClick = { expanded = !expanded }) {
+                    val chevron by animateFloatAsState(
+                        targetValue = if (expanded) 180f else 0f,
+                        label = "chevron",
+                    )
                     Icon(
-                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        Icons.Default.ExpandMore,
                         contentDescription = null,
+                        modifier = Modifier.rotate(chevron),
                     )
                 }
             }
 
-            if (expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterTextField(
                         value = filter.query,
@@ -273,30 +290,44 @@ private fun AppPickerDialog(
                 )
                 LazyColumn(Modifier.heightIn(max = 360.dp)) {
                     item {
-                        TextButton(onClick = { onSelect(null) }) {
-                            Text(
-                                stringResource(R.string.app_filter_all),
-                                color = if (current == null) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        }
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    stringResource(R.string.app_filter_all),
+                                    color = if (current == null) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                            },
+                            modifier = Modifier.clickable { onSelect(null) },
+                        )
                     }
                     items(shown.size) { i ->
                         val app = shown[i]
-                        TextButton(onClick = { onSelect(app.packageName) }) {
-                            Text(
-                                "${app.label}  ·  ${app.packageName}",
-                                color = if (current == app.packageName) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    app.label,
+                                    maxLines = 1,
+                                    color = if (current == app.packageName) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    app.packageName,
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            modifier = Modifier.clickable { onSelect(app.packageName) },
+                        )
                     }
                 }
             }

@@ -11,11 +11,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -101,22 +103,40 @@ fun SettingsScreen(
                         stringResource(R.string.settings_theme),
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = s.theme == "system",
-                            onClick = { viewModel.setTheme("system") },
-                            label = { Text(stringResource(R.string.theme_system)) },
-                        )
-                        FilterChip(
-                            selected = s.theme == "light",
-                            onClick = { viewModel.setTheme("light") },
-                            label = { Text(stringResource(R.string.theme_light)) },
-                        )
-                        FilterChip(
-                            selected = s.theme == "dark",
-                            onClick = { viewModel.setTheme("dark") },
-                            label = { Text(stringResource(R.string.theme_dark)) },
-                        )
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(
+                            "system" to R.string.theme_system,
+                            "light" to R.string.theme_light,
+                            "dark" to R.string.theme_dark,
+                        ).forEachIndexed { index, (value, labelRes) ->
+                            SegmentedButton(
+                                selected = s.theme == value,
+                                onClick = { viewModel.setTheme(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
+                            ) { Text(stringResource(labelRes)) }
+                        }
+                    }
+                }
+            }
+
+            Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_log_text_size),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(
+                            0 to R.string.text_size_compact,
+                            1 to R.string.text_size_default,
+                            2 to R.string.text_size_comfortable,
+                        ).forEachIndexed { index, (value, labelRes) ->
+                            SegmentedButton(
+                                selected = s.logTextScale == value,
+                                onClick = { viewModel.setLogTextScale(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
+                            ) { Text(stringResource(labelRes)) }
+                        }
                     }
                 }
             }
