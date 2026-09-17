@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -289,7 +290,7 @@ private fun AppPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 LazyColumn(Modifier.heightIn(max = 360.dp)) {
-                    item {
+                    item(key = "all") {
                         ListItem(
                             headlineContent = {
                                 Text(
@@ -301,17 +302,27 @@ private fun AppPickerDialog(
                                     },
                                 )
                             },
+                            trailingContent = {
+                                if (current == null) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
                             modifier = Modifier.clickable { onSelect(null) },
                         )
                     }
-                    items(shown.size) { i ->
+                    items(shown.size, key = { shown[it].packageName }) { i ->
                         val app = shown[i]
+                        val selected = current == app.packageName
                         ListItem(
                             headlineContent = {
                                 Text(
                                     app.label,
                                     maxLines = 1,
-                                    color = if (current == app.packageName) {
+                                    color = if (selected) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
                                         MaterialTheme.colorScheme.onSurface
@@ -326,7 +337,18 @@ private fun AppPickerDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
-                            modifier = Modifier.clickable { onSelect(app.packageName) },
+                            trailingContent = {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                            modifier = Modifier
+                                .clickable { onSelect(app.packageName) }
+                                .animateItem(),
                         )
                     }
                 }

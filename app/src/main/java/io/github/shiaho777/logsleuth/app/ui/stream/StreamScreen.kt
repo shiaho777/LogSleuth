@@ -85,6 +85,7 @@ import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
+import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -298,10 +299,10 @@ private fun RecordingBanner(lineCount: Long, onStop: () -> Unit) {
 @Composable
 private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Modifier) {
     val (label, color) = when (state) {
-        LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to Color(0xFF30D158)
-        LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to Color(0xFFFF9F0A)
-        LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to Color(0xFF8E8E93)
-        LogcatEngine.State.ERROR -> stringResource(R.string.engine_error) to Color(0xFFFF453A)
+        LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to LevelColors.I
+        LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to LevelColors.W
+        LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to LevelColors.V
+        LogcatEngine.State.ERROR -> stringResource(R.string.engine_error) to LevelColors.E
     }
     val dotAlpha by if (state == LogcatEngine.State.STARTING) {
         rememberInfiniteTransition(label = "engine").animateFloat(
@@ -469,6 +470,7 @@ private fun LogList(
                 highlight = searchQuery.takeIf { it.isNotBlank() },
                 isCurrentHit = currentHit == index,
                 snackbar = snackbar,
+                modifier = Modifier.animateItem(),
             )
         }
     }
