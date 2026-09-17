@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -88,11 +89,16 @@ fun LogRow(
     val timeText = remember(entry.timestampMillis) {
         timeFormat.format(Date(entry.timestampMillis))
     }
-    val tagText = remember(entry.tag, highlight) { highlighted(entry.tag, highlight) }
-    val messageText = remember(entry.message, highlight) { highlighted(entry.message, highlight) }
-
     val levelTint = levelColor(entry.level)
     val isError = entry.level.priority >= LogLevel.E.priority
+
+    val highlightStyle = highlightStyle(isError)
+    val tagText = remember(entry.tag, highlight, highlightStyle) {
+        highlighted(entry.tag, highlight, highlightStyle)
+    }
+    val messageText = remember(entry.message, highlight, highlightStyle) {
+        highlighted(entry.message, highlight, highlightStyle)
+    }
 
     val rowBg = when {
         isCurrentHit -> MaterialTheme.colorScheme.tertiaryContainer
@@ -148,6 +154,14 @@ fun LogRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = stringResource(R.string.entry_detail),
+                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(13.dp),
+                )
             }
             Text(
                 text = messageText,
@@ -285,7 +299,17 @@ fun LevelBadge(level: LogLevel) {
     }
 }
 
-private fun highlighted(text: String, query: String?): AnnotatedString {
+/** Search-hit highlight derived from the theme's tertiary container pair, so
+ *  it stays legible on both the plain surface and error-tinted rows, in light
+ *  and dark. */
+@Composable
+private fun highlightStyle(isError: Boolean) = SpanStyle(
+    background = MaterialTheme.colorScheme.tertiary.copy(
+        alpha = if (isError) 0.5f else 0.35f,
+    ),
+)
+
+private fun highlighted(text: String, query: String?, style: SpanStyle): AnnotatedString {
     if (query.isNullOrBlank()) return AnnotatedString(text)
     return buildAnnotatedString {
         var start = 0
@@ -298,7 +322,7 @@ private fun highlighted(text: String, query: String?): AnnotatedString {
                 break
             }
             append(text.substring(start, idx))
-            withStyle(SpanStyle(background = Color(0x66FFD54F))) {
+            withStyle(style) {
                 append(text.substring(idx, idx + q.length))
             }
             start = idx + q.length

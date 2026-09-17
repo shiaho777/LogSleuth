@@ -55,7 +55,10 @@ fun FiltersScreen(
                 title = { Text(stringResource(R.string.filters_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.report_back),
+                        )
                     }
                 },
             )
@@ -64,7 +67,9 @@ fun FiltersScreen(
             FloatingActionButton(onClick = {
                 editing = null
                 showEditor = true
-            }) { Icon(Icons.Default.Add, contentDescription = null) }
+            }) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.filter_add))
+            }
         },
     ) { padding ->
         if (presets.isEmpty()) {
@@ -82,7 +87,7 @@ fun FiltersScreen(
                     val preset = presets[i]
                     Card(
                         onClick = { editing = preset; showEditor = true },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().animateItem(),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(12.dp),
