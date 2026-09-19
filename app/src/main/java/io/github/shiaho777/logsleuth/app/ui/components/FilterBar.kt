@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -191,13 +192,29 @@ private fun LevelDropdown(current: LogLevel, onSelect: (LogLevel) -> Unit) {
         FilterChip(
             selected = current != LogLevel.V,
             onClick = { open = true },
-            label = { Text("≥ ${current.letter}") },
+            leadingIcon = { LevelBadge(current) },
+            label = { Text("≥ ${levelName(current)}", maxLines = 1) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
-        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        ExposedDropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            matchAnchorWidth = false,
+            modifier = Modifier.widthIn(min = 200.dp),
+        ) {
             LogLevel.entries.forEach { level ->
                 DropdownMenuItem(
-                    text = { Text("${level.letter} — ${levelName(level)}") },
+                    text = { Text(levelName(level), maxLines = 1) },
+                    leadingIcon = { LevelBadge(level) },
+                    trailingIcon = {
+                        if (level == current) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
                     onClick = {
                         onSelect(level)
                         open = false
