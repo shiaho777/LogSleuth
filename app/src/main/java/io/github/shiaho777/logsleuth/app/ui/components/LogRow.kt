@@ -75,7 +75,10 @@ fun LogRow(
     modifier: Modifier = Modifier,
     highlight: String? = null,
     isCurrentHit: Boolean = false,
+    isSelected: Boolean = false,
     snackbar: SnackbarHostState? = null,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     var showDetail by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -101,6 +104,7 @@ fun LogRow(
     }
 
     val rowBg = when {
+        isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
         isCurrentHit -> MaterialTheme.colorScheme.tertiaryContainer
         isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
         else -> Color.Transparent
@@ -112,11 +116,15 @@ fun LogRow(
             .clip(RoundedCornerShape(6.dp))
             .background(rowBg)
             .combinedClickable(
-                onClick = { showDetail = true },
+                onClick = { if (onClick != null) onClick() else showDetail = true },
                 onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    clipboard.setText(AnnotatedString(entry.raw))
-                    notifyCopied(snackbar, scope, context, copiedMessage)
+                    if (onLongClick != null) {
+                        onLongClick()
+                    } else {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        clipboard.setText(AnnotatedString(entry.raw))
+                        notifyCopied(snackbar, scope, context, copiedMessage)
+                    }
                 },
             )
             .padding(vertical = 2.dp),
