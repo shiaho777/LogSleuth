@@ -133,6 +133,7 @@
     <string name="copy_message">Copy message</string>
     <string name="copy_raw">Copy raw line</string>
     <string name="copied">Copied</string>
+    <string name="selected_count">%1$d selected</string>
 
     <!-- Import -->
     <string name="import_logs">Import</string>

@@ -13,6 +13,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -66,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,8 +79,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
@@ -108,11 +115,26 @@ fun StreamScreen(
         }
     }
 
+    // Range selection (long-press + drag): seq bounds of the selected span.
+    var selAnchor by remember { mutableStateOf(-1L) }
+    var selEnd by remember { mutableStateOf(-1L) }
+    val selecting = selAnchor >= 0L
+    val selLo = minOf(selAnchor, selEnd)
+    val selHi = maxOf(selAnchor, selEnd)
+    val clipboard = LocalClipboardManager.current
+    val copiedMsg = stringResource(R.string.copied)
+
     // Follow the tail only while the user is at the bottom.
     LaunchedEffect(ui.entries.size) {
-        if (isAtBottom && ui.entries.isNotEmpty() && !ui.paused) {
+        if (isAtBottom && ui.entries.isNotEmpty() && !ui.paused && !selecting) {
             listState.scrollToItem(ui.entries.lastIndex)
         }
+    }
+
+    // Back first dismisses an active selection.
+    BackHandler(enabled = selecting) {
+        selAnchor = -1L
+        selEnd = -1L
     }
 
     Scaffold(
@@ -147,7 +169,7 @@ fun StreamScreen(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = !isAtBottom && ui.entries.isNotEmpty(),
+                visible = !isAtBottom && ui.entries.isNotEmpty() && !selecting,
                 enter = scaleIn(),
                 exit = scaleOut(),
             ) {
@@ -227,6 +249,10 @@ fun StreamScreen(
                         searchQuery = ui.searchQuery,
                         currentHit = ui.searchHits.getOrNull(ui.searchHitIndex),
                         snackbar = snackbar,
+                        selAnchor = selAnchor,
+                        selEnd = selEnd,
+                        onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
+                        onSelectExtend = { seq -> selEnd = seq },
                     )
                 }
 
@@ -236,6 +262,29 @@ fun StreamScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
+                )
+
+                SelectionBar(
+                    visible = selecting,
+                    count = ui.entries.count { it.seq in selLo..selHi },
+                    onCopy = {
+                        val text = ui.entries
+                            .filter { it.seq in selLo..selHi }
+                            .joinToString("\n") { it.entry.raw }
+                        selAnchor = -1L
+                        selEnd = -1L
+                        if (text.isNotEmpty()) {
+                            clipboard.setText(AnnotatedString(text))
+                            scope.launch { snackbar.showSnackbar(copiedMsg) }
+                        }
+                    },
+                    onClear = {
+                        selAnchor = -1L
+                        selEnd = -1L
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
                 )
             }
         }
@@ -454,11 +503,30 @@ private fun LogList(
     searchQuery: String,
     currentHit: Int?,
     snackbar: SnackbarHostState,
+    selAnchor: Long,
+    selEnd: Long,
+    onSelectStart: (Long) -> Unit,
+    onSelectExtend: (Long) -> Unit,
 ) {
+    val currentEntries by rememberUpdatedState(ui.entries)
+    // Read through State: pointerInput keeps the first lambda instance, so
+    // selection state must be dereferenced fresh, not captured by value.
+    val selectingState by rememberUpdatedState(selAnchor >= 0L)
+    val haptic = LocalHapticFeedback.current
+    val lo = minOf(selAnchor, selEnd)
+    val hi = maxOf(selAnchor, selEnd)
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .logDragSelect(
+                listState = listState,
+                isSelecting = { selectingState },
+                seqAt = { currentEntries.getOrNull(it)?.seq },
+                onSelectExtend = onSelectExtend,
+            ),
+        // No inter-item spacing: gaps between rows are dead zones for the
+        // long-press that starts a selection — every Y must land on a row.
     ) {
         items(
             count = ui.entries.size,
@@ -469,9 +537,68 @@ private fun LogList(
                 entry = uiEntry.entry,
                 highlight = searchQuery.takeIf { it.isNotBlank() },
                 isCurrentHit = currentHit == index,
+                isSelected = uiEntry.seq in lo..hi,
                 snackbar = snackbar,
+                onClick = if (selAnchor >= 0L) {
+                    { onSelectExtend(uiEntry.seq) }
+                } else {
+                    null
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onSelectStart(uiEntry.seq)
+                },
                 modifier = Modifier.animateItem(),
             )
+        }
+    }
+}
+
+/** Floating action bar shown while a range selection is active. */
+@Composable
+private fun SelectionBar(
+    visible: Boolean,
+    count: Int,
+    onCopy: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = slideInVertically { it / 2 } + fadeIn(),
+        exit = slideOutVertically { it / 2 } + fadeOut(),
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 18.dp, end = 4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.selected_count, count),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Spacer(Modifier.size(8.dp))
+                TextButton(onClick = onCopy) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(stringResource(R.string.copy))
+                }
+                IconButton(onClick = onClear) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.close),
+                    )
+                }
+            }
         }
     }
 }

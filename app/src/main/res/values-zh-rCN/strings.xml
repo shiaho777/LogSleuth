@@ -133,6 +133,7 @@
     <string name="copy_message">复制消息</string>
     <string name="copy_raw">复制原始行</string>
     <string name="copied">已复制</string>
+    <string name="selected_count">已选 %1$d 行</string>
 
     <!-- 导入 -->
     <string name="import_logs">导入</string>
