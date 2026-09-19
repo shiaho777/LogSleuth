@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.service
 
 import android.annotation.SuppressLint
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
@@ -12,6 +13,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +30,10 @@ import kotlinx.coroutines.launch
 class BubbleService : Service() {
 
     @Inject lateinit var recordingManager: RecordingManager
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocales.wrap(newBase))
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var windowManager: WindowManager? = null

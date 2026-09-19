@@ -5,6 +5,18 @@
 
 [English](README.md)
 
+[![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+## 截图
+
+| 实时日志流 | 过滤与预设 | 崩溃 / ANR 侦测 |
+| :---: | :---: | :---: |
+| ![实时日志流](docs/screenshots/01-live-stream.png) | ![过滤](docs/screenshots/02-filters.png) | ![崩溃侦测](docs/screenshots/03-crashes.png) |
+| **录制会话** | **会话回放** | **内嵌 SDK 示例** |
+| ![录制](docs/screenshots/04-sessions.png) | ![回放](docs/screenshots/05-session-replay.png) | ![SDK 示例](docs/screenshots/06-sdk-sample.png) |
+
 ## LogSleuth 是什么?
 
 LogSleuth 是一个开源(Apache-2.0)的安卓日志工具,包含两种模式:
@@ -89,16 +101,6 @@ cd LogSleuth
 ./gradlew assembleDebug          # app + sdk + sample
 ./gradlew test                   # 单元测试
 python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
-```
-
-## 构建
-
-要求:JDK 17+,Android SDK 35。
-
-```bash
-./gradlew assembleDebug        # 构建 App
-./gradlew :sdk:assemble        # 构建 SDK AAR
-./gradlew test                 # 单元测试
 ```
 
 ## 下载

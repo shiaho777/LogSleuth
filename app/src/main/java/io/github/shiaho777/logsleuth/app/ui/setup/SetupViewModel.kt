@@ -11,12 +11,15 @@ import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessChecker
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus
+import io.github.shiaho777.logsleuth.app.data.prefs.Settings
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SetupUiState(
@@ -37,6 +40,9 @@ class SetupViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SetupUiState())
     val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
+
+    val settings: StateFlow<Settings?> = settingsRepository.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch {
@@ -73,5 +79,9 @@ class SetupViewModel @Inject constructor(
 
     fun markSetupCompleted() {
         viewModelScope.launch { settingsRepository.setSetupCompleted(true) }
+    }
+
+    fun setLanguage(value: String) = viewModelScope.launch {
+        settingsRepository.setLanguage(value)
     }
 }

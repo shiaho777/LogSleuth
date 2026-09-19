@@ -22,6 +22,8 @@ data class Settings(
     val logTextScale: Int = 1,
     /** Show the setup wizard until the user has granted some access once. */
     val setupCompleted: Boolean = false,
+    /** In-app language: "system" | "en" | "zh-CN" (see AppLocales). */
+    val language: String = AppLocales.SYSTEM,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -33,6 +35,7 @@ class SettingsRepository(private val context: Context) {
         val THEME = stringPreferencesKey("theme")
         val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
+        val LANGUAGE = stringPreferencesKey("language")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -43,6 +46,7 @@ class SettingsRepository(private val context: Context) {
             theme = p[Keys.THEME] ?: "system",
             logTextScale = p[Keys.LOG_TEXT_SCALE] ?: 1,
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
+            language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
         )
     }
 
@@ -63,4 +67,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSetupCompleted(value: Boolean) =
         context.dataStore.edit { it[Keys.SETUP_COMPLETED] = value }
+
+    /**
+     * Mirrors the choice into DataStore (for UI state) and applies the
+     * override synchronously via [AppLocales] — the caller recreates the
+     * activity on <33, the framework restarts it on 33+.
+     */
+    suspend fun setLanguage(value: String) {
+        AppLocales.setOverride(context, value)
+        context.dataStore.edit { it[Keys.LANGUAGE] = AppLocales.overrideTag(context) }
+    }
 }

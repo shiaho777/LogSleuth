@@ -37,6 +37,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setTheme(value)
     }
 
+    fun setLanguage(value: String) = viewModelScope.launch {
+        settingsRepository.setLanguage(value)
+    }
+
     fun setLogTextScale(value: Int) = viewModelScope.launch {
         settingsRepository.setLogTextScale(value)
     }

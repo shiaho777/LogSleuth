@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
+import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,6 +99,19 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+
+            Card {
+                LanguagePicker(
+                    current = s.language,
+                    onSelect = { tag ->
+                        viewModel.setLanguage(tag)
+                        // The repo's DataStore write is async; applyFromUi
+                        // commits the override synchronously and recreates
+                        // the activity on <33.
+                        AppLocales.applyFromUi(context, tag)
+                    },
+                )
             }
 
             Card {
