@@ -104,16 +104,6 @@ cd LogSleuth
 python3 scripts/check_string_parity.py   # bilingual string gate (runs in CI)
 ```
 
-## Building
-
-Requirements: JDK 17+, Android SDK 35.
-
-```bash
-./gradlew assembleDebug        # build the app
-./gradlew :sdk:assemble        # build the SDK AAR
-./gradlew test                 # unit tests
-```
-
 ## Download
 
 - GitHub Releases (see Releases page)

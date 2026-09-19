@@ -39,6 +39,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus
+import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
+import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
 
 @Composable
 fun SetupScreen(
@@ -68,6 +70,19 @@ fun SetupScreen(
             text = stringResource(R.string.setup_title),
             style = MaterialTheme.typography.headlineMedium,
         )
+
+        // Language first: every string below this point localizes live.
+        val settings by viewModel.settings.collectAsState()
+        Card(modifier = Modifier.fillMaxWidth()) {
+            LanguagePicker(
+                current = settings?.language ?: AppLocales.SYSTEM,
+                onSelect = { tag ->
+                    viewModel.setLanguage(tag)
+                    AppLocales.applyFromUi(context, tag)
+                },
+            )
+        }
+
         // Dynamic "Next step" banner — tells the user exactly what to do right now.
         Card(
             colors = CardDefaults.cardColors(

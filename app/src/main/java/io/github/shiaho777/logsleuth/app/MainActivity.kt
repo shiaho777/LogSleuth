@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
+import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.ui.navigation.LogSleuthNavHost
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
@@ -40,6 +41,10 @@ class MainActivity : ComponentActivity() {
 
     /** Session id produced by importing an externally shared log file. */
     private var importedSessionId by mutableStateOf<Long?>(null)
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocales.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
