@@ -10,6 +10,8 @@ import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
+import io.github.shiaho777.logsleuth.app.service.RecordingManager
+import io.github.shiaho777.logsleuth.app.service.RecordingState
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +32,16 @@ class SessionsViewModel @Inject constructor(
     private val bookmarkDao: BookmarkDao,
     private val exporter: SessionExporter,
     private val importer: LogImporter,
+    recordingManager: RecordingManager,
 ) : ViewModel() {
 
     val sessions: StateFlow<List<SessionEntity>> = sessionDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Live recording state: the in-progress session row shows its real
+     * line count instead of the DB's stale 0 (written only on finish). */
+    val recording: StateFlow<RecordingState> = recordingManager.state
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RecordingState())
 
     /** Session hidden pending the undo window; deleted for real on expiry. */
     private val _pendingDelete = MutableStateFlow<SessionEntity?>(null)

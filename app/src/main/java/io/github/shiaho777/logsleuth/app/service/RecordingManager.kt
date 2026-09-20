@@ -25,6 +25,8 @@ data class RecordingState(
     val isRecording: Boolean = false,
     val sessionId: Long? = null,
     val lineCount: Long = 0,
+    /** Lines backfilled from the engine buffer at start (context before live capture). */
+    val backfillCount: Long = 0,
     val startedAt: Long = 0L,
 )
 
@@ -91,6 +93,12 @@ class RecordingManager @Inject constructor(
             val matched = engine.snapshot().filter(compiled::matches)
             writeMutex.withLock {
                 matched.forEach { w.appendLine(it.raw) }
+                if (matched.isNotEmpty()) {
+                    // '#'-prefixed: skipped on replay, visible in exports.
+                    w.appendLine(
+                        "# ===== recording started; the ${matched.size} lines above are buffered context =====",
+                    )
+                }
                 w.flush()
             }
 
@@ -100,6 +108,7 @@ class RecordingManager @Inject constructor(
                 isRecording = true,
                 sessionId = sessionId,
                 lineCount = count,
+                backfillCount = count,
                 startedAt = System.currentTimeMillis(),
             )
 

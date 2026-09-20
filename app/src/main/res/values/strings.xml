@@ -91,6 +91,8 @@
     <string name="text_size_comfortable">Comfortable</string>
     <string name="undo">Undo</string>
     <string name="session_deleted">Session deleted</string>
+    <string name="session_recording_live">Recording</string>
+    <string name="lines_count">%1$d lines</string>
     <string name="crash_deleted">Crash event deleted</string>
     <string name="settings_about">About</string>
     <string name="settings_version">LogSleuth %1$s · open source (Apache-2.0)</string>
@@ -163,6 +165,7 @@
     <!-- Recording done prompt -->
     <string name="recording_saved">Recording saved</string>
     <string name="recording_saved_lines">%1$d lines captured</string>
+    <string name="recording_saved_lines_context">%1$d lines captured (%2$d buffered before start)</string>
     <string name="share_now">Share now</string>
     <string name="later">Later</string>
 
