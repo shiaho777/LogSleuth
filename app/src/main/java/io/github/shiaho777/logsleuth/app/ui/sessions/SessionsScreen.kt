@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
@@ -70,6 +71,7 @@ fun SessionsScreen(
     viewModel: SessionsViewModel = hiltViewModel(),
 ) {
     val sessions by viewModel.sessions.collectAsState()
+    val recording by viewModel.recording.collectAsState()
     val pendingDelete by viewModel.pendingDelete.collectAsState()
     val shown = sessions.filter { it.id != pendingDelete?.id }
     var shareTarget by remember { mutableStateOf<SessionEntity?>(null) }
@@ -162,6 +164,9 @@ fun SessionsScreen(
                     ) {
                         SessionCard(
                             session = session,
+                            liveLines = recording
+                                .takeIf { it.isRecording && it.sessionId == session.id }
+                                ?.lineCount,
                             animatedVisibilityScope = animatedVisibilityScope,
                             onOpen = { onOpenSession(session.id) },
                             onShare = { shareTarget = session },
@@ -197,6 +202,7 @@ fun SessionsScreen(
 @Composable
 private fun SessionCard(
     session: SessionEntity,
+    liveLines: Long?,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onOpen: () -> Unit,
     onShare: () -> Unit,
@@ -230,20 +236,20 @@ private fun SessionCard(
         ) {
             Surface(
                 shape = CircleShape,
-                color = if (session.imported) {
-                    MaterialTheme.colorScheme.tertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
+                color = when {
+                    liveLines != null -> MaterialTheme.colorScheme.errorContainer
+                    session.imported -> MaterialTheme.colorScheme.tertiaryContainer
+                    else -> MaterialTheme.colorScheme.primaryContainer
                 },
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
-                    Icons.Default.History,
+                    if (liveLines != null) Icons.Default.FiberManualRecord else Icons.Default.History,
                     contentDescription = null,
-                    tint = if (session.imported) {
-                        MaterialTheme.colorScheme.onTertiaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                    tint = when {
+                        liveLines != null -> MaterialTheme.colorScheme.onErrorContainer
+                        session.imported -> MaterialTheme.colorScheme.onTertiaryContainer
+                        else -> MaterialTheme.colorScheme.onPrimaryContainer
                     },
                     modifier = Modifier.padding(10.dp),
                 )
@@ -256,7 +262,7 @@ private fun SessionCard(
                     maxLines = 1,
                 )
                 Text(
-                    sessionMeta(session),
+                    sessionMeta(session, liveLines),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -279,16 +285,23 @@ private fun SessionCard(
     }
 }
 
-private fun sessionMeta(session: SessionEntity): String {
+@Composable
+private fun sessionMeta(session: SessionEntity, liveLines: Long?): String {
     val sizeKb = runCatching { File(session.filePath).length() / 1024 }.getOrDefault(0L)
     val relative = DateUtils.getRelativeTimeSpanString(
         session.startedAt,
         System.currentTimeMillis(),
         DateUtils.MINUTE_IN_MILLIS,
     ).toString()
+    // In-progress session: the DB row still says 0 — show the live count.
+    if (liveLines != null) {
+        return "$relative · ${stringResource(R.string.session_recording_live)}" +
+            " · ${stringResource(R.string.lines_count, liveLines)} · ${sizeKb}KB"
+    }
     val duration = session.endedAt?.let { end ->
         val secs = ((end - session.startedAt) / 1000).coerceAtLeast(0)
         if (secs >= 60) " · ${secs / 60}min ${secs % 60}s" else " · ${secs}s"
     } ?: ""
-    return "$relative · ${session.lineCount} lines · ${sizeKb}KB$duration"
+    return "$relative · ${stringResource(R.string.lines_count, session.lineCount)}" +
+        " · ${sizeKb}KB$duration"
 }

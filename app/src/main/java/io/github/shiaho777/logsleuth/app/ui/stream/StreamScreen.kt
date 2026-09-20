@@ -300,6 +300,7 @@ fun StreamScreen(
     ui.finishedSession?.let { session ->
         RecordingSavedSheet(
             session = session,
+            backfill = ui.finishedBackfill,
             onShare = { viewModel.shareFinishedSession(it) },
             onDismiss = viewModel::dismissFinishedSession,
         )
@@ -646,6 +647,7 @@ private fun PausedBanner(incoming: Int, onResume: () -> Unit) {
 @Composable
 private fun RecordingSavedSheet(
     session: io.github.shiaho777.logsleuth.app.data.db.SessionEntity,
+    backfill: Long,
     onShare: (io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -668,7 +670,15 @@ private fun RecordingSavedSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                stringResource(R.string.recording_saved_lines, session.lineCount),
+                if (backfill > 0) {
+                    stringResource(
+                        R.string.recording_saved_lines_context,
+                        session.lineCount,
+                        backfill,
+                    )
+                } else {
+                    stringResource(R.string.recording_saved_lines, session.lineCount)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),

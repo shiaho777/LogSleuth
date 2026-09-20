@@ -55,6 +55,8 @@ data class StreamUiState(
     val searchHitIndex: Int = -1,
     /** Session just finished — prompt the user to share it. */
     val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
+    /** How many of [finishedSession]'s lines were buffered before start. */
+    val finishedBackfill: Long = 0,
 )
 
 @HiltViewModel
@@ -90,16 +92,24 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch {
             var wasRecording = false
             var lastSessionId: Long? = null
+            var lastBackfill = 0L
             recordingManager.state.collect { r ->
-                if (r.isRecording) lastSessionId = r.sessionId
+                if (r.isRecording) {
+                    lastSessionId = r.sessionId
+                    lastBackfill = r.backfillCount
+                }
                 _ui.update { it.copy(recording = r) }
                 if (wasRecording && !r.isRecording && lastSessionId != null) {
                     val id = lastSessionId
+                    val backfill = lastBackfill
                     lastSessionId = null
+                    lastBackfill = 0L
                     // Session row finalizes asynchronously; fetch after a beat.
                     kotlinx.coroutines.delay(400)
                     val session = sessionDao.getById(id!!)
-                    _ui.update { it.copy(finishedSession = session) }
+                    _ui.update {
+                        it.copy(finishedSession = session, finishedBackfill = backfill)
+                    }
                 }
                 wasRecording = r.isRecording
             }
@@ -347,7 +357,7 @@ class StreamViewModel @Inject constructor(
 
     fun shareFinishedSession(format: io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) {
         val session = _ui.value.finishedSession ?: return
-        _ui.update { it.copy(finishedSession = null) }
+        _ui.update { it.copy(finishedSession = null, finishedBackfill = 0) }
         viewModelScope.launch {
             exporter.export(session.id, format).onSuccess { file ->
                 exporter.share(
@@ -363,7 +373,7 @@ class StreamViewModel @Inject constructor(
     }
 
     fun dismissFinishedSession() {
-        _ui.update { it.copy(finishedSession = null) }
+        _ui.update { it.copy(finishedSession = null, finishedBackfill = 0) }
     }
 
     override fun onCleared() {
