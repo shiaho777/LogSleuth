@@ -2,3 +2,4 @@
 -keep class io.github.shiaho777.logsleuth.sdk.Sleuth { *; }
 -keep class io.github.shiaho777.logsleuth.sdk.SleuthConfig { *; }
 -keep class io.github.shiaho777.logsleuth.sdk.SleuthConfig$* { *; }
+-keep class io.github.shiaho777.logsleuth.sdk.CrashReport { *; }

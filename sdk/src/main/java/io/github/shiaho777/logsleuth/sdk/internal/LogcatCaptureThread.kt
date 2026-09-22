@@ -8,9 +8,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Reads this app's own process logs via `logcat --pid=<self>`. Reading your
  * own logs requires no permission on any Android version.
+ *
+ * If the logcat process dies (logd restart, SELinux hiccup) the capture
+ * reconnects with exponential backoff instead of silently giving up —
+ * the whole point of the SDK is that logs are still there when you need them.
  */
 internal class LogcatCaptureThread(
-    private val config: SleuthConfig,
+    config: SleuthConfig,
     private val onLine: (String) -> Unit,
 ) : Thread("sleuth-logcat") {
 
@@ -19,33 +23,44 @@ internal class LogcatCaptureThread(
     @Volatile
     private var process: Process? = null
 
+    private val filter = LineFilter(config.tagFilter)
+
     init {
         isDaemon = true
     }
 
     override fun run() {
         val pid = android.os.Process.myPid()
-        try {
-            val proc = ProcessBuilder("logcat", "-v", "threadtime", "--pid=$pid")
-                .redirectErrorStream(true)
-                .start()
-            process = proc
-            BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-                while (running.get()) {
-                    val line = reader.readLine() ?: break
-                    if (accepts(line)) onLine(line)
+        var backoffMs = 1_000L
+        while (running.get()) {
+            try {
+                val proc = ProcessBuilder("logcat", "-v", "threadtime", "--pid=$pid")
+                    .redirectErrorStream(true)
+                    .start()
+                process = proc
+                var sawLine = false
+                BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                    while (running.get()) {
+                        val line = reader.readLine() ?: break
+                        if (!sawLine) {
+                            sawLine = true
+                            backoffMs = 1_000L // healthy stream: reset backoff
+                        }
+                        if (filter.accepts(line)) onLine(line)
+                    }
                 }
+            } catch (_: Throwable) {
+                // Logcat unavailable (very old devices / restricted ROMs):
+                // keep retrying while the SDK is alive.
+                if (!running.get()) return
             }
-        } catch (_: Throwable) {
-            // Logcat unavailable (very old devices / restricted ROMs): SDK silently degrades.
+            try {
+                sleep(backoffMs)
+            } catch (_: InterruptedException) {
+                return
+            }
+            backoffMs = (backoffMs * 2).coerceAtMost(15_000L)
         }
-    }
-
-    private fun accepts(line: String): Boolean {
-        val filter = config.tagFilter ?: return true
-        if (line.contains(filter)) return true
-        // Always keep errors and our own crash marker lines.
-        return line.contains(" E ") || line.contains(" F ") || line.contains("AndroidRuntime")
     }
 
     fun shutdown() {
