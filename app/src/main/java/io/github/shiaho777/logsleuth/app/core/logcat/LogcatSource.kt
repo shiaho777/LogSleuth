@@ -3,6 +3,7 @@ package io.github.shiaho777.logsleuth.app.core.logcat
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
@@ -51,7 +52,9 @@ private fun streamProcess(start: () -> Process): Flow<String> = callbackFlow {
         try {
             while (isActive) {
                 val line = reader.readLine() ?: break
-                trySend(line)
+                // Blocking send: under bursts the reader slows down and the
+                // logcat pipe backs up instead of silently dropping lines.
+                trySendBlocking(line)
             }
             close()
         } catch (t: Throwable) {

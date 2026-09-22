@@ -8,6 +8,8 @@ enum class LogLevel(val letter: Char, val priority: Int) {
     W('W', 5),
     E('E', 6),
     F('F', 7),
+    /** ASSERT — `Log.wtf` output; platform priority is 7, same severity as F. */
+    A('A', 7),
     ;
 
     companion object {
@@ -21,6 +23,9 @@ enum class LogLevel(val letter: Char, val priority: Int) {
  *
  * @param uid only present when logcat runs with `-v uid` (shell/Shizuku).
  * @param raw the original raw text, used for byte-faithful recording.
+ * @param seq engine-assigned sequence number (0 = unstamped, e.g. replayed
+ *   file entries). Lets consumers deduplicate a snapshot against live
+ *   emissions.
  */
 data class LogcatEntry(
     val timestampMillis: Long,
@@ -31,6 +36,7 @@ data class LogcatEntry(
     val tag: String,
     val message: String,
     val raw: String,
+    val seq: Long = 0,
 ) {
     val displayTime: String
         get() {

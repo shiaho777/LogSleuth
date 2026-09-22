@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,48 +90,67 @@ class RecordingManager @Inject constructor(
             val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
             engine.activeSessionId = sessionId
 
-            // Include recent history so the session has context before start.
-            val matched = engine.snapshot().filter(compiled::matches)
-            writeMutex.withLock {
-                matched.forEach { w.appendLine(it.raw) }
-                if (matched.isNotEmpty()) {
-                    // '#'-prefixed: skipped on replay, visible in exports.
-                    w.appendLine(
-                        "# ===== recording started; the ${matched.size} lines above are buffered context =====",
-                    )
-                }
-                w.flush()
-            }
-
-            var count = matched.size.toLong()
-            finalLines = count
+            // isRecording is published synchronously so stop() and duplicate
+            // start() calls see it before the collector coroutine runs.
             _state.value = RecordingState(
                 isRecording = true,
                 sessionId = sessionId,
-                lineCount = count,
-                backfillCount = count,
                 startedAt = System.currentTimeMillis(),
             )
 
+            var count = 0L
             collectJob = scope.launch {
-                engine.entries.collect { entry ->
-                    if (compiled.matches(entry)) {
+                var snapshotSeq = 0L
+                engine.entries
+                    .onSubscription {
+                        // Subscribe first, then snapshot: emissions between
+                        // registration and the snapshot land in both places
+                        // and are deduped by seq; emissions before the
+                        // subscription are recovered from the buffer.
+                        val snap = engine.snapshot()
+                        snapshotSeq = snap.maxSeq
+                        // Include recent history as context before start.
+                        val matched = snap.entries.filter(compiled::matches)
                         writeMutex.withLock {
-                            w.appendLine(entry.raw)
-                            count++
-                            finalLines = count
-                            if (count % FLUSH_BATCH == 0L) w.flush()
+                            matched.forEach { w.appendLine(it.raw) }
+                            if (matched.isNotEmpty()) {
+                                // '#'-prefixed: skipped on replay, visible in exports.
+                                w.appendLine(
+                                    "# ===== recording started; the ${matched.size} lines above are buffered context =====",
+                                )
+                            }
+                            w.flush()
                         }
-                        if (count % STATE_BATCH == 0L) {
-                            _state.value = _state.value.copy(lineCount = count)
+                        count = matched.size.toLong()
+                        finalLines = count
+                        _state.value = _state.value.copy(
+                            lineCount = count,
+                            backfillCount = count,
+                        )
+                    }
+                    .collect { entry ->
+                        if (entry.seq <= snapshotSeq) return@collect
+                        if (compiled.matches(entry)) {
+                            writeMutex.withLock {
+                                w.appendLine(entry.raw)
+                                count++
+                                finalLines = count
+                                if (count % FLUSH_BATCH == 0L) w.flush()
+                            }
+                            if (count % STATE_BATCH == 0L) {
+                                _state.value = _state.value.copy(lineCount = count)
+                            }
                         }
                     }
-                }
             }
 
             engine.acquireClient()
             sessionId
         }.onFailure {
+            collectJob?.cancel()
+            collectJob = null
+            engine.activeSessionId = null
+            _state.value = RecordingState()
             runCatching { writer?.close() }
             writer = null
         }

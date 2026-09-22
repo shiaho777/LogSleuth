@@ -36,6 +36,7 @@ object LevelColors {
     val W = Color(0xFFFF9F0A)
     val E = Color(0xFFFF453A)
     val F = Color(0xFFD70015)
+    val A = Color(0xFFBF5AF2)
 }
 
 @Composable

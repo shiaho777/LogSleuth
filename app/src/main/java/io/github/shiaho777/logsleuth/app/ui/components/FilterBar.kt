@@ -234,6 +234,7 @@ private fun levelName(level: LogLevel): String = when (level) {
     LogLevel.W -> stringResource(R.string.level_warn)
     LogLevel.E -> stringResource(R.string.level_error)
     LogLevel.F -> stringResource(R.string.level_fatal)
+    LogLevel.A -> stringResource(R.string.level_assert)
 }
 
 @Composable
