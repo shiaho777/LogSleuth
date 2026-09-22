@@ -57,6 +57,8 @@ data class StreamUiState(
     val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
     /** How many of [finishedSession]'s lines were buffered before start. */
     val finishedBackfill: Long = 0,
+    /** Floating recording controls are shown over other apps. */
+    val bubbleEnabled: Boolean = false,
 )
 
 @HiltViewModel
@@ -85,7 +87,10 @@ class StreamViewModel @Inject constructor(
         engine.acquireClient()
 
         viewModelScope.launch {
-            settingsRepository.settings.collect { bufferCap = it.bufferSize }
+            settingsRepository.settings.collect { s ->
+                bufferCap = s.bufferSize
+                _ui.update { it.copy(bubbleEnabled = s.bubbleEnabled) }
+            }
         }
         viewModelScope.launch { engine.access.collect { a -> _ui.update { it.copy(access = a) } } }
         viewModelScope.launch { engine.state.collect { s -> _ui.update { it.copy(engineState = s) } } }
@@ -262,6 +267,31 @@ class StreamViewModel @Inject constructor(
         if (recording) context.startService(intent)
         else androidx.core.content.ContextCompat.startForegroundService(context, intent)
     }
+
+    /** Toggles the floating control pill; returns false when the overlay
+     * permission is still missing (caller should open the system page). */
+    fun toggleBubble(): Boolean {
+        val enabling = !_ui.value.bubbleEnabled
+        if (enabling &&
+            !android.provider.Settings.canDrawOverlays(context)
+        ) {
+            return false
+        }
+        viewModelScope.launch {
+            settingsRepository.setBubbleEnabled(enabling)
+            if (enabling) {
+                context.startService(Intent(context, io.github.shiaho777.logsleuth.app.service.BubbleService::class.java))
+            } else {
+                context.stopService(Intent(context, io.github.shiaho777.logsleuth.app.service.BubbleService::class.java))
+            }
+        }
+        return true
+    }
+
+    fun overlaySettingsIntent(): Intent = Intent(
+        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+        android.net.Uri.parse("package:${context.packageName}"),
+    )
 
     fun savePreset(name: String) {
         viewModelScope.launch {

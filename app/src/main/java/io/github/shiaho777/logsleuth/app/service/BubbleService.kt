@@ -8,12 +8,12 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
+import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,14 +22,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * Floating bubble overlay: drag to move, tap to drop a timestamp bookmark
- * into the active recording, long-press to start/stop recording.
- * Disabled by default; needs the overlay permission.
+ * Floating control pill: start/stop recording, drop a timestamp bookmark into
+ * the active recording, or hide itself. Dragging the pill moves it.
+ * Needs the overlay permission; the in-app toggle clears it again.
  */
 @AndroidEntryPoint
 class BubbleService : Service() {
 
     @Inject lateinit var recordingManager: RecordingManager
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocales.wrap(newBase))
@@ -38,11 +39,9 @@ class BubbleService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var windowManager: WindowManager? = null
     private var bubble: BubbleView? = null
-    private var params: WindowManager.LayoutParams? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    @SuppressLint("ClickableViewAccessibility", "InflateParams")
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WindowManager::class.java)
@@ -66,6 +65,14 @@ class BubbleService : Service() {
             y = 200
         }
 
+        view.onToggleRecording = {
+            val recording = recordingManager.state.value.isRecording
+            val intent = Intent(this, RecordService::class.java).apply {
+                action = if (recording) RecordService.ACTION_STOP else RecordService.ACTION_START
+            }
+            if (recording) startService(intent)
+            else androidx.core.content.ContextCompat.startForegroundService(this, intent)
+        }
         view.onBookmark = {
             scope.launch {
                 if (recordingManager.state.value.isRecording) {
@@ -76,13 +83,9 @@ class BubbleService : Service() {
                 }
             }
         }
-        view.onToggleRecording = {
-            val recording = recordingManager.state.value.isRecording
-            val intent = Intent(this, RecordService::class.java).apply {
-                action = if (recording) RecordService.ACTION_STOP else RecordService.ACTION_START
-            }
-            if (recording) startService(intent)
-            else androidx.core.content.ContextCompat.startForegroundService(this, intent)
+        view.onHide = {
+            scope.launch { settingsRepository.setBubbleEnabled(false) }
+            stopSelf()
         }
         view.onDrag = { dx, dy ->
             lp.x += dx.toInt()
@@ -96,9 +99,19 @@ class BubbleService : Service() {
             }
         }
 
-        wm.addView(view, lp)
+        // If the permission was revoked while the service was starting,
+        // addView throws — don't leave a headless service running.
+        runCatching { wm.addView(view, lp) }
+            .onFailure { stopSelf() }
         bubble = view
-        params = lp
+    }
+
+    // Swiping the app away from recents removes the floating controls too —
+    // they only live while the app is around.
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        scope.launch { settingsRepository.setBubbleEnabled(false) }
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

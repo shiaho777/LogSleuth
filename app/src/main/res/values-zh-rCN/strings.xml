@@ -77,8 +77,10 @@
     <string name="settings_buffer_size">缓冲区大小</string>
     <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
     <string name="settings_crash_notifications">崩溃通知</string>
-    <string name="settings_bubble">悬浮气泡</string>
-    <string name="settings_bubble_desc">点按记录书签,长按开始/停止录制。需要悬浮窗权限。</string>
+    <string name="settings_bubble">悬浮控件</string>
+    <string name="settings_bubble_desc">在其他应用上显示录制、书签与隐藏控件。需要悬浮窗权限。</string>
+    <string name="bubble_controls">悬浮控件</string>
+    <string name="bubble_hide">隐藏悬浮控件</string>
     <string name="settings_theme">主题</string>
     <string name="theme_system">跟随系统</string>
     <string name="theme_light">浅色</string>
@@ -109,7 +111,7 @@
     <string name="tile_record">录制日志</string>
     <string name="tile_recording">录制中 · %1$d</string>
     <string name="bookmark_added">已添加书签</string>
-    <string name="not_recording">未在录制,长按开始</string>
+    <string name="not_recording">未在录制,请先点录制按钮</string>
 
     <!-- 通用 -->
     <string name="save">保存</string>
