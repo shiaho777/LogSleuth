@@ -22,25 +22,27 @@ sealed interface ParsedLine {
 object LogcatParser {
 
     private val THREADTIME =
-        Regex("""^(\d{2}-\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+((?:\d+\s+)+)([VDIWEF])\s+(.*?)\s*:\s(.*)$""")
+        Regex("""^(\d{2}-\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+((?:\d+\s+)+)([VDIWEFA])\s+(.*?)\s*:\s(.*)$""")
 
     fun parse(line: String, nowMillis: Long = System.currentTimeMillis()): ParsedLine {
-        val m = THREADTIME.matchEntire(line) ?: return ParsedLine.Continuation(line)
+        // Readers that split on '\n' alone leave a stray '\r' on CRLF files.
+        val clean = line.removeSuffix("\r")
+        val m = THREADTIME.matchEntire(clean) ?: return ParsedLine.Continuation(clean)
 
         val nums = m.groupValues[6].trim().split(Regex("""\s+""")).mapNotNull { it.toIntOrNull() }
         val (uid, pid, tid) = when (nums.size) {
             2 -> Triple(null, nums[0], nums[1])
             3 -> Triple(nums[0], nums[1], nums[2])
-            else -> return ParsedLine.Continuation(line)
+            else -> return ParsedLine.Continuation(clean)
         }
 
         val monthDay = m.groupValues[1]
-        val month = monthDay.substring(0, 2).toIntOrNull() ?: return ParsedLine.Continuation(line)
-        val day = monthDay.substring(3, 5).toIntOrNull() ?: return ParsedLine.Continuation(line)
-        val hour = m.groupValues[2].toIntOrNull() ?: return ParsedLine.Continuation(line)
-        val minute = m.groupValues[3].toIntOrNull() ?: return ParsedLine.Continuation(line)
-        val second = m.groupValues[4].toIntOrNull() ?: return ParsedLine.Continuation(line)
-        val milli = m.groupValues[5].toIntOrNull() ?: return ParsedLine.Continuation(line)
+        val month = monthDay.substring(0, 2).toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val day = monthDay.substring(3, 5).toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val hour = m.groupValues[2].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val minute = m.groupValues[3].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val second = m.groupValues[4].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val milli = m.groupValues[5].toIntOrNull() ?: return ParsedLine.Continuation(clean)
 
         val cal = Calendar.getInstance().apply {
             timeInMillis = nowMillis
@@ -64,7 +66,7 @@ object LogcatParser {
             level = LogLevel.from(m.groupValues[7].first()),
             tag = m.groupValues[8].trim(),
             message = m.groupValues[9],
-            raw = line,
+            raw = clean,
         )
         return ParsedLine.Entry(entry)
     }

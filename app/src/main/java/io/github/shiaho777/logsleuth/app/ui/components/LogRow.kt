@@ -67,6 +67,7 @@ fun levelColor(level: LogLevel): Color = when (level) {
     LogLevel.W -> LevelColors.W
     LogLevel.E -> LevelColors.E
     LogLevel.F -> LevelColors.F
+    LogLevel.A -> LevelColors.A
 }
 
 @Composable

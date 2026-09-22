@@ -47,6 +47,14 @@ class LogcatEngine @Inject constructor(
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
 
+    /**
+     * A buffer snapshot plus the sequence watermark at the time it was taken.
+     * Consumers that subscribe *before* calling [snapshot] can deduplicate
+     * live emissions with `entry.seq <= maxSeq`, closing the gap between
+     * snapshot and subscription where entries would otherwise be lost.
+     */
+    data class Snapshot(val entries: List<LogcatEntry>, val maxSeq: Long)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val _state = MutableStateFlow(State.STOPPED)
@@ -69,6 +77,9 @@ class LogcatEngine @Inject constructor(
     var activeSessionId: Long? = null
 
     private val bufferMutex = Mutex()
+
+    /** Guarded by [bufferMutex]. Monotonic across stream restarts. */
+    private var nextSeq = 0L
     private val buffer = ArrayDeque<LogcatEntry>()
 
     @Volatile
@@ -124,7 +135,9 @@ class LogcatEngine @Inject constructor(
     }
 
     /** Recent entries for consumers attaching later (e.g. opening the screen). */
-    suspend fun snapshot(): List<LogcatEntry> = bufferMutex.withLock { buffer.toList() }
+    suspend fun snapshot(): Snapshot = bufferMutex.withLock {
+        Snapshot(buffer.toList(), nextSeq)
+    }
 
     /** Inserts a timestamp bookmark; linked to the active recording if any. */
     suspend fun addBookmark(note: String = "") {
@@ -215,12 +228,14 @@ class LogcatEngine @Inject constructor(
     }
 
     private suspend fun dispatch(entry: LogcatEntry, crashDetector: CrashDetector) {
-        bufferMutex.withLock {
-            buffer.addLast(entry)
+        val stamped = bufferMutex.withLock {
+            val s = entry.copy(seq = ++nextSeq)
+            buffer.addLast(s)
             while (buffer.size > bufferCap) buffer.removeFirst()
+            s
         }
-        _entries.emit(entry)
-        crashDetector.onEntry(entry)?.let { onCrash(it) }
+        _entries.emit(stamped)
+        crashDetector.onEntry(stamped)?.let { onCrash(it) }
     }
 
     private fun onCrash(signal: CrashSignal) {

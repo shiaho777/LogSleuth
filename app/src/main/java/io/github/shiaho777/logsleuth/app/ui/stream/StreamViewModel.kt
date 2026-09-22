@@ -26,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -128,11 +129,23 @@ class StreamViewModel @Inject constructor(
 
         // Collector: stage entries; a ticker publishes them in ~120ms batches
         // so a busy logcat cannot trigger a recompose per line.
+        //
+        // onSubscription runs after this subscriber is registered but before
+        // it receives anything: the snapshot taken inside therefore covers
+        // every emission this subscription could miss, and seq dedup drops
+        // entries already included in it. No gap, no duplicates.
         viewModelScope.launch {
-            snapshotToLists()
-            engine.entries.collect { entry ->
-                stagedMutex.withLock { staged.add(entry) }
-            }
+            var snapshotSeq = 0L
+            engine.entries
+                .onSubscription {
+                    val snap = engine.snapshot()
+                    snapshotSeq = snap.maxSeq
+                    snapshotToLists(snap.entries)
+                }
+                .collect { entry ->
+                    if (entry.seq <= snapshotSeq) return@collect
+                    stagedMutex.withLock { staged.add(entry) }
+                }
         }
         viewModelScope.launch(Dispatchers.Default) {
             while (true) {
@@ -145,8 +158,7 @@ class StreamViewModel @Inject constructor(
     private val staged = ArrayList<LogcatEntry>(512)
     private val stagedMutex = Mutex()
 
-    private suspend fun snapshotToLists() {
-        val snapshot = engine.snapshot()
+    private suspend fun snapshotToLists(snapshot: List<LogcatEntry>) {
         val compiled = currentCompiled()
         listMutex.withLock {
             all.clear()

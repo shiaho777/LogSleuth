@@ -52,6 +52,28 @@ class LogcatParserTest {
     }
 
     @Test
+    fun `parses ASSERT level`() {
+        val line = "06-15 11:59:58.123  4567  4589 A MyTag: wtf happened"
+        val parsed = LogcatParser.parse(line, now) as ParsedLine.Entry
+        assertEquals(LogLevel.A, parsed.entry.level)
+        assertEquals("wtf happened", parsed.entry.message)
+    }
+
+    @Test
+    fun `assert severity ranks with fatal`() {
+        assertEquals(LogLevel.F.priority, LogLevel.A.priority)
+        assertEquals(LogLevel.A, LogLevel.from('A'))
+    }
+
+    @Test
+    fun `trailing carriage return is stripped`() {
+        val line = "06-15 11:59:58.123  4567  4589 I Tag: from windows\r"
+        val parsed = LogcatParser.parse(line, now) as ParsedLine.Entry
+        assertEquals("from windows", parsed.entry.message)
+        assertEquals(line.removeSuffix("\r"), parsed.entry.raw)
+    }
+
+    @Test
     fun `non-matching lines are continuations`() {
         assertTrue(LogcatParser.parse("--------- beginning of main", now) is ParsedLine.Continuation)
         assertTrue(LogcatParser.parse("    at com.example.Foo.bar(Foo.kt:12)", now) is ParsedLine.Continuation)

@@ -53,6 +53,7 @@
     <string name="level_warn">Warn</string>
     <string name="level_error">Error</string>
     <string name="level_fatal">Fatal</string>
+    <string name="level_assert">Assert</string>
 
     <!-- Sessions -->
     <string name="sessions_title">Sessions</string>
