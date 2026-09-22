@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -134,8 +135,10 @@ fun SessionsScreen(
             ) {
                 items(shown.size, key = { shown[it].id }) { i ->
                     val session = shown[i]
+                    val isLive = recording.isRecording && recording.sessionId == session.id
                     val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart },
+                        // A recording-in-progress session cannot be dismissed.
+                        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart && !isLive },
                     )
                     if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
                         LaunchedEffect(session.id) {
@@ -164,9 +167,7 @@ fun SessionsScreen(
                     ) {
                         SessionCard(
                             session = session,
-                            liveLines = recording
-                                .takeIf { it.isRecording && it.sessionId == session.id }
-                                ?.lineCount,
+                            liveLines = if (isLive) recording.lineCount else null,
                             animatedVisibilityScope = animatedVisibilityScope,
                             onOpen = { onOpenSession(session.id) },
                             onShare = { shareTarget = session },
@@ -260,6 +261,7 @@ private fun SessionCard(
                     session.name,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     sessionMeta(session, liveLines),
@@ -274,12 +276,15 @@ private fun SessionCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Deleting under a live writer loses the rest of the recording.
+            if (liveLines == null) {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -293,15 +298,20 @@ private fun sessionMeta(session: SessionEntity, liveLines: Long?): String {
         System.currentTimeMillis(),
         DateUtils.MINUTE_IN_MILLIS,
     ).toString()
+    val sizeText = stringResource(R.string.unit_kb, sizeKb)
     // In-progress session: the DB row still says 0 — show the live count.
     if (liveLines != null) {
         return "$relative · ${stringResource(R.string.session_recording_live)}" +
-            " · ${stringResource(R.string.lines_count, liveLines)} · ${sizeKb}KB"
+            " · ${stringResource(R.string.lines_count, liveLines)} · $sizeText"
     }
     val duration = session.endedAt?.let { end ->
         val secs = ((end - session.startedAt) / 1000).coerceAtLeast(0)
-        if (secs >= 60) " · ${secs / 60}min ${secs % 60}s" else " · ${secs}s"
+        if (secs >= 60) {
+            " · " + stringResource(R.string.duration_min_sec, secs / 60, secs % 60)
+        } else {
+            " · " + stringResource(R.string.duration_sec, secs)
+        }
     } ?: ""
     return "$relative · ${stringResource(R.string.lines_count, session.lineCount)}" +
-        " · ${sizeKb}KB$duration"
+        " · $sizeText$duration"
 }

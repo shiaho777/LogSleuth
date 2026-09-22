@@ -121,12 +121,12 @@ fun SessionDetailScreen(
                     0 -> Column {
                         FilterBar(
                             filter = ui.filter,
-                            regexInvalid = false,
-                            apps = emptyList(),
-                            presets = emptyList(),
+                            regexInvalid = ui.regexInvalid,
+                            apps = ui.apps,
+                            presets = ui.presets,
                             onFilterChange = viewModel::setFilter,
-                            onSavePreset = {},
-                            onApplyPreset = {},
+                            onSavePreset = viewModel::savePreset,
+                            onApplyPreset = viewModel::applyPreset,
                         )
                         when {
                             ui.loading -> Box(Modifier.fillMaxSize()) {

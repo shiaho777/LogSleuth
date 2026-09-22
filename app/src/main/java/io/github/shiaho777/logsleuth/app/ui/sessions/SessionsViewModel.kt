@@ -32,7 +32,7 @@ class SessionsViewModel @Inject constructor(
     private val bookmarkDao: BookmarkDao,
     private val exporter: SessionExporter,
     private val importer: LogImporter,
-    recordingManager: RecordingManager,
+    private val recordingManager: RecordingManager,
 ) : ViewModel() {
 
     val sessions: StateFlow<List<SessionEntity>> = sessionDao.observeAll()
@@ -50,6 +50,10 @@ class SessionsViewModel @Inject constructor(
     private var deleteJob: Job? = null
 
     fun requestDelete(session: SessionEntity) {
+        // Deleting under a live writer loses the rest of the recording and
+        // leaves finish() updating a dead row.
+        val rec = recording.value
+        if (rec.isRecording && rec.sessionId == session.id) return
         // A new request commits the previous pending delete — otherwise the
         // first item would silently reappear when the pending slot is replaced.
         _pendingDelete.value?.let { delete(it) }
