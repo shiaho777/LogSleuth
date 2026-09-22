@@ -85,7 +85,10 @@ class RecordService : Service() {
 
             else -> stopSelf()
         }
-        return START_STICKY
+        // Recording state lives in-process; a restart could not resume the
+        // writer or filter anyway. Unfinished sessions are reconciled at
+        // app start (endedAt = file mtime).
+        return START_NOT_STICKY
     }
 
     private fun startForegroundWithNotification() {
