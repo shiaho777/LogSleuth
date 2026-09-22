@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,7 +47,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -177,20 +177,29 @@ fun StreamScreen(
                 enter = scaleIn(),
                 exit = scaleOut(),
             ) {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch { listState.animateScrollToItem(ui.entries.lastIndex) }
-                    },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    BadgedBox(badge = {
-                        if (ui.pausedIncoming > 0) Badge { Text("+${ui.pausedIncoming}") }
-                    }) {
+                // Badge anchors to the FAB itself, not the icon: BadgedBox
+                // extends content rightward past the anchor's end, so a long
+                // "+N" pill would stick out past the FAB edge and clip
+                // against the screen edge (FAB sits only 16dp inside).
+                Box {
+                    FloatingActionButton(
+                        onClick = {
+                            scope.launch { listState.animateScrollToItem(ui.entries.lastIndex) }
+                        },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
                         Icon(
                             Icons.Default.KeyboardArrowDown,
                             contentDescription = stringResource(R.string.scroll_bottom),
                         )
+                    }
+                    if (ui.pausedIncoming > 0) {
+                        Badge(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 4.dp, y = (-8).dp),
+                        ) { Text("+${ui.pausedIncoming}") }
                     }
                 }
             }
