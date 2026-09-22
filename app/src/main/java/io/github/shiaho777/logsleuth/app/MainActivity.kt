@@ -93,7 +93,15 @@ class MainActivity : ComponentActivity() {
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
         lifecycleScope.launch {
-            logImporter.import(uri).onSuccess { importedSessionId = it }
+            logImporter.import(uri)
+                .onSuccess { importedSessionId = it }
+                .onFailure {
+                    android.widget.Toast.makeText(
+                        this@MainActivity,
+                        R.string.import_failed,
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
         }
     }
 
