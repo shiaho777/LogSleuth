@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -106,6 +107,7 @@ fun StreamScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -152,15 +154,17 @@ fun StreamScreen(
             } else {
                 StreamTopBar(
                     paused = ui.paused,
-                    recording = ui.recording.isRecording,
+                    bubbleEnabled = ui.bubbleEnabled,
                     onPauseToggle = {
                         haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
                         viewModel.setPaused(!ui.paused)
                     },
                     onSearch = { viewModel.setSearching(true) },
-                    onRecordToggle = {
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                        viewModel.toggleRecording()
+                    onBubbleToggle = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
+                        if (!viewModel.toggleBubble()) {
+                            context.startActivity(viewModel.overlaySettingsIntent())
+                        }
                     },
                     onClear = viewModel::clear,
                     onNavigate = onNavigate,
@@ -390,10 +394,10 @@ private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Mod
 @Composable
 private fun StreamTopBar(
     paused: Boolean,
-    recording: Boolean,
+    bubbleEnabled: Boolean,
     onPauseToggle: () -> Unit,
     onSearch: () -> Unit,
-    onRecordToggle: () -> Unit,
+    onBubbleToggle: () -> Unit,
     onClear: () -> Unit,
     onNavigate: (String) -> Unit,
 ) {
@@ -418,11 +422,15 @@ private fun StreamTopBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onRecordToggle) {
+            IconButton(onClick = onBubbleToggle) {
                 Icon(
-                    if (recording) Icons.Default.Stop else Icons.Default.FiberManualRecord,
-                    contentDescription = stringResource(if (recording) R.string.record_stop else R.string.record_start),
-                    tint = MaterialTheme.colorScheme.error,
+                    Icons.Default.BubbleChart,
+                    contentDescription = stringResource(R.string.bubble_controls),
+                    tint = if (bubbleEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
             }
             IconButton(onClick = { menuOpen = true }) {

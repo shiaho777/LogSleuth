@@ -2,107 +2,150 @@ package io.github.shiaho777.logsleuth.app.service
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
-import android.view.GestureDetector
+import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.MotionEvent
-import android.view.View
+import android.view.ViewConfiguration
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import io.github.shiaho777.logsleuth.app.R
 import kotlin.math.abs
 
 /**
- * A plain drawn bubble: circle + bookmark glyph. Red ring while recording.
- * Tap = bookmark, long-press = toggle recording, drag = move.
+ * Floating control pill: [record toggle] [bookmark] [hide]. The whole pill is
+ * draggable — a move past touch slop is treated as a drag, otherwise the
+ * tapped button handles the event.
  */
 @SuppressLint("ViewConstructor")
-class BubbleView(context: Context) : View(context) {
+class BubbleView(context: Context) : LinearLayout(context) {
 
-    var onBookmark: (() -> Unit)? = null
     var onToggleRecording: (() -> Unit)? = null
+    var onBookmark: (() -> Unit)? = null
+    var onHide: (() -> Unit)? = null
     var onDrag: ((Float, Float) -> Unit)? = null
 
     private var recording = false
+    private val density = resources.displayMetrics.density
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(0xE6, 0x1F, 0x1F, 0x1F)
-        style = Paint.Style.FILL
-    }
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(0xFF, 0xB0, 0xB0, 0xB0)
-        style = Paint.Style.STROKE
-        strokeWidth = 4f
-    }
-    private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.FILL
-        textAlign = Paint.Align.CENTER
-        textSize = 34f
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
+    private val pill = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = 28f * density
+        setColor(0xE6_1F1F1F.toInt())
+        setStroke((1.5f * density).toInt(), 0xFF_B0B0B0.toInt())
     }
 
-    private var lastX = 0f
-    private var lastY = 0f
-    private var dragging = false
-
-    private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent): Boolean = true
-
-        override fun onSingleTapUp(e: MotionEvent): Boolean {
-            onBookmark?.invoke()
-            return true
-        }
-
-        override fun onLongPress(e: MotionEvent) {
-            onToggleRecording?.invoke()
-        }
-    })
+    private val recordButton = actionButton(
+        icon = R.drawable.ic_bubble_record,
+        tint = 0xFF_FF453A.toInt(),
+        description = context.getString(R.string.record_start),
+    ) { onToggleRecording?.invoke() }
 
     init {
-        val size = (56 * resources.displayMetrics.density).toInt()
-        layoutParams = android.view.ViewGroup.LayoutParams(size, size)
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER
+        background = pill
+        val pad = (6 * density).toInt()
+        setPadding(pad, pad, pad, pad)
+
+        addView(recordButton)
+        addView(
+            actionButton(
+                icon = R.drawable.ic_bubble_bookmark,
+                tint = 0xFF_FFFFFF.toInt(),
+                description = context.getString(R.string.notif_action_bookmark),
+            ) { onBookmark?.invoke() },
+        )
+        addView(
+            actionButton(
+                icon = R.drawable.ic_bubble_close,
+                tint = 0xFF_B0B0B0.toInt(),
+                description = context.getString(R.string.bubble_hide),
+            ) { onHide?.invoke() },
+        )
     }
 
     fun setRecording(value: Boolean) {
-        if (recording != value) {
-            recording = value
-            ringPaint.color = if (value) Color.argb(0xFF, 0xFF, 0x45, 0x3A) else Color.argb(0xFF, 0xB0, 0xB0, 0xB0)
-            invalidate()
+        if (recording == value) return
+        recording = value
+        recordButton.setImageResource(
+            if (value) R.drawable.ic_bubble_stop else R.drawable.ic_bubble_record,
+        )
+        recordButton.contentDescription = context.getString(
+            if (value) R.string.record_stop else R.string.record_start,
+        )
+        pill.setStroke(
+            (1.5f * density).toInt(),
+            if (value) 0xFF_FF453A.toInt() else 0xFF_B0B0B0.toInt(),
+        )
+    }
+
+    private fun actionButton(
+        icon: Int,
+        tint: Int,
+        description: String,
+        onClick: () -> Unit,
+    ): ImageButton = ImageButton(context).apply {
+        setImageResource(icon)
+        setColorFilter(tint)
+        contentDescription = description
+        val size = (44 * density).toInt()
+        layoutParams = LayoutParams(size, size)
+        val pad = (10 * density).toInt()
+        setPadding(pad, pad, pad, pad)
+        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        val outValue = TypedValue()
+        context.theme.resolveAttribute(
+            android.R.attr.selectableItemBackgroundBorderless,
+            outValue,
+            true,
+        )
+        setBackgroundResource(outValue.resourceId)
+        setOnClickListener { onClick() }
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+    private var lastX = 0f
+    private var lastY = 0f
+
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.rawX
+                downY = event.rawY
+                lastX = event.rawX
+                lastY = event.rawY
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (abs(event.rawX - downX) > touchSlop ||
+                    abs(event.rawY - downY) > touchSlop
+                ) {
+                    lastX = event.rawX
+                    lastY = event.rawY
+                    return true
+                }
+            }
         }
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val size = (56 * resources.displayMetrics.density).toInt()
-        setMeasuredDimension(size, size)
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val r = width / 2f - ringPaint.strokeWidth
-        canvas.drawCircle(width / 2f, height / 2f, r, fillPaint)
-        canvas.drawCircle(width / 2f, height / 2f, r, ringPaint)
-        canvas.drawText("◉", width / 2f, height / 2f + glyphPaint.textSize / 3f, glyphPaint)
+        return super.onInterceptTouchEvent(event)
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                lastX = event.rawX
-                lastY = event.rawY
-                dragging = false
-            }
-
+        when (event.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - lastX
                 val dy = event.rawY - lastY
-                if (abs(dx) > 6 || abs(dy) > 6) {
-                    dragging = true
-                    onDrag?.invoke(dx, dy)
-                    lastX = event.rawX
-                    lastY = event.rawY
-                }
+                lastX = event.rawX
+                lastY = event.rawY
+                if (dx != 0f || dy != 0f) onDrag?.invoke(dx, dy)
+                return true
             }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> return true
         }
-        return gestures.onTouchEvent(event) || super.onTouchEvent(event)
+        return super.onTouchEvent(event)
     }
 }

@@ -77,8 +77,10 @@
     <string name="settings_buffer_size">Buffer size</string>
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
     <string name="settings_crash_notifications">Crash notifications</string>
-    <string name="settings_bubble">Floating bubble</string>
-    <string name="settings_bubble_desc">Tap to bookmark a moment, long-press to toggle recording. Needs the overlay permission.</string>
+    <string name="settings_bubble">Floating controls</string>
+    <string name="settings_bubble_desc">Show record, bookmark and hide controls over other apps. Needs the overlay permission.</string>
+    <string name="bubble_controls">Floating controls</string>
+    <string name="bubble_hide">Hide floating controls</string>
     <string name="settings_theme">Theme</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
@@ -109,7 +111,7 @@
     <string name="tile_record">Record logs</string>
     <string name="tile_recording">Recording · %1$d</string>
     <string name="bookmark_added">Bookmark added</string>
-    <string name="not_recording">Not recording — long-press to start</string>
+    <string name="not_recording">Not recording — tap the record button first</string>
 
     <!-- Common -->
     <string name="save">Save</string>
