@@ -2,12 +2,12 @@ package io.github.shiaho777.logsleuth.app.ui.stream
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
+import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
@@ -31,12 +31,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /** A log line with a stable identity for LazyColumn keys. */
 data class UiLogEntry(val seq: Long, val entry: LogcatEntry)
-
-data class AppChoice(val packageName: String, val label: String)
 
 data class StreamUiState(
     val access: AccessState? = null,
@@ -71,6 +68,7 @@ class StreamViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val sessionDao: io.github.shiaho777.logsleuth.app.data.db.SessionDao,
     private val exporter: io.github.shiaho777.logsleuth.app.core.export.SessionExporter,
+    private val installedApps: InstalledApps,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(StreamUiState())
@@ -125,7 +123,9 @@ class StreamViewModel @Inject constructor(
                 _ui.update { it.copy(presets = list.map(::toModel)) }
             }
         }
-        viewModelScope.launch { loadInstalledApps() }
+        viewModelScope.launch {
+            _ui.update { it.copy(apps = installedApps.load()) }
+        }
 
         // Collector: stage entries; a ticker publishes them in ~120ms batches
         // so a busy logcat cannot trigger a recompose per line.
@@ -374,28 +374,8 @@ class StreamViewModel @Inject constructor(
         _ui.update { it.copy(regexInvalid = compiled.regexInvalid) }
     }
 
-    private suspend fun loadInstalledApps() = withContext(Dispatchers.IO) {
-        val pm = context.packageManager
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = runCatching {
-            pm.queryIntentActivities(intent, PackageManager.MATCH_ALL).mapNotNull { ri ->
-                val info: ApplicationInfo = ri.activityInfo.applicationInfo
-                AppChoice(
-                    packageName = info.packageName,
-                    label = runCatching { pm.getApplicationLabel(info).toString() }
-                        .getOrDefault(info.packageName),
-                )
-            }.distinctBy { it.packageName }.sortedBy { it.label.lowercase() }
-        }.getOrDefault(emptyList())
-        _ui.update { it.copy(apps = apps) }
-    }
-
-    private fun resolveUid(packageName: String?): Int? {
-        if (packageName == null) return null
-        return runCatching {
-            context.packageManager.getApplicationInfo(packageName, 0).uid
-        }.getOrNull()
-    }
+    private fun resolveUid(packageName: String?): Int? =
+        installedApps.resolveUid(packageName)
 
     fun shareFinishedSession(format: io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) {
         val session = _ui.value.finishedSession ?: return

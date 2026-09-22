@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
@@ -43,7 +44,7 @@ fun LanguagePicker(
                     selected = current == tag,
                     onClick = { onSelect(tag) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = labels.size),
-                ) { Text(label, maxLines = 1) }
+                ) { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         }
     }

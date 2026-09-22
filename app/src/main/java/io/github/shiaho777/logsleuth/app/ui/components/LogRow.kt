@@ -180,6 +180,10 @@ fun LogRow(
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
+                // Multi-line entries (e.g. glued fatal blocks) are capped in
+                // the list; the detail sheet always shows the full message.
+                maxLines = 8,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

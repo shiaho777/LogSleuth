@@ -96,6 +96,9 @@
     <string name="session_deleted">会话已删除</string>
     <string name="session_recording_live">录制中</string>
     <string name="lines_count">%1$d 行</string>
+    <string name="unit_kb">%1$d KB</string>
+    <string name="duration_sec">%1$d 秒</string>
+    <string name="duration_min_sec">%1$d 分 %2$d 秒</string>
     <string name="crash_deleted">崩溃事件已删除</string>
     <string name="settings_about">关于</string>
     <string name="settings_version">LogSleuth %1$s · 开源(Apache-2.0)</string>

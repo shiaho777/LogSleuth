@@ -26,6 +26,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -68,14 +71,27 @@ fun SettingsScreen(
                         stringResource(R.string.settings_buffer_size),
                         style = MaterialTheme.typography.titleSmall,
                     )
+                    // Drag locally; persist once on release — writing the
+                    // DataStore on every pointer move stalls the stream.
+                    var sliderValue by remember(s.bufferSize) {
+                        mutableStateOf(s.bufferSize.toFloat())
+                    }
                     Text(
-                        stringResource(R.string.settings_buffer_size_value, s.bufferSize),
+                        stringResource(
+                            R.string.settings_buffer_size_value,
+                            sliderValue.roundToInt(),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Slider(
-                        value = s.bufferSize.toFloat(),
-                        onValueChange = { viewModel.setBufferSize((it / 1000f).roundToInt() * 1000) },
+                        value = sliderValue,
+                        onValueChange = {
+                            sliderValue = (it / 1000f).roundToInt() * 1000f
+                        },
+                        onValueChangeFinished = {
+                            viewModel.setBufferSize(sliderValue.roundToInt())
+                        },
                         valueRange = 1_000f..200_000f,
                     )
                 }

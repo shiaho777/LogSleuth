@@ -90,6 +90,13 @@ class BubbleService : Service() {
         view.onDrag = { dx, dy ->
             lp.x += dx.toInt()
             lp.y += dy.toInt()
+            // Clamp to the visible window — an off-screen pill cannot be
+            // reached again without disabling the feature entirely.
+            val bounds = displayBounds()
+            val w = if (view.width > 0) view.width else view.measuredWidth
+            val h = if (view.height > 0) view.height else view.measuredHeight
+            lp.x = lp.x.coerceIn(bounds.left, (bounds.right - w).coerceAtLeast(bounds.left))
+            lp.y = lp.y.coerceIn(bounds.top, (bounds.bottom - h).coerceAtLeast(bounds.top))
             runCatching { wm.updateViewLayout(view, lp) }
         }
 
@@ -104,6 +111,21 @@ class BubbleService : Service() {
         runCatching { wm.addView(view, lp) }
             .onFailure { stopSelf() }
         bubble = view
+    }
+
+    /** Visible window bounds for clamping the drag position. */
+    private fun displayBounds(): android.graphics.Rect {
+        val wm = windowManager ?: return android.graphics.Rect()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            wm.currentWindowMetrics.bounds
+        } else {
+            @Suppress("DEPRECATION")
+            android.graphics.Rect().also {
+                val dm = android.util.DisplayMetrics()
+                wm.defaultDisplay.getMetrics(dm)
+                it.set(0, 0, dm.widthPixels, dm.heightPixels)
+            }
+        }
     }
 
     // Swiping the app away from recents removes the floating controls too —

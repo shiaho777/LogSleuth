@@ -50,10 +50,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
-import io.github.shiaho777.logsleuth.app.ui.stream.AppChoice
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +90,8 @@ fun FilterBar(
                             filter.packageName
                                 ?: stringResource(R.string.app_filter_all),
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 180.dp),
                         )
                     },
                 )
@@ -102,7 +105,14 @@ fun FilterBar(
                         FilterChip(
                             selected = preset.id != 0L && preset.id == filter.id,
                             onClick = { onApplyPreset(preset) },
-                            label = { Text(preset.name, maxLines = 1) },
+                            label = {
+                                Text(
+                                    preset.name,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 140.dp),
+                                )
+                            },
                         )
                     }
                 }
@@ -193,7 +203,7 @@ private fun LevelDropdown(current: LogLevel, onSelect: (LogLevel) -> Unit) {
             selected = current != LogLevel.V,
             onClick = { open = true },
             leadingIcon = { LevelBadge(current) },
-            label = { Text("≥ ${levelName(current)}", maxLines = 1) },
+            label = { Text("≥ ${levelName(current)}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(
@@ -204,7 +214,7 @@ private fun LevelDropdown(current: LogLevel, onSelect: (LogLevel) -> Unit) {
         ) {
             LogLevel.entries.forEach { level ->
                 DropdownMenuItem(
-                    text = { Text(levelName(level), maxLines = 1) },
+                    text = { Text(levelName(level), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { LevelBadge(level) },
                     trailingIcon = {
                         if (level == current) {
@@ -340,6 +350,7 @@ private fun AppPickerDialog(
                                 Text(
                                     app.label,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     color = if (selected) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
@@ -351,6 +362,7 @@ private fun AppPickerDialog(
                                 Text(
                                     app.packageName,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
