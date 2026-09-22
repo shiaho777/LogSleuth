@@ -3,6 +3,7 @@ package io.github.shiaho777.logsleuth.app.service
 import android.content.Context
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
@@ -180,6 +181,42 @@ class RecordingManager @Inject constructor(
         }
         s.sessionId?.let { sessionDao.finish(it, System.currentTimeMillis(), finalLines) }
         _state.value = RecordingState()
+    }
+
+    /**
+     * Marks sessions orphaned by a process death as finished — the writer
+     * died with the process, so endedAt was never written. Called once at
+     * app start; endedAt falls back to the file's mtime (when recording
+     * actually stopped), and the line count is recomputed with the same
+     * assembler logic used live. A recording that is currently active is
+     * never touched.
+     */
+    fun reconcileInterruptedSessions() {
+        scope.launch {
+            if (_state.value.isRecording) return@launch
+            for (s in sessionDao.unfinished()) {
+                val file = File(s.filePath)
+                val endedAt = file.lastModified()
+                    .takeIf { it > 0L } ?: System.currentTimeMillis()
+                sessionDao.finish(s.id, endedAt, countEntries(file))
+            }
+        }
+    }
+
+    private fun countEntries(file: File): Long {
+        if (!file.isFile) return 0L
+        val assembler = EntryAssembler()
+        var n = 0L
+        runCatching {
+            file.bufferedReader().useLines { lines ->
+                for (line in lines) {
+                    if (line.startsWith("#") || line.startsWith("=====")) continue
+                    n += assembler.onLine(line).size
+                }
+            }
+            if (assembler.flush() != null) n++
+        }
+        return n
     }
 
     private fun defaultName(): String {

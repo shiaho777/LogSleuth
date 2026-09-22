@@ -24,6 +24,10 @@ interface SessionDao {
     @Query("UPDATE sessions SET endedAt = :endedAt, lineCount = :lineCount WHERE id = :id")
     suspend fun finish(id: Long, endedAt: Long, lineCount: Long)
 
+    /** Sessions left open by a process death (endedAt never written). */
+    @Query("SELECT * FROM sessions WHERE endedAt IS NULL")
+    suspend fun unfinished(): List<SessionEntity>
+
     @Delete
     suspend fun delete(entity: SessionEntity)
 }

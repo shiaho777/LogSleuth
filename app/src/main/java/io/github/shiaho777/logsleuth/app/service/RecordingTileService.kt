@@ -8,6 +8,7 @@ import io.github.shiaho777.logsleuth.app.R
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -18,11 +19,16 @@ class RecordingTileService : TileService() {
 
     @Inject lateinit var recordingManager: RecordingManager
 
+    /** Lives for the service instance; onClick needs it between listens. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /** Collects recording state only while the QS panel is visible. */
+    private var listenJob: Job? = null
 
     override fun onStartListening() {
         super.onStartListening()
-        scope.launch {
+        listenJob?.cancel()
+        listenJob = scope.launch {
             recordingManager.state.collect { state ->
                 qsTile?.apply {
                     this.state = if (state.isRecording) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
@@ -38,8 +44,14 @@ class RecordingTileService : TileService() {
     }
 
     override fun onStopListening() {
+        listenJob?.cancel()
+        listenJob = null
         super.onStopListening()
+    }
+
+    override fun onDestroy() {
         scope.cancel()
+        super.onDestroy()
     }
 
     override fun onClick() {

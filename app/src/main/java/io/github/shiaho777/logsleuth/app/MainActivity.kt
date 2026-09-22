@@ -42,6 +42,9 @@ class MainActivity : ComponentActivity() {
     /** Session id produced by importing an externally shared log file. */
     private var importedSessionId by mutableStateOf<Long?>(null)
 
+    /** Route requested by a later intent (singleTask → onNewIntent). */
+    private var pendingRoute by mutableStateOf<String?>(null)
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocales.wrap(newBase))
     }
@@ -61,6 +64,13 @@ class MainActivity : ComponentActivity() {
                 importedSessionId?.let {
                     navController.navigate(Routes.sessionDetail(it))
                     importedSessionId = null
+                }
+            }
+
+            LaunchedEffect(pendingRoute) {
+                pendingRoute?.let {
+                    navController.navigate(it)
+                    pendingRoute = null
                 }
             }
 
@@ -86,7 +96,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_CRASHES, false)) {
+            pendingRoute = Routes.CRASHES
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
