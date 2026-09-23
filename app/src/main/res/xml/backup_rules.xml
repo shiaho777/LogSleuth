@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Log captures and the crash database may hold sensitive log data; only
+     settings (files/datastore) are worth backing up. "." excludes a domain
+     root entirely. -->
+<full-backup-content>
+    <exclude domain="file" path="recordings/" />
+    <exclude domain="file" path="imports/" />
+    <exclude domain="database" path="." />
+</full-backup-content>

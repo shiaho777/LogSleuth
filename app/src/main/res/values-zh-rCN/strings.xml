@@ -68,7 +68,7 @@
 
     <!-- 崩溃 -->
     <string name="crashes_title">崩溃与 ANR</string>
-    <string name="crashes_empty">还没有侦测到崩溃。LogSleuth 会在流式查看或录制时标记 FATAL EXCEPTION 与 ANR 事件。</string>
+    <string name="crashes_empty">还没有侦测到崩溃。LogSleuth 会在流式查看或录制时标记 FATAL EXCEPTION、原生崩溃与 ANR 事件。</string>
     <string name="unknown_app">未知应用</string>
     <string name="copy">复制</string>
     <string name="close">关闭</string>
@@ -77,6 +77,8 @@
     <string name="settings_title">设置</string>
     <string name="settings_buffer_size">缓冲区大小</string>
     <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
+    <string name="settings_recording_max">录制大小上限</string>
+    <string name="settings_recording_max_value">录制达到 %1$d MB 后自动停止</string>
     <string name="settings_crash_notifications">崩溃通知</string>
     <string name="settings_bubble">悬浮控件</string>
     <string name="settings_bubble_desc">在其他应用上显示录制、书签与隐藏控件。需要悬浮窗权限。</string>
@@ -108,9 +110,12 @@
     <string name="notif_channel_crashes">崩溃与 ANR</string>
     <string name="notif_recording_title">正在录制日志</string>
     <string name="notif_recording_text">已捕获 %1$d 行</string>
+    <string name="notif_recording_limit_title">录制已停止</string>
+    <string name="notif_recording_limit_text">已达到大小上限(%1$d MB)</string>
     <string name="notif_action_stop">停止</string>
     <string name="notif_action_bookmark">书签</string>
     <string name="notif_crash_title">崩溃:%1$s</string>
+    <string name="notif_native_title">原生崩溃:%1$s</string>
     <string name="notif_anr_title">ANR:%1$s</string>
     <string name="tile_record">录制日志</string>
     <string name="tile_recording">录制中 · %1$d</string>

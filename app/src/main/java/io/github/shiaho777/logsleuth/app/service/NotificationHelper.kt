@@ -18,6 +18,7 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_CRASHES = "crashes"
         const val ID_RECORDING = 1001
+        const val ID_RECORDING_LIMIT = 1002
         const val ID_CRASH_BASE = 2000
     }
 
@@ -70,10 +71,15 @@ class NotificationHelper(private val context: Context) {
             .build()
     }
 
-    fun notifyCrash(signal: CrashSignal) {
+    /**
+     * [eventId] is the Room row id — stable and unique per crash, unlike a
+     * timestamp slice which collides when several crashes land at once.
+     */
+    fun notifyCrash(signal: CrashSignal, eventId: Long) {
         val label = signal.packageName ?: context.getString(R.string.unknown_app)
         val title = when (signal.type) {
             CrashType.CRASH -> context.getString(R.string.notif_crash_title, label)
+            CrashType.NATIVE -> context.getString(R.string.notif_native_title, label)
             CrashType.ANR -> context.getString(R.string.notif_anr_title, label)
         }
         val openIntent = PendingIntent.getActivity(
@@ -89,6 +95,24 @@ class NotificationHelper(private val context: Context) {
             .setContentIntent(openIntent)
             .setAutoCancel(true)
             .build()
-        manager.notify(ID_CRASH_BASE + (signal.timeMillis % 100_000).toInt(), notification)
+        manager.notify(ID_CRASH_BASE + (eventId % 1_000_000).toInt(), notification)
+    }
+
+    /** Posted when a recording auto-stops after hitting the size limit. */
+    fun notifyRecordingLimit(maxMb: Int) {
+        val openIntent = PendingIntent.getActivity(
+            context,
+            5,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_RECORDING)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_recording_limit_title))
+            .setContentText(context.getString(R.string.notif_recording_limit_text, maxMb))
+            .setContentIntent(openIntent)
+            .setAutoCancel(true)
+            .build()
+        manager.notify(ID_RECORDING_LIMIT, notification)
     }
 }

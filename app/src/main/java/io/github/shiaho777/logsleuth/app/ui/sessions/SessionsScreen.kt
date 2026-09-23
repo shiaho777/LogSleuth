@@ -60,7 +60,6 @@ import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScope
-import java.io.File
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,7 +73,7 @@ fun SessionsScreen(
     val sessions by viewModel.sessions.collectAsState()
     val recording by viewModel.recording.collectAsState()
     val pendingDelete by viewModel.pendingDelete.collectAsState()
-    val shown = sessions.filter { it.id != pendingDelete?.id }
+    val shown = sessions.filter { it.session.id != pendingDelete?.id }
     var shareTarget by remember { mutableStateOf<SessionEntity?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -133,8 +132,9 @@ fun SessionsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(shown.size, key = { shown[it].id }) { i ->
-                    val session = shown[i]
+                items(shown.size, key = { shown[it].session.id }) { i ->
+                    val row = shown[i]
+                    val session = row.session
                     val isLive = recording.isRecording && recording.sessionId == session.id
                     val dismissState = rememberSwipeToDismissBoxState(
                         // A recording-in-progress session cannot be dismissed.
@@ -167,6 +167,7 @@ fun SessionsScreen(
                     ) {
                         SessionCard(
                             session = session,
+                            sizeBytes = row.sizeBytes,
                             liveLines = if (isLive) recording.lineCount else null,
                             animatedVisibilityScope = animatedVisibilityScope,
                             onOpen = { onOpenSession(session.id) },
@@ -203,6 +204,7 @@ fun SessionsScreen(
 @Composable
 private fun SessionCard(
     session: SessionEntity,
+    sizeBytes: Long,
     liveLines: Long?,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onOpen: () -> Unit,
@@ -264,7 +266,7 @@ private fun SessionCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    sessionMeta(session, liveLines),
+                    sessionMeta(session, liveLines, sizeBytes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -291,8 +293,8 @@ private fun SessionCard(
 }
 
 @Composable
-private fun sessionMeta(session: SessionEntity, liveLines: Long?): String {
-    val sizeKb = runCatching { File(session.filePath).length() / 1024 }.getOrDefault(0L)
+private fun sessionMeta(session: SessionEntity, liveLines: Long?, sizeBytes: Long): String {
+    val sizeKb = sizeBytes / 1024
     val relative = DateUtils.getRelativeTimeSpanString(
         session.startedAt,
         System.currentTimeMillis(),

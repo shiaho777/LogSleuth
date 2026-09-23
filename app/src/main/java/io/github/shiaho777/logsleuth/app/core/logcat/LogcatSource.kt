@@ -16,8 +16,13 @@ sealed interface LogcatSource {
      * Command line for streaming with the uid column included. Per-app
      * filtering is done client-side against this column, which works on both
      * access paths (logd restricts the server-side `--uid` mask to shell).
+     *
+     * `crash` and `events` buffers are merged in so native crash dumps
+     * (`Fatal signal`, tag DEBUG) and `am_anr` events reach CrashDetector —
+     * the default main buffer alone carries neither.
      */
-    fun buildCommand(): List<String> = listOf("logcat", "-v", "threadtime", "-v", "uid")
+    fun buildCommand(): List<String> =
+        listOf("logcat", "-b", "main", "-b", "crash", "-b", "events", "-v", "threadtime", "-v", "uid")
 
     /** Streams raw logcat lines until the flow collector is cancelled. */
     fun stream(): Flow<String>

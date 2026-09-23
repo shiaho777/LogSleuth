@@ -38,7 +38,7 @@ data class CrashEventEntity(
     val time: Long,
     val pid: Int,
     val packageName: String? = null,
-    val type: String, // CRASH | ANR
+    val type: String, // CRASH | ANR | NATIVE
     val firstLine: String,
     val snippet: String,
 )

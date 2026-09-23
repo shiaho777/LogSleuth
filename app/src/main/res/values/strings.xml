@@ -68,7 +68,7 @@
 
     <!-- Crashes -->
     <string name="crashes_title">Crashes &amp; ANRs</string>
-    <string name="crashes_empty">No crashes detected. LogSleuth flags FATAL EXCEPTION and ANR events while streaming or recording.</string>
+    <string name="crashes_empty">No crashes detected. LogSleuth flags FATAL EXCEPTION, native crash and ANR events while streaming or recording.</string>
     <string name="unknown_app">Unknown app</string>
     <string name="copy">Copy</string>
     <string name="close">Close</string>
@@ -77,6 +77,8 @@
     <string name="settings_title">Settings</string>
     <string name="settings_buffer_size">Buffer size</string>
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
+    <string name="settings_recording_max">Recording size limit</string>
+    <string name="settings_recording_max_value">Recording auto-stops at %1$d MB</string>
     <string name="settings_crash_notifications">Crash notifications</string>
     <string name="settings_bubble">Floating controls</string>
     <string name="settings_bubble_desc">Show record, bookmark and hide controls over other apps. Needs the overlay permission.</string>
@@ -108,9 +110,12 @@
     <string name="notif_channel_crashes">Crashes &amp; ANRs</string>
     <string name="notif_recording_title">Recording logs</string>
     <string name="notif_recording_text">%1$d lines captured</string>
+    <string name="notif_recording_limit_title">Recording stopped</string>
+    <string name="notif_recording_limit_text">Size limit reached (%1$d MB)</string>
     <string name="notif_action_stop">Stop</string>
     <string name="notif_action_bookmark">Bookmark</string>
     <string name="notif_crash_title">Crash: %1$s</string>
+    <string name="notif_native_title">Native crash: %1$s</string>
     <string name="notif_anr_title">ANR: %1$s</string>
     <string name="tile_record">Record logs</string>
     <string name="tile_recording">Recording · %1$d</string>

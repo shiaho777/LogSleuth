@@ -240,7 +240,7 @@ class LogcatEngine @Inject constructor(
 
     private fun onCrash(signal: CrashSignal) {
         scope.launch {
-            crashEventDao.insert(
+            val eventId = crashEventDao.insert(
                 CrashEventEntity(
                     sessionId = activeSessionId,
                     time = signal.timeMillis,
@@ -252,9 +252,12 @@ class LogcatEngine @Inject constructor(
                 ),
             )
             if (crashNotifications) {
-                notificationHelper.notifyCrash(signal)
+                notificationHelper.notifyCrash(signal, eventId)
             }
-            _crashes.emit(signal)
+            // Non-blocking: with no collector (record-only sessions) a full
+            // buffer would suspend this coroutine forever. Room is the source
+            // of truth, so a dropped live event is harmless.
+            _crashes.tryEmit(signal)
         }
     }
 

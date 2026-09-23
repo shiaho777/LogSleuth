@@ -70,8 +70,9 @@ class SessionDetailViewModel @Inject constructor(
                 return@launch
             }
             all = parseFile(session)
+            val fileMissing = withContext(Dispatchers.IO) { !File(session.filePath).exists() }
             applyFilter(_ui.value.filter)
-            _ui.update { it.copy(loading = false, missingFile = all.isEmpty() && !File(session.filePath).exists()) }
+            _ui.update { it.copy(loading = false, missingFile = all.isEmpty() && fileMissing) }
         }
         viewModelScope.launch {
             crashEventDao.observeForSession(sessionId).collect { c -> _ui.update { it.copy(crashes = c) } }

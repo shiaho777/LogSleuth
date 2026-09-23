@@ -196,7 +196,9 @@ class StreamViewModel @Inject constructor(
             }
             // Paused entries are bounded too: without this, pausing during a
             // log storm grows `pending` without limit.
-            while (pending.size > bufferCap) pending.removeAt(0)
+            if (pending.size > bufferCap) {
+                pending.subList(0, pending.size - bufferCap).clear()
+            }
             trimLocked()
             if (!pausedNow && addedVisible > 0) publishLocked()
         }
@@ -439,8 +441,10 @@ internal fun evictOverflow(
     val overflow = all.size - cap
     if (overflow <= 0) return
     val lastEvictedSeq = all[overflow - 1].seq
-    repeat(overflow) { all.removeAt(0) }
+    // subList().clear() is a single arraycopy — removeAt(0) in a loop is
+    // O(n·overflow) and stalls the drain under sustained streams.
+    all.subList(0, overflow).clear()
     var drop = 0
     while (drop < visible.size && visible[drop].seq <= lastEvictedSeq) drop++
-    repeat(drop) { visible.removeAt(0) }
+    if (drop > 0) visible.subList(0, drop).clear()
 }
