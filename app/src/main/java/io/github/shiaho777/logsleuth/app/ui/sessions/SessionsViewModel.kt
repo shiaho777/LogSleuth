@@ -21,9 +21,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** A session row plus its log file's size, resolved off the main thread. */
+data class SessionRow(val session: SessionEntity, val sizeBytes: Long)
 
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
@@ -35,7 +40,12 @@ class SessionsViewModel @Inject constructor(
     private val recordingManager: RecordingManager,
 ) : ViewModel() {
 
-    val sessions: StateFlow<List<SessionEntity>> = sessionDao.observeAll()
+    val sessions: StateFlow<List<SessionRow>> = sessionDao.observeAll()
+        .map { list ->
+            // File.length() is a stat syscall — keep it off the composition path.
+            list.map { SessionRow(it, runCatching { File(it.filePath).length() }.getOrDefault(0L)) }
+        }
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Live recording state: the in-progress session row shows its real

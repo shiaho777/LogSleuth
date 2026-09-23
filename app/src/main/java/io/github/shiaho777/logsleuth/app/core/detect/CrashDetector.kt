@@ -3,7 +3,7 @@ package io.github.shiaho777.logsleuth.app.core.detect
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 
-enum class CrashType { CRASH, ANR }
+enum class CrashType { CRASH, ANR, NATIVE }
 
 data class CrashSignal(
     val type: CrashType,
@@ -20,7 +20,11 @@ data class CrashSignal(
  * - CRASH: an `AndroidRuntime` error line starting with `FATAL EXCEPTION`,
  *   followed by the exception block (same pid, AndroidRuntime, E-level).
  *   The block ends on the first non-matching line or after [maxBlockLines].
- * - ANR: any line containing `ANR in <package>` (or `am_anr`).
+ * - NATIVE: a `Fatal signal` line from the crash buffer (tag `DEBUG`,
+ *   emitted by crash_dump; `libc` on some ROMs), followed by the tombstone
+ *   dump lines from the same pid/tag at any level.
+ * - ANR: `ANR in <package>` on the main buffer (ActivityManager), or an
+ *   `am_anr` event line whose payload is `[user,pid,package,flags,reason]`.
  *
  * Feed every entry via [onEntry]; it returns a completed [CrashSignal] or null.
  * Call [flush] when the stream stops to emit a still-open crash block.
@@ -29,20 +33,28 @@ class CrashDetector(private val maxBlockLines: Int = 100) {
 
     private val processRegex = Regex("""Process:\s*([\w.]+)\s*,\s*PID:""")
     private val anrRegex = Regex("""ANR in\s+([\w.]+)""")
+    private val fatalPidRegex = Regex("""pid\s+(\d+)\s+\(([\w.]+)\)""")
+    private val amAnrRegex = Regex("""\[\s*-?\d+\s*,\s*(-?\d+)\s*,\s*([\w.]+)""")
 
     private var collectingPid: Int? = null
     private var collectingTag: String? = null
+
+    /** Minimum level a continuation line needs — E for Java fatals, any
+     * level for native dumps (crash_dump writes them at I/D). */
+    private var blockMinPriority = LogLevel.E.priority
     private val block = StringBuilder()
     private var blockLines = 0
+    private var blockType = CrashType.CRASH
     private var firstLine = ""
     private var packageName: String? = null
     private var startTime = 0L
     private var pid = -1
 
     fun onEntry(entry: LogcatEntry): CrashSignal? {
-        // A fresh FATAL line always starts a new block; flush any open one first
-        // (the previous process died, this is a different crash).
-        if (isFatalStart(entry)) {
+        // A fresh crash line always starts a new block; flush any open one
+        // first (the previous process died, this is a different crash).
+        val newBlock = isFatalStart(entry) || isNativeStart(entry)
+        if (newBlock) {
             val flushed = if (collectingPid != null) finishBlock() else null
             startBlock(entry)
             return flushed
@@ -52,7 +64,7 @@ class CrashDetector(private val maxBlockLines: Int = 100) {
         if (pidBeingCollected != null) {
             val stillInBlock = entry.pid == pidBeingCollected &&
                 entry.tag == collectingTag &&
-                entry.level.priority >= LogLevel.E.priority &&
+                entry.level.priority >= blockMinPriority &&
                 blockLines < maxBlockLines
             if (stillInBlock) {
                 block.appendLine(entry.raw)
@@ -76,16 +88,31 @@ class CrashDetector(private val maxBlockLines: Int = 100) {
             entry.level.priority >= LogLevel.E.priority &&
             entry.message.startsWith("FATAL EXCEPTION")
 
+    private fun isNativeStart(entry: LogcatEntry): Boolean =
+        (entry.tag == "DEBUG" || entry.tag == "libc") &&
+            entry.message.startsWith("Fatal signal")
+
     private fun startBlock(entry: LogcatEntry) {
+        val native = isNativeStart(entry)
         collectingPid = entry.pid
         collectingTag = entry.tag
+        blockMinPriority = if (native) LogLevel.V.priority else LogLevel.E.priority
+        blockType = if (native) CrashType.NATIVE else CrashType.CRASH
         block.clear()
         block.appendLine(entry.raw)
         blockLines = 1
         firstLine = entry.message.take(200)
-        packageName = null
         startTime = entry.timestampMillis
-        pid = entry.pid
+        if (native) {
+            // `... in tid N (thread), pid M (com.pkg)` — the payload names the
+            // crashed process; the logcat pid column is crash_dump's own.
+            val m = fatalPidRegex.find(entry.message)
+            pid = m?.groupValues?.get(1)?.toIntOrNull() ?: entry.pid
+            packageName = m?.groupValues?.get(2)
+        } else {
+            pid = entry.pid
+            packageName = null
+        }
     }
 
     private fun detectStart(entry: LogcatEntry): CrashSignal? {
@@ -100,12 +127,27 @@ class CrashDetector(private val maxBlockLines: Int = 100) {
                 timeMillis = entry.timestampMillis,
             )
         }
+        // `am_anr` from the events buffer: [userId,pid,package,flags,reason].
+        // The pid/package in the payload identify the stalled app, not
+        // system_server which emits the line.
+        if (entry.tag == "am_anr") {
+            amAnrRegex.find(entry.message)?.let { match ->
+                return CrashSignal(
+                    type = CrashType.ANR,
+                    pid = match.groupValues[1].toIntOrNull() ?: entry.pid,
+                    packageName = match.groupValues[2],
+                    firstLine = entry.message.take(200),
+                    snippet = entry.raw,
+                    timeMillis = entry.timestampMillis,
+                )
+            }
+        }
         return null
     }
 
     private fun finishBlock(): CrashSignal {
         val signal = CrashSignal(
-            type = CrashType.CRASH,
+            type = blockType,
             pid = pid,
             packageName = packageName,
             firstLine = firstLine,

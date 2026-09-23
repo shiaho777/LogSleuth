@@ -24,6 +24,8 @@ data class Settings(
     val setupCompleted: Boolean = false,
     /** In-app language: "system" | "en" | "zh-CN" (see AppLocales). */
     val language: String = AppLocales.SYSTEM,
+    /** Recordings auto-stop at this size so a long session can't fill storage. */
+    val recordingMaxMb: Int = 64,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -36,6 +38,7 @@ class SettingsRepository(private val context: Context) {
         val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
         val LANGUAGE = stringPreferencesKey("language")
+        val RECORDING_MAX_MB = intPreferencesKey("recording_max_mb")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -47,6 +50,7 @@ class SettingsRepository(private val context: Context) {
             logTextScale = p[Keys.LOG_TEXT_SCALE] ?: 1,
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
+            recordingMaxMb = p[Keys.RECORDING_MAX_MB] ?: 64,
         )
     }
 
@@ -67,6 +71,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSetupCompleted(value: Boolean) =
         context.dataStore.edit { it[Keys.SETUP_COMPLETED] = value }
+
+    suspend fun setRecordingMaxMb(value: Int) =
+        context.dataStore.edit { it[Keys.RECORDING_MAX_MB] = value.coerceIn(8, 512) }
 
     /**
      * Mirrors the choice into DataStore (for UI state) and applies the

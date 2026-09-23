@@ -31,7 +31,7 @@ A polished, Logcat-style live log viewer for the whole device — no root requir
 | Filters | Level / tag / keyword / regex / exclusion filters, saved filter presets |
 | Per-app filter | Filter by target app (requires Shizuku) |
 | Recording | Record sessions in the background, replay them later |
-| Crash & ANR detection | Highlights `FATAL EXCEPTION` and ANR events, notifies you |
+| Crash & ANR detection | Highlights `FATAL EXCEPTION`, native `Fatal signal` and ANR events, notifies you |
 | Bookmarks | Optional floating bubble to timestamp "the problem happened NOW" |
 | Export | Share sessions as `.txt` or `.zip` with device info attached |
 
@@ -84,7 +84,7 @@ LogcatSource (local READ_LOGS / Shizuku shell)
   → LogcatEngine (single owner of the logcat process, auto-reconnect)
       ├→ Stream UI (level colors, filters, search, pause/buffering)
       ├→ RecordingManager (foreground service → session files + Room)
-      └→ CrashDetector (FATAL EXCEPTION / ANR → events + notifications)
+      └→ CrashDetector (FATAL EXCEPTION / Fatal signal / ANR → events + notifications)
 
 logsleuth-sdk (embedded in a host app — zero permissions, zero network):
   Sleuth.init → own-process logcat capture + crash handler + ANR watchdog

@@ -7,6 +7,7 @@ import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
+import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import java.io.BufferedWriter
 import java.io.File
 import javax.inject.Inject
@@ -18,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -45,6 +47,8 @@ class RecordingManager @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val engine: LogcatEngine,
     private val sessionDao: SessionDao,
+    private val settingsRepository: SettingsRepository,
+    private val notificationHelper: NotificationHelper,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -59,6 +63,20 @@ class RecordingManager @Inject constructor(
     private var writer: BufferedWriter? = null
     private val writeMutex = Mutex()
 
+    /** Session file byte cap captured at start; 0 = not recording. */
+    @Volatile
+    private var maxBytes = 0L
+
+    @Volatile
+    private var limitMb = 0
+
+    /** Set once the cap fires — later emissions must not re-trigger stop/notify. */
+    @Volatile
+    private var limitTriggered = false
+
+    /** Bytes written so far — counted as UTF-8 line bytes, matching the file. */
+    private var bytesWritten = 0L
+
     suspend fun start(name: String?, filter: LogFilter): Result<Long> =
         runCatching {
             check(!_state.value.isRecording) { "Already recording" }
@@ -68,6 +86,11 @@ class RecordingManager @Inject constructor(
             val w = file.bufferedWriter(Charsets.UTF_8, 64 * 1024)
             writer = w
 
+            limitMb = settingsRepository.settings.first().recordingMaxMb
+            maxBytes = limitMb.toLong() * 1024 * 1024
+            bytesWritten = 0L
+            limitTriggered = false
+
             val header = buildString {
                 appendLine("# LogSleuth session")
                 appendLine("# started: ${java.time.Instant.now()}")
@@ -76,6 +99,7 @@ class RecordingManager @Inject constructor(
                 appendLine("# access: ${engine.access.value.kind}")
             }
             w.write(header)
+            bytesWritten += header.toByteArray(Charsets.UTF_8).size
             w.flush()
 
             val sessionId = sessionDao.insert(
@@ -113,7 +137,10 @@ class RecordingManager @Inject constructor(
                         // Include recent history as context before start.
                         val matched = snap.entries.filter(compiled::matches)
                         writeMutex.withLock {
-                            matched.forEach { w.appendLine(it.raw) }
+                            matched.forEach {
+                                w.appendLine(it.raw)
+                                bytesWritten += it.raw.toByteArray(Charsets.UTF_8).size + 1
+                            }
                             if (matched.isNotEmpty()) {
                                 // '#'-prefixed: skipped on replay, visible in exports.
                                 w.appendLine(
@@ -128,12 +155,15 @@ class RecordingManager @Inject constructor(
                             lineCount = count,
                             backfillCount = count,
                         )
+                        // A huge engine buffer can already exceed the cap.
+                        if (bytesWritten >= maxBytes) stopForLimit()
                     }
                     .collect { entry ->
                         if (entry.seq <= snapshotSeq) return@collect
                         if (compiled.matches(entry)) {
                             writeMutex.withLock {
                                 w.appendLine(entry.raw)
+                                bytesWritten += entry.raw.toByteArray(Charsets.UTF_8).size + 1
                                 count++
                                 finalLines = count
                                 if (count % FLUSH_BATCH == 0L) w.flush()
@@ -141,6 +171,7 @@ class RecordingManager @Inject constructor(
                             if (count % STATE_BATCH == 0L) {
                                 _state.value = _state.value.copy(lineCount = count)
                             }
+                            if (bytesWritten >= maxBytes) stopForLimit()
                         }
                     }
             }
@@ -164,6 +195,21 @@ class RecordingManager @Inject constructor(
         }
     }
 
+    /**
+     * Called from the collector when the session file reaches [maxBytes].
+     * Stops the recording on a separate coroutine (cancelling our own job
+     * mid-write would deadlock the mutex) and tells the user why it ended.
+     */
+    private fun stopForLimit() {
+        if (limitTriggered) return
+        limitTriggered = true
+        val mb = limitMb
+        scope.launch {
+            stop()
+            notificationHelper.notifyRecordingLimit(mb)
+        }
+    }
+
     suspend fun stop() {
         val s = _state.value
         if (!s.isRecording) return
@@ -171,6 +217,7 @@ class RecordingManager @Inject constructor(
         collectJob = null
         engine.activeSessionId = null
         engine.releaseClient()
+        maxBytes = 0L
 
         writeMutex.withLock {
             runCatching {

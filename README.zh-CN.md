@@ -31,7 +31,7 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具,包含两种模式:
 | 过滤系统 | 级别 / Tag / 关键字 / 正则 / 排除过滤,可保存过滤器预设 |
 | 按应用过滤 | 只看你关心的 App(需 Shizuku) |
 | 录制回放 | 后台录制日志会话,随时回放 |
-| 崩溃 / ANR 侦测 | 自动高亮 `FATAL EXCEPTION` 与 ANR 并通知 |
+| 崩溃 / ANR 侦测 | 自动高亮 `FATAL EXCEPTION`、原生 `Fatal signal` 与 ANR 并通知 |
 | 时间戳书签 | 可选悬浮气泡,出问题那一刻一键打点 |
 | 导出分享 | 导出 `.txt` 或 `.zip`(附设备信息)发给开发者 |
 
@@ -83,7 +83,7 @@ LogcatSource(本机 READ_LOGS / Shizuku shell)
   → LogcatEngine(唯一的 logcat 进程持有者,断线自动重连)
       ├→ 实时日志流 UI(级别着色、过滤、搜索、暂停缓冲)
       ├→ RecordingManager(前台服务 → 会话文件 + Room)
-      └→ CrashDetector(FATAL EXCEPTION / ANR → 事件 + 通知)
+      └→ CrashDetector(FATAL EXCEPTION / Fatal signal / ANR → 事件 + 通知)
 
 logsleuth-sdk(内嵌在宿主 App——零权限、零网络):
   Sleuth.init → 自进程日志捕获 + 崩溃接管 + ANR 看门狗

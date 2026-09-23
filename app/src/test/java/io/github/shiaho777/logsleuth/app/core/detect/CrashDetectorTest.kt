@@ -65,6 +65,73 @@ class CrashDetectorTest {
     }
 
     @Test
+    fun `detects am_anr event with pid and package from payload`() {
+        val d = CrashDetector()
+        // Events-buffer line: emitted by system_server (pid 1500); the app
+        // being reported is inside the bracketed payload.
+        val signal = d.onEntry(
+            entry(
+                tag = "am_anr",
+                level = LogLevel.I,
+                pid = 1500,
+                message = "[0,4242,com.example.anr,-9527,Input dispatching timed out]",
+            ),
+        )
+        assertNotNull(signal)
+        signal!!
+        assertEquals(CrashType.ANR, signal.type)
+        assertEquals("com.example.anr", signal.packageName)
+        assertEquals(4242, signal.pid)
+    }
+
+    @Test
+    fun `detects a native fatal-signal block`() {
+        val d = CrashDetector()
+        // The logcat pid (9999) is crash_dump's; the payload names the
+        // crashed process (pid 5678, com.example.native).
+        assertNull(
+            d.onEntry(
+                entry(
+                    tag = "DEBUG",
+                    level = LogLevel.I,
+                    pid = 9999,
+                    message = "Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), " +
+                        "fault addr 0x0 in tid 5670 (main), pid 5678 (com.example.native)",
+                ),
+            ),
+        )
+        // Dump lines ride at low levels — the block must not require E.
+        assertNull(
+            d.onEntry(
+                entry(tag = "DEBUG", level = LogLevel.D, pid = 9999, message = "backtrace: #00 pc 0x1"),
+            ),
+        )
+        val signal = d.onEntry(entry(tag = "OtherTag", message = "unrelated"))
+        assertNotNull(signal)
+        signal!!
+        assertEquals(CrashType.NATIVE, signal.type)
+        assertEquals("com.example.native", signal.packageName)
+        assertEquals(5678, signal.pid)
+        assertTrue(signal.snippet.contains("backtrace"))
+    }
+
+    @Test
+    fun `a new fatal line flushes an open native block`() {
+        val d = CrashDetector()
+        d.onEntry(
+            entry(
+                tag = "DEBUG",
+                pid = 9999,
+                message = "Fatal signal 11 (SIGSEGV), code 1, fault addr 0x0, pid 5678 (com.a)",
+            ),
+        )
+        val flushed = d.onEntry(entry(message = "FATAL EXCEPTION: main"))
+        assertNotNull(flushed)
+        assertEquals(CrashType.NATIVE, flushed!!.type)
+        assertEquals("com.a", flushed.packageName)
+    }
+
+    @Test
     fun `ordinary lines produce nothing`() {
         val d = CrashDetector()
         assertNull(d.onEntry(entry(tag = "ActivityManager", level = LogLevel.I, message = "Start proc")))

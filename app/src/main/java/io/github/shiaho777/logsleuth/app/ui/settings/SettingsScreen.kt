@@ -98,6 +98,37 @@ fun SettingsScreen(
             }
 
             Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_recording_max),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    // Same drag-then-persist pattern as the buffer slider.
+                    var limitValue by remember(s.recordingMaxMb) {
+                        mutableStateOf(s.recordingMaxMb.toFloat())
+                    }
+                    Text(
+                        stringResource(
+                            R.string.settings_recording_max_value,
+                            limitValue.roundToInt(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = limitValue,
+                        onValueChange = {
+                            limitValue = (it / 8f).roundToInt() * 8f
+                        },
+                        onValueChangeFinished = {
+                            viewModel.setRecordingMaxMb(limitValue.roundToInt())
+                        },
+                        valueRange = 8f..512f,
+                    )
+                }
+            }
+
+            Card {
                 Column {
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_crash_notifications),

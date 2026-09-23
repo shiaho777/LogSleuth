@@ -37,6 +37,7 @@ class LogImporter @Inject constructor(
 
     suspend fun import(uri: Uri): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
+            pruneStalePartDirs()
             val displayName = queryDisplayName(uri) ?: "import"
             val dir = File(context.filesDir, "imports").apply { mkdirs() }
             val file = File(dir, "import_${System.currentTimeMillis()}.log")
@@ -178,6 +179,20 @@ class LogImporter @Inject constructor(
             partsDir.deleteRecursively()
         }
         return meta
+    }
+
+    /**
+     * A process death mid-import can leave `import_*` part dirs behind —
+     * `partsDir.deleteRecursively()` only runs on a live VM. Stale ones are
+     * safe to remove after a day (an in-flight import is never that old).
+     */
+    private fun pruneStalePartDirs() {
+        runCatching {
+            val cutoff = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+            context.cacheDir.listFiles()
+                ?.filter { it.isDirectory && it.name.startsWith("import_") && it.lastModified() < cutoff }
+                ?.forEach { it.deleteRecursively() }
+        }
     }
 
     private fun readCapped(ins: InputStream, max: Int): ByteArray {

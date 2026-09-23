@@ -27,12 +27,16 @@ class SessionExporter @Inject constructor(
 ) {
     companion object {
         const val AUTHORITY_SUFFIX = ".fileprovider"
+
+        /** Shared exports outlive the share sheet by a day, then get pruned. */
+        private const val EXPORT_TTL_MS = 24L * 60 * 60 * 1000
     }
 
     enum class Format { TXT, ZIP }
 
     suspend fun export(sessionId: Long, format: Format): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
+            pruneExports()
             val session = sessionDao.getById(sessionId) ?: error("Session $sessionId not found")
             val source = File(session.filePath)
             require(source.exists()) { "Log file missing: ${session.filePath}" }
@@ -69,6 +73,7 @@ class SessionExporter @Inject constructor(
     suspend fun shareSnippet(name: String, content: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
+                pruneExports()
                 val dir = File(context.cacheDir, "exports").apply { mkdirs() }
                 val file = File(dir, name)
                 file.writeText(content)
@@ -98,6 +103,20 @@ class SessionExporter @Inject constructor(
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val safeName = session.name.replace(Regex("""[^\w.-]+"""), "_")
         return File(dir, "${safeName}_${session.id}.$ext")
+    }
+
+    /**
+     * Removes exports older than [EXPORT_TTL_MS]. The TTL is generous on
+     * purpose: a just-shared file may still be read by the receiving app
+     * through the FileProvider grant.
+     */
+    private fun pruneExports() {
+        runCatching {
+            val cutoff = System.currentTimeMillis() - EXPORT_TTL_MS
+            File(context.cacheDir, "exports").listFiles()
+                ?.filter { it.lastModified() < cutoff }
+                ?.forEach { it.delete() }
+        }
     }
 
     private fun deviceInfo(): String = buildString {
