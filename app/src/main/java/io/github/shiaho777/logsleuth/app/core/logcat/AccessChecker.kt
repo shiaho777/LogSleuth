@@ -37,6 +37,9 @@ class AccessChecker(
             PackageManager.PERMISSION_GRANTED
 
     fun currentState(): AccessState {
+        // Grants toggled inside the Shizuku app raise no callback, so the
+        // cached status would go stale — re-ping on every access check.
+        shizukuManager.refresh()
         val shizuku = shizukuManager.status.value
         val readLogs = readLogsGranted()
         val kind = when {
