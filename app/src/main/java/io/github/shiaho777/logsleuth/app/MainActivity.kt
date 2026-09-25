@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.ui.navigation.LogSleuthNavHost
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var logImporter: LogImporter
+    @Inject lateinit var engine: LogcatEngine
 
     /** Session id produced by importing an externally shared log file. */
     private var importedSessionId by mutableStateOf<Long?>(null)
@@ -92,6 +94,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Grants toggled in the Shizuku app or via adb while we were away
+        // fire no callback — re-evaluate on every return to foreground.
+        engine.refreshAccess()
     }
 
     override fun onNewIntent(intent: Intent) {

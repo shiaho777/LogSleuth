@@ -103,22 +103,18 @@ class LogcatEngine @Inject constructor(
                 crashNotifications = it.crashNotifications
             }
         }
-        // When Shizuku (re)connects or gets granted, pick it up live: refresh
-        // access and restart a dead stream immediately instead of waiting out
-        // the backoff timer.
+        // Shizuku status events funnel through refreshAccess, which restarts
+        // the stream on a false→true grant transition — regardless of whether
+        // the grant came from our dialog, the Shizuku app, or adb.
         scope.launch {
-            var lastGranted = _access.value.granted
-            shizukuManager.status.collect {
-                refreshAccess()
-                val granted = _access.value.granted
-                if (granted && !lastGranted) resetBackoffAndRestart()
-                lastGranted = granted
-            }
+            shizukuManager.status.collect { refreshAccess() }
         }
     }
 
     fun refreshAccess() {
+        val wasGranted = _access.value.granted
         _access.value = accessChecker.currentState()
+        if (!wasGranted && _access.value.granted) resetBackoffAndRestart()
     }
 
     /** A consumer wants the stream. Starts logcat on first consumer. */
@@ -151,7 +147,10 @@ class LogcatEngine @Inject constructor(
     }
 
     private fun startStreamLocked() {
-        refreshAccess()
+        // Set _access directly: refreshAccess()'s restart-on-grant would
+        // re-enter startStreamLocked while this monitor is already held and
+        // leave a second stream's Job orphaned.
+        _access.value = accessChecker.currentState()
         if (!_access.value.granted) {
             _state.value = State.ERROR
             return

@@ -11,10 +11,11 @@ import rikka.shizuku.Shizuku
 
 /** Where the app stands regarding the optional Shizuku integration. */
 enum class ShizukuStatus {
-    /** Shizuku app not installed (provider not found). */
+    /** Binder dead and package invisible — likely not installed, but could
+     *  also be a work-profile/second-space install we cannot see. */
     NOT_INSTALLED,
 
-    /** Installed but service not running (or binder not received yet). */
+    /** Package visible but binder dead: installed, service not running. */
     NOT_RUNNING,
 
     /** Running, but this app has not been granted permission yet. */
@@ -72,17 +73,22 @@ class ShizukuManager(private val context: Context) {
     }
 
     private fun computeStatus(): ShizukuStatus {
-        if (!isInstalled()) return ShizukuStatus.NOT_INSTALLED
-        if (!Shizuku.pingBinder()) {
-            service = null
-            return ShizukuStatus.NOT_RUNNING
+        // Binder liveness is authoritative — the package lookup lies for
+        // work-profile installs, Sui (no package at all), and repackaged
+        // forks, yet their binder still reaches us and grants still work.
+        if (Shizuku.pingBinder()) {
+            val granted = try {
+                // Pre-v11 Shizuku predates the permission model: implicitly granted.
+                Shizuku.isPreV11() ||
+                    Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            } catch (_: Exception) {
+                false
+            }
+            return if (granted) ShizukuStatus.READY else ShizukuStatus.PERMISSION_REQUIRED
         }
-        val granted = try {
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } catch (_: Exception) {
-            false
-        }
-        return if (granted) ShizukuStatus.READY else ShizukuStatus.PERMISSION_REQUIRED
+        service = null
+        // Dead binder: package visibility only drives the install-vs-start hint.
+        return if (isInstalled()) ShizukuStatus.NOT_RUNNING else ShizukuStatus.NOT_INSTALLED
     }
 
     /** Shows the Shizuku permission dialog (no-op unless running). */
