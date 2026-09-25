@@ -19,6 +19,7 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_CRASHES = "crashes"
         const val ID_RECORDING = 1001
         const val ID_RECORDING_LIMIT = 1002
+        const val ID_RECORDING_TIMEOUT = 1003
         const val ID_CRASH_BASE = 2000
     }
 
@@ -98,21 +99,40 @@ class NotificationHelper(private val context: Context) {
         manager.notify(ID_CRASH_BASE + (eventId % 1_000_000).toInt(), notification)
     }
 
-    /** Posted when a recording auto-stops after hitting the size limit. */
-    fun notifyRecordingLimit(maxMb: Int) {
-        val openIntent = PendingIntent.getActivity(
-            context,
-            5,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+    /**
+     * Posted when a recording auto-stops after hitting the size limit.
+     * Tapping it opens the just-finished session, not the app root.
+     */
+    fun notifyRecordingLimit(maxMb: Int, sessionId: Long?) {
         val notification = NotificationCompat.Builder(context, CHANNEL_RECORDING)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notif_recording_limit_title))
             .setContentText(context.getString(R.string.notif_recording_limit_text, maxMb))
-            .setContentIntent(openIntent)
+            .setContentIntent(sessionIntent(5, sessionId))
             .setAutoCancel(true)
             .build()
         manager.notify(ID_RECORDING_LIMIT, notification)
     }
+
+    /** Posted when a recording auto-stops after hitting the duration cap. */
+    fun notifyRecordingTimeout(maxHours: Int, sessionId: Long?) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_RECORDING)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_recording_limit_title))
+            .setContentText(context.getString(R.string.notif_recording_timeout_text, maxHours))
+            .setContentIntent(sessionIntent(6, sessionId))
+            .setAutoCancel(true)
+            .build()
+        manager.notify(ID_RECORDING_TIMEOUT, notification)
+    }
+
+    /** Opens [MainActivity] at the finished session's detail page (or the
+     *  app root when no session is attached). */
+    private fun sessionIntent(requestCode: Int, sessionId: Long?): PendingIntent =
+        PendingIntent.getActivity(
+            context,
+            requestCode,
+            MainActivity.sessionIntent(context, sessionId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 }

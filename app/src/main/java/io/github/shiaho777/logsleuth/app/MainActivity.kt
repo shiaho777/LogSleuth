@@ -104,7 +104,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action != Intent.ACTION_VIEW) return
+        intent ?: return
+        // Notification taps deep-link into a specific session.
+        val sessionId = intent.getLongExtra(EXTRA_OPEN_SESSION, -1L)
+        if (sessionId > 0) pendingRoute = Routes.sessionDetail(sessionId)
+        if (intent.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
         lifecycleScope.launch {
             logImporter.import(uri)
@@ -132,10 +136,17 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_CRASHES = "extra_open_crashes"
+        const val EXTRA_OPEN_SESSION = "extra_open_session"
 
         fun crashesIntent(context: Context): Intent =
             Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_OPEN_CRASHES, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+
+        fun sessionIntent(context: Context, sessionId: Long?): Intent =
+            Intent(context, MainActivity::class.java).apply {
+                if (sessionId != null) putExtra(EXTRA_OPEN_SESSION, sessionId)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
     }

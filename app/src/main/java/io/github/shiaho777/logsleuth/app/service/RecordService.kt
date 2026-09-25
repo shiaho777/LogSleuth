@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import javax.inject.Inject
@@ -42,6 +43,10 @@ class RecordService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    /** True once [observeRecording] is running — a second ACTION_START while
+     * already recording must not stack another state collector. */
+    private var observing = false
+
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocales.wrap(newBase))
     }
@@ -65,9 +70,29 @@ class RecordService : Service() {
                     useRegex = intent.getBooleanExtra(EXTRA_FILTER_REGEX, false),
                 )
                 scope.launch {
-                    recordingManager.start(name = null, filter = filter)
+                    // Foreground first: the FGS deadline runs from
+                    // startForegroundService, and start() burns it on file
+                    // IO + Room. A missed window crashes the service.
                     startForegroundWithNotification()
-                    observeRecording()
+                    val result = recordingManager.start(name = null, filter = filter)
+                    if (!recordingManager.state.value.isRecording) {
+                        // Start failed (no log access, IO error) — nothing
+                        // to keep this service alive for.
+                        if (result.isFailure) {
+                            android.widget.Toast.makeText(
+                                this@RecordService,
+                                R.string.recording_start_failed,
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                        return@launch
+                    }
+                    if (!observing) {
+                        observing = true
+                        observeRecording()
+                    }
                 }
             }
 

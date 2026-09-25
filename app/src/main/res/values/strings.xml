@@ -79,6 +79,9 @@
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
     <string name="settings_recording_max">Recording size limit</string>
     <string name="settings_recording_max_value">Recording auto-stops at %1$d MB</string>
+    <string name="settings_recording_hours">Recording duration limit</string>
+    <string name="settings_recording_hours_value">Recording auto-stops after %1$d h</string>
+    <string name="settings_recording_hours_unlimited">No time limit</string>
     <string name="settings_crash_notifications">Crash notifications</string>
     <string name="settings_bubble">Floating controls</string>
     <string name="settings_bubble_desc">Show record, bookmark and hide controls over other apps. Needs the overlay permission.</string>
@@ -112,6 +115,7 @@
     <string name="notif_recording_text">%1$d lines captured</string>
     <string name="notif_recording_limit_title">Recording stopped</string>
     <string name="notif_recording_limit_text">Size limit reached (%1$d MB)</string>
+    <string name="notif_recording_timeout_text">Time limit reached (%1$d h)</string>
     <string name="notif_action_stop">Stop</string>
     <string name="notif_action_bookmark">Bookmark</string>
     <string name="notif_crash_title">Crash: %1$s</string>
@@ -121,6 +125,7 @@
     <string name="tile_recording">Recording · %1$d</string>
     <string name="bookmark_added">Bookmark added</string>
     <string name="not_recording">Not recording — tap the record button first</string>
+    <string name="recording_start_failed">Couldn\'t start recording — check log access</string>
 
     <!-- Common -->
     <string name="save">Save</string>

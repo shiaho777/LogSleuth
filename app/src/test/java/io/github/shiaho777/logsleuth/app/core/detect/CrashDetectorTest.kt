@@ -14,9 +14,10 @@ class CrashDetectorTest {
         tag: String = "AndroidRuntime",
         level: LogLevel = LogLevel.E,
         pid: Int = 777,
+        time: Long = 1000,
         message: String,
     ) = LogcatEntry(
-        timestampMillis = 1000, pid = pid, tid = 777, uid = 10123,
+        timestampMillis = time, pid = pid, tid = 777, uid = 10123,
         level = level, tag = tag, message = message, raw = "RAW: $message",
     )
 
@@ -82,6 +83,120 @@ class CrashDetectorTest {
         assertEquals(CrashType.ANR, signal.type)
         assertEquals("com.example.anr", signal.packageName)
         assertEquals(4242, signal.pid)
+    }
+
+    @Test
+    fun `ANR in line and am_anr event for the same package produce one signal`() {
+        val d = CrashDetector()
+        // One real ANR surfaces on both buffers ~simultaneously; the events
+        // buffer line must not become a second crash event + notification.
+        val first = d.onEntry(
+            entry(
+                tag = "ActivityManager",
+                level = LogLevel.E,
+                time = 10_000,
+                message = "ANR in com.example.slow (com.example.slow/.MainActivity)",
+            ),
+        )
+        assertNotNull(first)
+        val dup = d.onEntry(
+            entry(
+                tag = "am_anr",
+                level = LogLevel.I,
+                pid = 1500,
+                time = 10_050,
+                message = "[0,4242,com.example.slow,-9527,Input dispatching timed out]",
+            ),
+        )
+        assertNull(dup)
+    }
+
+    @Test
+    fun `repeated ANR for the same package inside the window is suppressed`() {
+        val d = CrashDetector()
+        assertNotNull(
+            d.onEntry(
+                entry(
+                    tag = "ActivityManager",
+                    time = 10_000,
+                    message = "ANR in com.example.slow",
+                ),
+            ),
+        )
+        // A continuing ANR re-logs "ANR in" while the dialog stays up.
+        assertNull(
+            d.onEntry(
+                entry(
+                    tag = "ActivityManager",
+                    time = 30_000,
+                    message = "ANR in com.example.slow",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `ANR for a different package is not suppressed`() {
+        val d = CrashDetector()
+        assertNotNull(
+            d.onEntry(
+                entry(
+                    tag = "ActivityManager",
+                    time = 10_000,
+                    message = "ANR in com.example.a",
+                ),
+            ),
+        )
+        assertNotNull(
+            d.onEntry(
+                entry(
+                    tag = "ActivityManager",
+                    time = 10_100,
+                    message = "ANR in com.example.b",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `ANR for the same package after the window is reported again`() {
+        val d = CrashDetector(anrDedupeWindowMs = 60_000)
+        assertNotNull(
+            d.onEntry(
+                entry(
+                    tag = "ActivityManager",
+                    time = 10_000,
+                    message = "ANR in com.example.slow",
+                ),
+            ),
+        )
+        // A fresh episode long after the first one is a new event.
+        assertNotNull(
+            d.onEntry(
+                entry(
+                    tag = "am_anr",
+                    level = LogLevel.I,
+                    pid = 1500,
+                    time = 10_000 + 61_000,
+                    message = "[0,4242,com.example.slow,-9527,Broadcast timeout]",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `ANR in from a non-ActivityManager tag is ignored`() {
+        val d = CrashDetector()
+        // An app quoting the marker in its own log must not raise an event.
+        assertNull(
+            d.onEntry(
+                entry(
+                    tag = "MyApp",
+                    level = LogLevel.E,
+                    message = "ANR in com.example.slow",
+                ),
+            ),
+        )
     }
 
     @Test

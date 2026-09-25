@@ -49,6 +49,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setRecordingMaxMb(value)
     }
 
+    fun setRecordingMaxHours(value: Int) = viewModelScope.launch {
+        settingsRepository.setRecordingMaxHours(value)
+    }
+
     /** Toggles the floating bubble; returns false when the overlay permission
      * is still missing (caller should open the system settings page). */
     fun setBubbleEnabled(value: Boolean): Boolean {
