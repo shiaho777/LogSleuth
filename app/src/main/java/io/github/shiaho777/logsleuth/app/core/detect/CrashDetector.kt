@@ -23,18 +23,30 @@ data class CrashSignal(
  * - NATIVE: a `Fatal signal` line from the crash buffer (tag `DEBUG`,
  *   emitted by crash_dump; `libc` on some ROMs), followed by the tombstone
  *   dump lines from the same pid/tag at any level.
- * - ANR: `ANR in <package>` on the main buffer (ActivityManager), or an
- *   `am_anr` event line whose payload is `[user,pid,package,flags,reason]`.
+ * - ANR: `ANR in <package>` on the main buffer (tag `ActivityManager`), or
+ *   an `am_anr` event line whose payload is `[user,pid,package,flags,reason]`.
+ *   One episode typically produces both lines ~simultaneously and a stalled
+ *   app re-logs `ANR in` while unresponsive — same-package signals within
+ *   [anrDedupeWindowMs] are deduplicated.
  *
  * Feed every entry via [onEntry]; it returns a completed [CrashSignal] or null.
  * Call [flush] when the stream stops to emit a still-open crash block.
  */
-class CrashDetector(private val maxBlockLines: Int = 100) {
+class CrashDetector(
+    private val maxBlockLines: Int = 100,
+    private val anrDedupeWindowMs: Long = 60_000,
+) {
 
     private val processRegex = Regex("""Process:\s*([\w.]+)\s*,\s*PID:""")
     private val anrRegex = Regex("""ANR in\s+([\w.]+)""")
     private val fatalPidRegex = Regex("""pid\s+(\d+)\s+\(([\w.]+)\)""")
     private val amAnrRegex = Regex("""\[\s*-?\d+\s*,\s*(-?\d+)\s*,\s*([\w.]+)""")
+
+    /** Last ANR signal time per package — one ANR episode appears on both
+     * the events buffer (`am_anr`) and the main buffer (`ANR in`), and a
+     * continuing ANR re-logs while the dialog is up. Same-package repeats
+     * inside the window are the same episode, not new events. */
+    private val lastAnrAt = HashMap<String, Long>()
 
     private var collectingPid: Int? = null
     private var collectingTag: String? = null
@@ -116,33 +128,48 @@ class CrashDetector(private val maxBlockLines: Int = 100) {
     }
 
     private fun detectStart(entry: LogcatEntry): CrashSignal? {
-        // ANR is a single-line event.
-        anrRegex.find(entry.message)?.let { match ->
-            return CrashSignal(
-                type = CrashType.ANR,
-                pid = entry.pid,
-                packageName = match.groupValues[1],
-                firstLine = entry.message.take(200),
-                snippet = entry.raw,
-                timeMillis = entry.timestampMillis,
-            )
+        // "ANR in" is an ActivityManager line — an app quoting the marker in
+        // its own message must not raise a false event.
+        if (entry.tag == "ActivityManager") {
+            anrRegex.find(entry.message)?.let { match ->
+                return anrSignal(
+                    entry = entry,
+                    pid = entry.pid,
+                    packageName = match.groupValues[1],
+                )
+            }
         }
         // `am_anr` from the events buffer: [userId,pid,package,flags,reason].
         // The pid/package in the payload identify the stalled app, not
         // system_server which emits the line.
         if (entry.tag == "am_anr") {
             amAnrRegex.find(entry.message)?.let { match ->
-                return CrashSignal(
-                    type = CrashType.ANR,
+                return anrSignal(
+                    entry = entry,
                     pid = match.groupValues[1].toIntOrNull() ?: entry.pid,
                     packageName = match.groupValues[2],
-                    firstLine = entry.message.take(200),
-                    snippet = entry.raw,
-                    timeMillis = entry.timestampMillis,
                 )
             }
         }
         return null
+    }
+
+    /** Builds an ANR signal unless the same package already signalled within
+     * [anrDedupeWindowMs] — the two buffers report one episode together. */
+    private fun anrSignal(entry: LogcatEntry, pid: Int, packageName: String): CrashSignal? {
+        val last = lastAnrAt[packageName]
+        if (last != null && entry.timestampMillis - last < anrDedupeWindowMs) {
+            return null
+        }
+        lastAnrAt[packageName] = entry.timestampMillis
+        return CrashSignal(
+            type = CrashType.ANR,
+            pid = pid,
+            packageName = packageName,
+            firstLine = entry.message.take(200),
+            snippet = entry.raw,
+            timeMillis = entry.timestampMillis,
+        )
     }
 
     private fun finishBlock(): CrashSignal {

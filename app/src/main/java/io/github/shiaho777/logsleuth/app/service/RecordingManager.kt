@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,9 +71,16 @@ class RecordingManager @Inject constructor(
     @Volatile
     private var limitMb = 0
 
-    /** Set once the cap fires — later emissions must not re-trigger stop/notify. */
+    /** Duration cap in hours captured at start; 0 = unlimited. */
+    @Volatile
+    private var limitHours = 0
+
+    /** Set once a cap fires — later emissions must not re-trigger stop/notify. */
     @Volatile
     private var limitTriggered = false
+
+    /** Timer for the duration cap; null when unlimited. */
+    private var durationJob: Job? = null
 
     /** Bytes written so far — counted as UTF-8 line bytes, matching the file. */
     private var bytesWritten = 0L
@@ -80,14 +88,19 @@ class RecordingManager @Inject constructor(
     suspend fun start(name: String?, filter: LogFilter): Result<Long> =
         runCatching {
             check(!_state.value.isRecording) { "Already recording" }
+            // Without a log grant the engine streams nothing; a recording
+            // would silently produce a header-only file.
+            check(engine.access.value.granted) { "Log access not granted" }
 
             val dir = File(context.filesDir, "recordings").apply { mkdirs() }
             val file = File(dir, "session_${System.currentTimeMillis()}.log")
             val w = file.bufferedWriter(Charsets.UTF_8, 64 * 1024)
             writer = w
 
-            limitMb = settingsRepository.settings.first().recordingMaxMb
+            val settings = settingsRepository.settings.first()
+            limitMb = settings.recordingMaxMb
             maxBytes = limitMb.toLong() * 1024 * 1024
+            limitHours = settings.recordingMaxHours
             bytesWritten = 0L
             limitTriggered = false
 
@@ -176,11 +189,22 @@ class RecordingManager @Inject constructor(
                     }
             }
 
+            // Duration cap: 0 disables it; the timer stops the recording and
+            // notifies instead of letting an idle session run forever.
+            if (limitHours > 0) {
+                durationJob = scope.launch {
+                    delay(limitHours.toLong() * 3_600_000L)
+                    stopForTimeout()
+                }
+            }
+
             engine.acquireClient()
             sessionId
         }.onFailure {
             collectJob?.cancel()
             collectJob = null
+            durationJob?.cancel()
+            durationJob = null
             engine.activeSessionId = null
             _state.value = RecordingState()
             runCatching { writer?.close() }
@@ -204,9 +228,23 @@ class RecordingManager @Inject constructor(
         if (limitTriggered) return
         limitTriggered = true
         val mb = limitMb
+        val sessionId = _state.value.sessionId
         scope.launch {
             stop()
-            notificationHelper.notifyRecordingLimit(mb)
+            notificationHelper.notifyRecordingLimit(mb, sessionId)
+        }
+    }
+
+    /** Called by the duration-cap timer. Same shape as [stopForLimit]: the
+     * actual stop runs on a separate coroutine so the writer mutex is free. */
+    private fun stopForTimeout() {
+        if (limitTriggered) return
+        limitTriggered = true
+        val hours = limitHours
+        val sessionId = _state.value.sessionId
+        scope.launch {
+            stop()
+            notificationHelper.notifyRecordingTimeout(hours, sessionId)
         }
     }
 
@@ -215,6 +253,8 @@ class RecordingManager @Inject constructor(
         if (!s.isRecording) return
         collectJob?.cancel()
         collectJob = null
+        durationJob?.cancel()
+        durationJob = null
         engine.activeSessionId = null
         engine.releaseClient()
         maxBytes = 0L

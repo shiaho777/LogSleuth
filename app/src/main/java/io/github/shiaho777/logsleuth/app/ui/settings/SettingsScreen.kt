@@ -129,6 +129,39 @@ fun SettingsScreen(
             }
 
             Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_recording_hours),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    // 0 means "no time limit"; 1..24 h otherwise.
+                    var hoursValue by remember(s.recordingMaxHours) {
+                        mutableStateOf(s.recordingMaxHours.toFloat())
+                    }
+                    Text(
+                        if (hoursValue.roundToInt() == 0) {
+                            stringResource(R.string.settings_recording_hours_unlimited)
+                        } else {
+                            stringResource(
+                                R.string.settings_recording_hours_value,
+                                hoursValue.roundToInt(),
+                            )
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = hoursValue,
+                        onValueChange = { hoursValue = it.roundToInt().toFloat() },
+                        onValueChangeFinished = {
+                            viewModel.setRecordingMaxHours(hoursValue.roundToInt())
+                        },
+                        valueRange = 0f..24f,
+                    )
+                }
+            }
+
+            Card {
                 Column {
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_crash_notifications),

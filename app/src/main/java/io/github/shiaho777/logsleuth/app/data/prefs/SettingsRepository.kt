@@ -26,6 +26,8 @@ data class Settings(
     val language: String = AppLocales.SYSTEM,
     /** Recordings auto-stop at this size so a long session can't fill storage. */
     val recordingMaxMb: Int = 64,
+    /** Recordings auto-stop after this many hours; 0 = unlimited. */
+    val recordingMaxHours: Int = 0,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -39,6 +41,7 @@ class SettingsRepository(private val context: Context) {
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
         val LANGUAGE = stringPreferencesKey("language")
         val RECORDING_MAX_MB = intPreferencesKey("recording_max_mb")
+        val RECORDING_MAX_HOURS = intPreferencesKey("recording_max_hours")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -51,6 +54,7 @@ class SettingsRepository(private val context: Context) {
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
             recordingMaxMb = p[Keys.RECORDING_MAX_MB] ?: 64,
+            recordingMaxHours = p[Keys.RECORDING_MAX_HOURS] ?: 0,
         )
     }
 
@@ -74,6 +78,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRecordingMaxMb(value: Int) =
         context.dataStore.edit { it[Keys.RECORDING_MAX_MB] = value.coerceIn(8, 512) }
+
+    suspend fun setRecordingMaxHours(value: Int) =
+        context.dataStore.edit { it[Keys.RECORDING_MAX_HOURS] = value.coerceIn(0, 24) }
 
     /**
      * Mirrors the choice into DataStore (for UI state) and applies the
