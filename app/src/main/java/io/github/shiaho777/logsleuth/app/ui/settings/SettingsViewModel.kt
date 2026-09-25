@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.prefs.Settings
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.BubbleService
@@ -20,10 +22,18 @@ import kotlinx.coroutines.launch
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
+    private val engine: LogcatEngine,
 ) : ViewModel() {
 
     val settings: StateFlow<Settings?> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Live log-access state — Shizuku grant changes push through the engine. */
+    val access: StateFlow<AccessState> = engine.access
+
+    /** Called when the screen opens: an ADB grant has no event bus, so the
+     *  access state only refreshes when someone asks. */
+    fun refreshAccess() = engine.refreshAccess()
 
     fun setBufferSize(value: Int) = viewModelScope.launch {
         settingsRepository.setBufferSize(value)

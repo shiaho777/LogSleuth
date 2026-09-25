@@ -49,8 +49,12 @@ fun SetupScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val settings by viewModel.settings.collectAsState()
 
-    if (state.granted) {
+    // Auto-forward only during first-run setup: when the wizard is re-opened
+    // from Settings while a grant already exists, the user wants to *see* the
+    // status/next-step cards, not get bounced straight to the stream.
+    if (state.granted && settings?.setupCompleted != true) {
         // Access became available while on this screen: proceed.
         androidx.compose.runtime.LaunchedEffect(Unit) {
             viewModel.markSetupCompleted()
@@ -72,7 +76,6 @@ fun SetupScreen(
         )
 
         // Language first: every string below this point localizes live.
-        val settings by viewModel.settings.collectAsState()
         Card(modifier = Modifier.fillMaxWidth()) {
             LanguagePicker(
                 current = settings?.language ?: AppLocales.SYSTEM,
