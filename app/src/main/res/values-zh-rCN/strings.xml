@@ -75,6 +75,10 @@
 
     <!-- 设置 -->
     <string name="settings_title">设置</string>
+    <string name="settings_access">日志访问权限</string>
+    <string name="settings_access_shizuku">已通过 Shizuku 连接</string>
+    <string name="settings_access_adb">已通过 ADB 授权(READ_LOGS)</string>
+    <string name="settings_access_open">打开设置向导</string>
     <string name="settings_buffer_size">缓冲区大小</string>
     <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
     <string name="settings_recording_max">录制大小上限</string>

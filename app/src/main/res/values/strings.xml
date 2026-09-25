@@ -75,6 +75,10 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <string name="settings_access">Log access</string>
+    <string name="settings_access_shizuku">Connected via Shizuku</string>
+    <string name="settings_access_adb">Granted via ADB (READ_LOGS)</string>
+    <string name="settings_access_open">Open setup guide</string>
     <string name="settings_buffer_size">Buffer size</string>
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
     <string name="settings_recording_max">Recording size limit</string>

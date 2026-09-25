@@ -170,7 +170,10 @@ fun LogSleuthNavHost(
                         FiltersScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Routes.SETTINGS) {
-                        SettingsScreen(onBack = { navController.popBackStack() })
+                        SettingsScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenSetup = { navController.navigate(Routes.SETUP) },
+                        )
                     }
                 }
             }

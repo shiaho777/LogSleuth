@@ -22,8 +22,10 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.logcat.AccessKind
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
 import kotlin.math.roundToInt
@@ -46,11 +49,16 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenSetup: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsState()
+    val access by viewModel.access.collectAsState()
     val context = LocalContext.current
     val s = settings ?: return
+
+    // ADB grants have no event stream — refresh when the screen opens.
+    LaunchedEffect(Unit) { viewModel.refreshAccess() }
 
     Scaffold(
         topBar = {
@@ -65,6 +73,32 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_access),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    val accessText = when (access.kind) {
+                        AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
+                        AccessKind.READ_LOGS -> stringResource(R.string.settings_access_adb)
+                        AccessKind.NONE -> stringResource(R.string.no_access_title)
+                    }
+                    Text(
+                        accessText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (access.granted) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                    TextButton(onClick = onOpenSetup) {
+                        Text(stringResource(R.string.settings_access_open))
+                    }
+                }
+            }
+
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
