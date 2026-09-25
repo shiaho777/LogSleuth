@@ -16,17 +16,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -56,7 +54,7 @@ fun SetupScreen(
     // status/next-step cards, not get bounced straight to the stream.
     if (state.granted && settings?.setupCompleted != true) {
         // Access became available while on this screen: proceed.
-        androidx.compose.runtime.LaunchedEffect(Unit) {
+        LaunchedEffect(Unit) {
             viewModel.markSetupCompleted()
             onDone()
         }
@@ -69,10 +67,15 @@ fun SetupScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.setup_title),
             style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = stringResource(R.string.setup_explainer),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         // Language first: every string below this point localizes live.
@@ -86,86 +89,58 @@ fun SetupScreen(
             )
         }
 
-        // Dynamic "Next step" banner — tells the user exactly what to do right now.
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.setup_next_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = when {
-                        state.granted -> stringResource(R.string.setup_next_done)
-                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.PERMISSION_REQUIRED ->
-                            stringResource(R.string.setup_next_grant_shizuku)
-                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.NOT_RUNNING ->
-                            stringResource(R.string.setup_next_start_shizuku)
-                        state.shizukuStatus == io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus.NOT_INSTALLED ->
-                            stringResource(R.string.setup_next_install_shizuku)
-                        else -> stringResource(R.string.setup_next_adb)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        }
-
         // --- Shizuku path ---
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.setup_shizuku_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.setup_shizuku_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatusText(
+                        label = when (state.shizukuStatus) {
+                            ShizukuStatus.NOT_INSTALLED -> stringResource(R.string.setup_shizuku_not_installed)
+                            ShizukuStatus.NOT_RUNNING -> stringResource(R.string.setup_shizuku_not_running)
+                            ShizukuStatus.PERMISSION_REQUIRED -> stringResource(R.string.setup_shizuku_needs_permission)
+                            ShizukuStatus.READY -> stringResource(R.string.setup_shizuku_ready)
+                        },
+                        ready = state.shizukuStatus == ShizukuStatus.READY,
+                    )
+                }
                 Text(
                     stringResource(R.string.setup_shizuku_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                StatusChip(
-                    label = when (state.shizukuStatus) {
-                        ShizukuStatus.NOT_INSTALLED -> stringResource(R.string.setup_shizuku_not_installed)
-                        ShizukuStatus.NOT_RUNNING -> stringResource(R.string.setup_shizuku_not_running)
-                        ShizukuStatus.PERMISSION_REQUIRED -> stringResource(R.string.setup_shizuku_needs_permission)
-                        ShizukuStatus.READY -> stringResource(R.string.setup_shizuku_ready)
-                    },
-                    ok = state.shizukuStatus == ShizukuStatus.READY,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    when (state.shizukuStatus) {
-                        ShizukuStatus.NOT_INSTALLED -> Button(onClick = {
+                when (state.shizukuStatus) {
+                    ShizukuStatus.NOT_INSTALLED -> Button(onClick = {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://shizuku.rikka.app/download/"),
+                            ),
+                        )
+                    }) { Text(stringResource(R.string.setup_get_shizuku)) }
+
+                    ShizukuStatus.NOT_RUNNING -> Button(onClick = {
+                        runCatching {
                             context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://shizuku.rikka.app/download/"),
+                                context.packageManager.getLaunchIntentForPackage(
+                                    "moe.shizuku.privileged.api",
                                 ),
                             )
-                        }) { Text(stringResource(R.string.setup_get_shizuku)) }
+                        }
+                    }) { Text(stringResource(R.string.setup_open_shizuku)) }
 
-                        ShizukuStatus.NOT_RUNNING -> Button(onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    context.packageManager.getLaunchIntentForPackage(
-                                        "moe.shizuku.privileged.api",
-                                    ),
-                                )
-                            }
-                        }) { Text(stringResource(R.string.setup_open_shizuku)) }
+                    ShizukuStatus.PERMISSION_REQUIRED -> Button(onClick = {
+                        viewModel.requestShizukuPermission()
+                    }) { Text(stringResource(R.string.setup_grant_shizuku)) }
 
-                        ShizukuStatus.PERMISSION_REQUIRED -> Button(onClick = {
-                            viewModel.requestShizukuPermission()
-                        }) { Text(stringResource(R.string.setup_grant_shizuku)) }
-
-                        ShizukuStatus.READY -> {}
-                    }
+                    ShizukuStatus.READY -> {}
                 }
             }
         }
@@ -173,16 +148,31 @@ fun SetupScreen(
         // --- ADB path ---
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    stringResource(R.string.setup_adb_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.setup_adb_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (state.readLogsGranted) {
+                        StatusText(
+                            label = stringResource(R.string.setup_adb_granted),
+                            ready = true,
+                        )
+                    }
+                }
                 Text(
                     stringResource(R.string.setup_adb_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Card {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
                     Text(
                         text = "adb shell pm grant ${BuildConfig.APPLICATION_ID} android.permission.READ_LOGS",
                         fontFamily = FontFamily.Monospace,
@@ -191,15 +181,12 @@ fun SetupScreen(
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { viewModel.copyAdbCommand() }) {
+                    Button(onClick = { viewModel.copyAdbCommand() }) {
                         Text(stringResource(R.string.setup_copy_command))
                     }
-                    OutlinedButton(onClick = { viewModel.refresh() }) {
+                    TextButton(onClick = { viewModel.refresh() }) {
                         Text(stringResource(R.string.setup_recheck))
                     }
-                }
-                if (state.readLogsGranted) {
-                    StatusChip(label = stringResource(R.string.setup_adb_granted), ok = true)
                 }
             }
         }
@@ -213,35 +200,24 @@ fun SetupScreen(
     }
 }
 
+/** Quiet inline status: accent + check when ready, muted text otherwise. */
 @Composable
-private fun StatusChip(label: String, ok: Boolean) {
-    val bg = if (ok) {
-        MaterialTheme.colorScheme.primaryContainer
+private fun StatusText(label: String, ready: Boolean) {
+    val color = if (ready) {
+        MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.errorContainer
+        MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val fg = if (ok) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onErrorContainer
-    }
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = bg,
-        contentColor = fg,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (ready) {
             Icon(
-                if (ok) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                Icons.Default.CheckCircle,
                 contentDescription = null,
+                tint = color,
                 modifier = Modifier.size(16.dp),
             )
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(4.dp))
         }
+        Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }
 }

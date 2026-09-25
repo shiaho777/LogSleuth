@@ -197,10 +197,4 @@
     <string name="crash_share">Share</string>
 
     <!-- Setup next step -->
-    <string name="setup_next_title">Your next step</string>
-    <string name="setup_next_install_shizuku">Install Shizuku, start it once, then come back and grant access.</string>
-    <string name="setup_next_start_shizuku">Open Shizuku and start its service (Wireless debugging on Android 11+).</string>
-    <string name="setup_next_grant_shizuku">Tap "Grant permission" on the Shizuku card below.</string>
-    <string name="setup_next_adb">Or use a computer: copy the ADB command below and run it once, then tap re-check.</string>
-    <string name="setup_next_done">All set — taking you to the live stream…</string>
 </resources>

@@ -197,10 +197,4 @@
     <string name="crash_share">分享</string>
 
     <!-- 引导下一步 -->
-    <string name="setup_next_title">下一步</string>
-    <string name="setup_next_install_shizuku">安装 Shizuku,启动一次,然后回来授权。</string>
-    <string name="setup_next_start_shizuku">打开 Shizuku 并启动服务(Android 11+ 用无线调试)。</string>
-    <string name="setup_next_grant_shizuku">点击下方 Shizuku 卡片里的"授权"。</string>
-    <string name="setup_next_adb">或用电脑:复制下方 ADB 命令执行一次,然后点"重新检测"。</string>
-    <string name="setup_next_done">都准备好了,正在进入实时日志流…</string>
 </resources>
