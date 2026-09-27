@@ -6,7 +6,11 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.BugReport
@@ -84,6 +88,13 @@ fun LogSleuthNavHost(
     val showBottomBar = currentRoute in topLevelRoutes
 
     Scaffold(
+        // Exclude the status-bar inset: screens' TopAppBar consumes it
+        // itself — applying it here too produced a double-height top gap.
+        // Keep horizontal (cutouts) and bottom (gesture bar on screens
+        // without the nav bar).
+        contentWindowInsets = WindowInsets.safeDrawing.only(
+            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+        ),
         bottomBar = {
             if (showBottomBar) {
                 ShortNavigationBar {
