@@ -43,14 +43,11 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Badge
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -237,7 +234,6 @@ fun StreamScreen(
                         }
                     },
                     onClear = viewModel::clear,
-                    onNavigate = onNavigate,
                 )
             }
         },
@@ -479,9 +475,7 @@ private fun StreamTopBar(
     onSearch: () -> Unit,
     onBubbleToggle: () -> Unit,
     onClear: () -> Unit,
-    onNavigate: (String) -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     TopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -513,30 +507,11 @@ private fun StreamTopBar(
                     },
                 )
             }
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = null)
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.clear)) },
-                    leadingIcon = { Icon(Icons.Default.Clear, null) },
-                    onClick = { menuOpen = false; onClear() },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.sessions_title)) },
-                    onClick = { menuOpen = false; onNavigate(Routes.SESSIONS) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.crashes_title)) },
-                    onClick = { menuOpen = false; onNavigate(Routes.CRASHES) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.filters_title)) },
-                    onClick = { menuOpen = false; onNavigate(Routes.FILTERS) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.settings_title)) },
-                    onClick = { menuOpen = false; onNavigate(Routes.SETTINGS) },
+            IconButton(onClick = onClear) {
+                Icon(
+                    Icons.Default.Clear,
+                    contentDescription = stringResource(R.string.clear),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
