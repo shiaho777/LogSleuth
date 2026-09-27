@@ -17,7 +17,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +84,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -120,22 +123,20 @@ fun StreamScreen(
         }
     }
 
-    // Tail-follow pin. Releases only on an explicit upward drag: a publish
-    // can push the last visible row beyond the -2 tolerance (breaking a
-    // naive isAtBottom check), and head eviction shifts indices without the
-    // user scrolling at all — neither must break the pin. Re-engages as
-    // soon as the bottom is reached again (drag down or the ↓ FAB).
+    // Tail-follow pin. Releases only on an explicit upward user scroll and
+    // re-engages whenever the bottom is reached (drag down or the ↓ FAB).
+    //
+    // Two traps: publishes push the last visible row past the -2 tolerance
+    // and head eviction shifts indices — neither is a user scroll, so the
+    // pin can't be a plain "last index < total-N" check. And
+    // interactionSource can't separate user drags from the chase's own
+    // scroll{} calls (programmatic scrolls emit DragInteraction too), so
+    // "user scroll" = finger down on the list, or an upward fling while no
+    // programmatic scroll is in flight (covers wheel/trackpad).
     var followTail by remember { mutableStateOf(true) }
-    var userDragging by remember { mutableStateOf(false) }
+    var userTouching by remember { mutableStateOf(false) }
+    var autoScrolling by remember { mutableStateOf(false) }
 
-    LaunchedEffect(listState) {
-        listState.interactionSource.interactions.collect { i ->
-            userDragging = when (i) {
-                is DragInteraction.Start -> true
-                else -> false // Stop / Cancel
-            }
-        }
-    }
     LaunchedEffect(listState) {
         var prevPos = Float.POSITIVE_INFINITY
         snapshotFlow {
@@ -143,11 +144,12 @@ fun StreamScreen(
                 isAtBottom,
                 listState.firstVisibleItemIndex +
                     listState.firstVisibleItemScrollOffset / 10_000f,
-                userDragging,
+                userTouching ||
+                    (listState.isScrollInProgress && !autoScrolling),
             )
-        }.collect { (atBottom, pos, dragging) ->
+        }.collect { (atBottom, pos, userScroll) ->
             if (atBottom) followTail = true
-            else if (dragging && pos < prevPos) followTail = false
+            else if (userScroll && pos < prevPos) followTail = false
             prevPos = pos
         }
     }
@@ -187,11 +189,16 @@ fun StreamScreen(
                 belowVisible + (lastIdx - last.index) * avgRow
             }
             if (remaining <= 1f) break
-            if (remaining > 4_000f) {
-                listState.scrollToItem(lastIdx)
-                break
+            autoScrolling = true
+            try {
+                if (remaining > 4_000f) {
+                    listState.scrollToItem(lastIdx)
+                    break
+                }
+                listState.scroll { scrollBy((remaining * 0.30f).coerceIn(1f, 360f)) }
+            } finally {
+                autoScrolling = false
             }
-            listState.scroll { scrollBy((remaining * 0.30f).coerceIn(1f, 360f)) }
             withFrameNanos { }
         }
     }
@@ -329,6 +336,7 @@ fun StreamScreen(
                         selEnd = selEnd,
                         onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
                         onSelectExtend = { seq -> selEnd = seq },
+                        onUserTouch = { userTouching = it },
                     )
                 }
 
@@ -588,6 +596,7 @@ private fun LogList(
     selEnd: Long,
     onSelectStart: (Long) -> Unit,
     onSelectExtend: (Long) -> Unit,
+    onUserTouch: (Boolean) -> Unit = {},
 ) {
     val currentEntries by rememberUpdatedState(ui.entries)
     // Read through State: pointerInput keeps the first lambda instance, so
@@ -600,6 +609,19 @@ private fun LogList(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
+            // Passive touch tracking for tail-follow release: Initial pass +
+            // requireUnconsumed=false, so it never eats events and can't
+            // break scrolling or the drag-select gesture below.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    onUserTouch(true)
+                    while (currentEvent.changes.any { it.pressed }) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                    }
+                    onUserTouch(false)
+                }
+            }
             .logDragSelect(
                 listState = listState,
                 isSelecting = { selectingState },
