@@ -17,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -117,6 +120,38 @@ fun StreamScreen(
         }
     }
 
+    // Tail-follow pin. Releases only on an explicit upward drag: a publish
+    // can push the last visible row beyond the -2 tolerance (breaking a
+    // naive isAtBottom check), and head eviction shifts indices without the
+    // user scrolling at all — neither must break the pin. Re-engages as
+    // soon as the bottom is reached again (drag down or the ↓ FAB).
+    var followTail by remember { mutableStateOf(true) }
+    var userDragging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { i ->
+            userDragging = when (i) {
+                is DragInteraction.Start -> true
+                else -> false // Stop / Cancel
+            }
+        }
+    }
+    LaunchedEffect(listState) {
+        var prevPos = Float.POSITIVE_INFINITY
+        snapshotFlow {
+            Triple(
+                isAtBottom,
+                listState.firstVisibleItemIndex +
+                    listState.firstVisibleItemScrollOffset / 10_000f,
+                userDragging,
+            )
+        }.collect { (atBottom, pos, dragging) ->
+            if (atBottom) followTail = true
+            else if (dragging && pos < prevPos) followTail = false
+            prevPos = pos
+        }
+    }
+
     // Range selection (long-press + drag): seq bounds of the selected span.
     var selAnchor by remember { mutableStateOf(-1L) }
     var selEnd by remember { mutableStateOf(-1L) }
@@ -126,10 +161,38 @@ fun StreamScreen(
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
 
-    // Follow the tail only while the user is at the bottom.
-    LaunchedEffect(ui.entries.size) {
-        if (isAtBottom && ui.entries.isNotEmpty() && !ui.paused && !selecting) {
-            listState.scrollToItem(ui.entries.lastIndex)
+    // While pinned, glide toward the stream's end. Per-publish scrollToItem
+    // snaps and per-publish animateScrollToItem restarts a fresh animation
+    // every ~120ms (velocity resets → lurch); this loop instead removes a
+    // fraction of the remaining distance per frame — critically damped, so
+    // successive batches merge into one continuous glide. Far behind
+    // (initial load, burst backlog) snaps instantly rather than gliding
+    // through thousands of rows.
+    // Keyed on the last entry's seq, not size: once the buffer hits its
+    // cap the size stays constant while content churns — a size-keyed
+    // effect would never re-fire and the list would freeze mid-stream.
+    LaunchedEffect(ui.entries.lastOrNull()?.seq, followTail, ui.paused, selecting) {
+        if (!followTail || ui.paused || selecting || ui.entries.isEmpty()) return@LaunchedEffect
+        while (true) {
+            val info = listState.layoutInfo
+            val items = info.visibleItemsInfo
+            val lastIdx = info.totalItemsCount - 1
+            val last = items.lastOrNull() ?: break
+            if (lastIdx < 0) break
+            val belowVisible = last.offset + last.size - info.viewportEndOffset
+            val remaining = if (last.index == lastIdx) {
+                belowVisible.toFloat()
+            } else {
+                val avgRow = items.sumOf { it.size }.toFloat() / items.size
+                belowVisible + (lastIdx - last.index) * avgRow
+            }
+            if (remaining <= 1f) break
+            if (remaining > 4_000f) {
+                listState.scrollToItem(lastIdx)
+                break
+            }
+            listState.scroll { scrollBy((remaining * 0.30f).coerceIn(1f, 360f)) }
+            withFrameNanos { }
         }
     }
 
@@ -173,7 +236,7 @@ fun StreamScreen(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = !isAtBottom && ui.entries.isNotEmpty() && !selecting,
+                visible = !followTail && ui.entries.isNotEmpty() && !selecting,
                 enter = scaleIn(),
                 exit = scaleOut(),
             ) {

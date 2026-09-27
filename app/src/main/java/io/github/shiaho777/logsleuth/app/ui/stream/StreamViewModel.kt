@@ -80,6 +80,11 @@ class StreamViewModel @Inject constructor(
     private var seq = 0L
     private var bufferCap = 20_000
     private val pending = ArrayList<LogcatEntry>()
+    // Declared before init: SharedFlow emissions run on the emitter's
+    // thread, so the collector below can touch these while init is still
+    // running — a post-init declaration reads as null there (NPE crash).
+    private val staged = ArrayList<LogcatEntry>(512)
+    private val stagedMutex = Mutex()
 
     init {
         engine.refreshAccess()
@@ -154,9 +159,6 @@ class StreamViewModel @Inject constructor(
             }
         }
     }
-
-    private val staged = ArrayList<LogcatEntry>(512)
-    private val stagedMutex = Mutex()
 
     private suspend fun snapshotToLists(snapshot: List<LogcatEntry>) {
         val compiled = currentCompiled()
