@@ -29,6 +29,7 @@
     <string name="record_start">Start recording</string>
     <string name="record_stop">Stop recording</string>
     <string name="scroll_bottom">Scroll to bottom</string>
+    <string name="scroll_top">Scroll to top</string>
     <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
     <string name="no_access_title">No log access yet</string>
     <string name="no_access_desc">LogSleuth needs either Shizuku or a one-time ADB grant to read device logs.</string>

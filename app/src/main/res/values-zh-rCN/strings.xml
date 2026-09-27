@@ -29,6 +29,7 @@
     <string name="record_start">开始录制</string>
     <string name="record_stop">停止录制</string>
     <string name="scroll_bottom">回到底部</string>
+    <string name="scroll_top">回到顶部</string>
     <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
     <string name="no_access_title">还没有日志访问权限</string>
     <string name="no_access_desc">LogSleuth 需要 Shizuku 或一次性 ADB 授权才能读取设备日志。</string>

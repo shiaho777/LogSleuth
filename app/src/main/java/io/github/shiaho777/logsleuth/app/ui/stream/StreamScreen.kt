@@ -68,6 +68,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +87,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -122,35 +124,31 @@ fun StreamScreen(
             info.totalItemsCount == 0 || last >= info.totalItemsCount - 2
         }
     }
+    val canScrollBack by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > 0
+        }
+    }
 
-    // Tail-follow pin. Releases only on an explicit upward user scroll and
-    // re-engages whenever the bottom is reached (drag down or the ↓ FAB).
-    //
-    // Two traps: publishes push the last visible row past the -2 tolerance
-    // and head eviction shifts indices — neither is a user scroll, so the
-    // pin can't be a plain "last index < total-N" check. And
-    // interactionSource can't separate user drags from the chase's own
-    // scroll{} calls (programmatic scrolls emit DragInteraction too), so
-    // "user scroll" = finger down on the list, or an upward fling while no
-    // programmatic scroll is in flight (covers wheel/trackpad).
+    // Tail-follow pin — standard chat-log semantics:
+    //   · initial state and every arrival at the bottom re-engage it
+    //     (finger drag to the end, ↓ FAB, or the chase itself);
+    //   · any deliberate pull toward older entries releases it the
+    //     moment finger travel exceeds touch slop — no full-row
+    //     displacement needed.
+    // Direction comes from FINGER deltas (onUserDrag), never list
+    // position: head eviction and the chase's own scrolls move indices
+    // under a held finger but produce no finger motion, so neither can
+    // fake or mask a user pull.
     var followTail by remember { mutableStateOf(true) }
-    var userTouching by remember { mutableStateOf(false) }
     var autoScrolling by remember { mutableStateOf(false) }
+    var pullAccum by remember { mutableFloatStateOf(0f) }
+    val touchSlop = LocalViewConfiguration.current.touchSlop
 
     LaunchedEffect(listState) {
-        var prevPos = Float.POSITIVE_INFINITY
-        snapshotFlow {
-            Triple(
-                isAtBottom,
-                listState.firstVisibleItemIndex +
-                    listState.firstVisibleItemScrollOffset / 10_000f,
-                userTouching ||
-                    (listState.isScrollInProgress && !autoScrolling),
-            )
-        }.collect { (atBottom, pos, userScroll) ->
+        snapshotFlow { isAtBottom }.collect { atBottom ->
             if (atBottom) followTail = true
-            else if (userScroll && pos < prevPos) followTail = false
-            prevPos = pos
         }
     }
 
@@ -249,34 +247,59 @@ fun StreamScreen(
             }
         },
         floatingActionButton = {
-            AnimatedVisibility(
-                visible = !followTail && ui.entries.isNotEmpty() && !selecting,
-                enter = scaleIn(),
-                exit = scaleOut(),
-            ) {
-                // Badge anchors to the FAB itself, not the icon: BadgedBox
-                // extends content rightward past the anchor's end, so a long
-                // "+N" pill would stick out past the FAB edge and clip
-                // against the screen edge (FAB sits only 16dp inside).
-                Box {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Jump to the oldest buffered line.
+                AnimatedVisibility(
+                    visible = canScrollBack && ui.entries.isNotEmpty() && !selecting,
+                    enter = scaleIn(),
+                    exit = scaleOut(),
+                ) {
                     FloatingActionButton(
                         onClick = {
-                            scope.launch { listState.animateScrollToItem(ui.entries.lastIndex) }
+                            followTail = false
+                            scope.launch { listState.scrollToItem(0) }
                         },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ) {
                         Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.scroll_bottom),
+                            Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.scroll_top),
                         )
                     }
-                    if (ui.pausedIncoming > 0) {
-                        Badge(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 4.dp, y = (-8).dp),
-                        ) { Text("+${ui.pausedIncoming}") }
+                }
+                AnimatedVisibility(
+                    visible = !followTail && ui.entries.isNotEmpty() && !selecting,
+                    enter = scaleIn(),
+                    exit = scaleOut(),
+                ) {
+                    // Badge anchors to the FAB itself, not the icon: BadgedBox
+                    // extends content rightward past the anchor's end, so a long
+                    // "+N" pill would stick out past the FAB edge and clip
+                    // against the screen edge (FAB sits only 16dp inside).
+                    Box {
+                        FloatingActionButton(
+                            onClick = {
+                                followTail = true
+                                scope.launch {
+                                    listState.animateScrollToItem(ui.entries.lastIndex)
+                                }
+                            },
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.scroll_bottom),
+                            )
+                        }
+                        if (ui.pausedIncoming > 0) {
+                            Badge(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 4.dp, y = (-8).dp),
+                            ) { Text("+${ui.pausedIncoming}") }
+                        }
                     }
                 }
             }
@@ -343,7 +366,17 @@ fun StreamScreen(
                         selEnd = selEnd,
                         onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
                         onSelectExtend = { seq -> selEnd = seq },
-                        onUserTouch = { userTouching = it },
+                        onUserTouch = { down -> if (!down) pullAccum = 0f },
+                        onUserDrag = { dy ->
+                            // Finger sliding down drags the view toward
+                            // older lines; sliding up toward newer ones
+                            // decays the pull instead of releasing.
+                            pullAccum = if (dy > 0f) pullAccum + dy else 0f
+                            if (pullAccum > touchSlop && !selecting) {
+                                pullAccum = 0f
+                                followTail = false
+                            }
+                        },
                     )
                 }
 
@@ -632,6 +665,7 @@ private fun LogList(
     onSelectStart: (Long) -> Unit,
     onSelectExtend: (Long) -> Unit,
     onUserTouch: (Boolean) -> Unit = {},
+    onUserDrag: (Float) -> Unit = {},
 ) {
     val currentEntries by rememberUpdatedState(ui.entries)
     // Read through State: pointerInput keeps the first lambda instance, so
@@ -652,7 +686,14 @@ private fun LogList(
                     awaitFirstDown(requireUnconsumed = false)
                     onUserTouch(true)
                     while (currentEvent.changes.any { it.pressed }) {
-                        awaitPointerEvent(PointerEventPass.Initial)
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        // Report the raw finger delta — it is the only
+                        // direction signal that head eviction and the
+                        // tail-follow chase cannot produce.
+                        val dy = event.changes
+                            .sumOf { (it.position.y - it.previousPosition.y).toDouble() }
+                            .toFloat()
+                        if (dy != 0f) onUserDrag(dy)
                     }
                     onUserTouch(false)
                 }
