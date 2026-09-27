@@ -60,6 +60,7 @@ import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScope
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +122,7 @@ fun SessionsScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        Box(Modifier.fillMaxSize().tourTarget("sessionsContent")) {
         if (shown.isEmpty()) {
             EmptyState(
                 text = stringResource(R.string.sessions_empty),
@@ -177,6 +179,7 @@ fun SessionsScreen(
                     }
                 }
             }
+        }
         }
     }
 

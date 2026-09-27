@@ -7,7 +7,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -24,8 +26,10 @@ import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -39,6 +43,10 @@ import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
+import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
+import io.github.shiaho777.logsleuth.app.ui.guide.TourController
+import io.github.shiaho777.logsleuth.app.ui.guide.TourOverlay
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.report.ReportScreen
 import io.github.shiaho777.logsleuth.app.ui.sessiondetail.SessionDetailScreen
 import io.github.shiaho777.logsleuth.app.ui.sessions.SessionsScreen
@@ -82,12 +90,26 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 fun LogSleuthNavHost(
     navController: NavHostController,
     startDestination: String,
+    guideCompleted: Boolean = true,
+    onTourFinished: () -> Unit = {},
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in topLevelRoutes
 
-    Scaffold(
+    // Coach-mark tour: one controller for the whole graph. Screens mark
+    // their highlight elements with Modifier.tourTarget; the overlay sits
+    // above everything (nav bar included) inside this Box.
+    val tour = remember { TourController() }
+    LaunchedEffect(guideCompleted, currentRoute) {
+        if (!guideCompleted && !tour.hasRun && currentRoute == Routes.STREAM) {
+            tour.start()
+        }
+    }
+
+    CompositionLocalProvider(LocalTourController provides tour) {
+        Box(Modifier.fillMaxSize()) {
+            Scaffold(
         // Exclude the status-bar inset: screens' TopAppBar consumes it
         // itself — applying it here too produced a double-height top gap.
         // Keep horizontal (cutouts) and bottom (gesture bar on screens
@@ -97,7 +119,7 @@ fun LogSleuthNavHost(
         ),
         bottomBar = {
             if (showBottomBar) {
-                ShortNavigationBar {
+                ShortNavigationBar(Modifier.tourTarget("navBar")) {
                     topLevelDestinations.forEach { dest ->
                         ShortNavigationBarItem(
                             selected = currentRoute == dest.route,
@@ -184,9 +206,43 @@ fun LogSleuthNavHost(
                         SettingsScreen(
                             onBack = { navController.popBackStack() },
                             onOpenSetup = { navController.navigate(Routes.SETUP) },
+                            onOpenGuide = {
+                                navController.navigate(Routes.STREAM) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = false
+                                    }
+                                    launchSingleTop = true
+                                }
+                                tour.start()
+                            },
                         )
                     }
                 }
+            }
+        }
+    }
+
+            // Coach-mark overlay — above the whole Scaffold, nav bar
+            // included, so targets anywhere can be highlighted.
+            if (tour.active) {
+                TourOverlay(
+                    controller = tour,
+                    // Same semantics as the bottom bar — save/restore tab
+                    // state so the stream keeps its scroll position.
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onFinished = {
+                        tour.stop()
+                        onTourFinished()
+                    },
+                )
             }
         }
     }

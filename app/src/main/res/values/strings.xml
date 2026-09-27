@@ -212,4 +212,43 @@
     <string name="scope_loading">Counting…</string>
     <string name="scope_unattributed">Unattributed</string>
 
+    <!-- Guided tour (coach marks over the real UI) -->
+    <string name="tour_skip">Skip</string>
+    <string name="tour_next">Next</string>
+    <string name="tour_done">Done</string>
+    <string name="tour_intro_title">Welcome to LogSleuth</string>
+    <string name="tour_intro_desc">A quick hands-on tour of the live stream — tap anywhere to move to the next tip.</string>
+    <string name="tour_filter_title">Filter bar</string>
+    <string name="tour_filter_desc">Narrow the stream by level, per app, or saved presets. Tap Next to unfold it.</string>
+    <string name="tour_fields_title">Detail filters</string>
+    <string name="tour_fields_desc">The bar just expanded — keyword, tag, exclude, regex toggle, and saving the combo as a preset.</string>
+    <string name="tour_engine_title">Engine status</string>
+    <string name="tour_engine_desc">This chip shows the logcat connection: Streaming, Reconnecting or Stopped. The engine recovers on its own.</string>
+    <string name="tour_pause_title">Pause</string>
+    <string name="tour_pause_desc">Watch — the stream just paused: new lines keep buffering in the background while the display freezes.</string>
+    <string name="tour_paused_title">While paused</string>
+    <string name="tour_paused_desc">This banner counts buffered lines arriving underneath. Tap resume (or it happens on the next step) to catch up instantly.</string>
+    <string name="tour_search_title">Search</string>
+    <string name="tour_search_desc">The search bar just opened: type a query and jump between matches across the whole buffer.</string>
+    <string name="tour_bubble_title">Floating bubble</string>
+    <string name="tour_bubble_desc">Keep an eye on crashes while using other apps — a system-wide bubble shows a live indicator.</string>
+    <string name="tour_scope_title">Clear &amp; save</string>
+    <string name="tour_scope_desc">Wipe the buffer or snapshot it into a session — either for everything, or just the apps you pick. Watch it open next.</string>
+    <string name="tour_scope_demo_desc">The scope picker opened by itself — All, or per-app with live log stats on the right.</string>
+    <string name="tour_select_title">Multi-select</string>
+    <string name="tour_select_desc">Long-press just started — rows show checkmarks and this bar copies or dismisses the selection. Tapping a row expands its full text.</string>
+    <string name="tour_fab_title">Jump controls</string>
+    <string name="tour_fab_desc">The list just scrolled up: the ↓ button returns to the live tail, ↑ jumps to the oldest buffered line.</string>
+    <string name="tour_sessions_title">Sessions</string>
+    <string name="tour_sessions_desc">Every recording and saved snapshot lands here — tap one to replay it, swipe to delete.</string>
+    <string name="tour_report_title">Report</string>
+    <string name="tour_report_desc">Pick an app and LogSleuth aggregates its log stats — level mix, noisy tags, error bursts.</string>
+    <string name="tour_crashes_title">Crashes</string>
+    <string name="tour_crashes_desc">Detected crashes and ANRs are collected automatically — expand a card for the full stack trace.</string>
+    <string name="tour_settings_title">Settings</string>
+    <string name="tour_settings_desc">Buffer size, recording limits, crash notifications, language, theme — and the replay button for this tour.</string>
+    <string name="tour_done_title">You are all set</string>
+    <string name="tour_done_desc">Replay this tour anytime from Settings → About. Happy log-hunting!</string>
+    <string name="settings_replay_guide">Replay guided tour</string>
+
 </resources>

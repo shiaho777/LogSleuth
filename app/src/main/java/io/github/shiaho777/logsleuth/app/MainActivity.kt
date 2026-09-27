@@ -89,7 +89,14 @@ class MainActivity : ComponentActivity() {
                             intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
                             else -> Routes.STREAM
                         }
-                        LogSleuthNavHost(navController = navController, startDestination = start)
+                        LogSleuthNavHost(
+                            navController = navController,
+                            startDestination = start,
+                            guideCompleted = settings?.guideCompleted ?: true,
+                            onTourFinished = {
+                                settingsRepository.setGuideCompletedAsync(true)
+                            },
+                        )
                     }
                 }
             }

@@ -64,6 +64,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -97,6 +98,8 @@ import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
+import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
 import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
@@ -164,8 +167,119 @@ fun StreamScreen(
     // Clear / save scope picker — one shared dialog, two actions.
     var scopeDialog by remember { mutableStateOf<ScopeAction?>(null) }
     var scopeGroups by remember { mutableStateOf<List<AppLogGroup>?>(null) }
+    // Tour demo opens the picker straight into per-app mode.
+    var scopeStartPerApp by remember { mutableStateOf(false) }
     LaunchedEffect(scopeDialog) {
         if (scopeDialog != null) scopeGroups = viewModel.appGroups()
+    }
+
+    // Coach-mark hooks: the tour overlay fires these to demo features
+    // live — pause for real, open the search bar, pop the scope dialog,
+    // nudge the list so the jump FABs appear. Each "off" action only
+    // undoes what its "on" partner actually did, so pre-existing user
+    // state (e.g. already paused) is preserved.
+    val tour = LocalTourController.current
+    DisposableEffect(Unit) {
+        var pausedByTour = false
+        var searchByTour = false
+        var scopeByTour = false
+        tour.actions["pauseOn"] = {
+            if (!viewModel.ui.value.paused) {
+                viewModel.setPaused(true)
+                pausedByTour = true
+            }
+        }
+        tour.actions["pauseOff"] = {
+            if (pausedByTour) viewModel.setPaused(false)
+        }
+        var selectedByTour = false
+        var peekedByTour = false
+        tour.actions["searchOpen"] = {
+            if (!viewModel.ui.value.searching) {
+                viewModel.setSearching(true)
+                // Type a real query so hits and the jump buttons light up —
+                // "logsleuth" always matches our own lines in the buffer.
+                viewModel.setSearchQuery("logsleuth")
+                searchByTour = true
+            }
+        }
+        tour.actions["searchClose"] = {
+            if (searchByTour) {
+                viewModel.setSearchQuery("")
+                viewModel.setSearching(false)
+            }
+        }
+        tour.actions["scopeOpenPerApp"] = {
+            if (scopeDialog == null) {
+                scopeStartPerApp = true
+                scopeDialog = ScopeAction.CLEAR
+                scopeByTour = true
+            }
+        }
+        tour.actions["scopeClose"] = {
+            if (scopeByTour) {
+                scopeDialog = null
+                scopeStartPerApp = false
+            }
+        }
+        tour.actions["selectDemo"] = {
+            val visible = ui.entries
+            if (visible.size > 4 && !selecting) {
+                val i = (listState.firstVisibleItemIndex + 1)
+                    .coerceIn(0, visible.size - 3)
+                selAnchor = visible[i].seq
+                selEnd = visible[i + 2].seq
+                selectedByTour = true
+            }
+        }
+        tour.actions["selectOff"] = {
+            if (selectedByTour) {
+                selAnchor = -1L
+                selEnd = -1L
+            }
+        }
+        tour.actions["fabPeek"] = {
+            if (ui.entries.isNotEmpty()) {
+                followTail = false
+                peekedByTour = true
+                scope.launch { listState.scroll { scrollBy(600f) } }
+            }
+        }
+        tour.actions["fabBack"] = {
+            if (peekedByTour) {
+                followTail = true
+                scope.launch {
+                    listState.scrollToItem(
+                        viewModel.ui.value.entries.lastIndex.coerceAtLeast(0),
+                    )
+                }
+            }
+        }
+        // Skip at ANY step must undo whatever the tour turned on —
+        // per-step leave actions only fire for the step being left.
+        tour.actions["leave.stream"] = {
+            if (pausedByTour) viewModel.setPaused(false)
+            if (searchByTour) {
+                viewModel.setSearchQuery("")
+                viewModel.setSearching(false)
+            }
+            if (scopeByTour) {
+                scopeDialog = null
+                scopeStartPerApp = false
+            }
+            if (selectedByTour) {
+                selAnchor = -1L
+                selEnd = -1L
+            }
+            if (peekedByTour) followTail = true
+        }
+        onDispose {
+            listOf(
+                "pauseOn", "pauseOff", "searchOpen", "searchClose",
+                "scopeOpenPerApp", "scopeClose", "selectDemo", "selectOff",
+                "fabPeek", "fabBack", "leave.stream",
+            ).forEach { tour.actions.remove(it) }
+        }
     }
 
     // While pinned, glide toward the stream's end. Per-publish scrollToItem
@@ -217,15 +331,17 @@ fun StreamScreen(
     Scaffold(
         topBar = {
             if (ui.searching) {
-                SearchTopBar(
-                    query = ui.searchQuery,
-                    hits = ui.searchHits.size,
-                    hitIndex = ui.searchHitIndex,
-                    onQueryChange = viewModel::setSearchQuery,
-                    onPrev = { viewModel.nextSearchHit(-1) },
-                    onNext = { viewModel.nextSearchHit(1) },
-                    onClose = { viewModel.setSearching(false) },
-                )
+                Box(Modifier.tourTarget("searchBar")) {
+                    SearchTopBar(
+                        query = ui.searchQuery,
+                        hits = ui.searchHits.size,
+                        hitIndex = ui.searchHitIndex,
+                        onQueryChange = viewModel::setSearchQuery,
+                        onPrev = { viewModel.nextSearchHit(-1) },
+                        onNext = { viewModel.nextSearchHit(1) },
+                        onClose = { viewModel.setSearching(false) },
+                    )
+                }
             } else {
                 StreamTopBar(
                     paused = ui.paused,
@@ -247,7 +363,10 @@ fun StreamScreen(
             }
         },
         floatingActionButton = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.tourTarget("fab"),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 // Jump to the oldest buffered line.
                 AnimatedVisibility(
                     visible = canScrollBack && ui.entries.isNotEmpty() && !selecting,
@@ -330,21 +449,25 @@ fun StreamScreen(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut(),
             ) {
-                PausedBanner(
-                    incoming = ui.pausedIncoming,
-                    onResume = { viewModel.setPaused(false) },
-                )
+                Box(Modifier.tourTarget("pausedBanner")) {
+                    PausedBanner(
+                        incoming = ui.pausedIncoming,
+                        onResume = { viewModel.setPaused(false) },
+                    )
+                }
             }
 
-            FilterBar(
-                filter = ui.filter,
-                regexInvalid = ui.regexInvalid,
-                apps = ui.apps,
-                presets = ui.presets,
-                onFilterChange = viewModel::setFilter,
-                onSavePreset = viewModel::savePreset,
-                onApplyPreset = viewModel::applyPreset,
-            )
+            Box(Modifier.tourTarget("filterBar")) {
+                FilterBar(
+                    filter = ui.filter,
+                    regexInvalid = ui.regexInvalid,
+                    apps = ui.apps,
+                    presets = ui.presets,
+                    onFilterChange = viewModel::setFilter,
+                    onSavePreset = viewModel::savePreset,
+                    onApplyPreset = viewModel::applyPreset,
+                )
+            }
 
             Box(Modifier.fillMaxSize()) {
                 when {
@@ -385,7 +508,8 @@ fun StreamScreen(
                     state = ui.engineState,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp),
+                        .padding(8.dp)
+                        .tourTarget("engineStatus"),
                 )
 
                 SelectionBar(
@@ -408,7 +532,8 @@ fun StreamScreen(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 16.dp)
+                        .tourTarget("selectionBar"),
                 )
             }
         }
@@ -445,7 +570,11 @@ fun StreamScreen(
             },
             groups = scopeGroups,
             totalLines = ui.entries.size,
-            onDismiss = { scopeDialog = null },
+            initialPerApp = scopeStartPerApp,
+            onDismiss = {
+                scopeDialog = null
+                scopeStartPerApp = false
+            },
             onConfirm = { uids ->
                 if (action == ScopeAction.CLEAR) {
                     if (uids == null) viewModel.clear() else viewModel.clearApps(uids)
@@ -453,6 +582,7 @@ fun StreamScreen(
                     viewModel.saveToSession(uids)
                 }
                 scopeDialog = null
+                scopeStartPerApp = false
             },
         )
     }
@@ -568,21 +698,21 @@ private fun StreamTopBar(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
         actions = {
-            IconButton(onClick = onPauseToggle) {
+            IconButton(onClick = onPauseToggle, modifier = Modifier.tourTarget("pause")) {
                 Icon(
                     if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
                     contentDescription = stringResource(if (paused) R.string.resume else R.string.pause),
                     tint = if (paused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onSearch) {
+            IconButton(onClick = onSearch, modifier = Modifier.tourTarget("search")) {
                 Icon(
                     Icons.Default.Search,
                     contentDescription = stringResource(R.string.search_hint),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onBubbleToggle) {
+            IconButton(onClick = onBubbleToggle, modifier = Modifier.tourTarget("bubble")) {
                 Icon(
                     Icons.Default.BubbleChart,
                     contentDescription = stringResource(R.string.bubble_controls),
@@ -593,19 +723,21 @@ private fun StreamTopBar(
                     },
                 )
             }
-            IconButton(onClick = onClear) {
-                Icon(
-                    Icons.Default.Clear,
-                    contentDescription = stringResource(R.string.clear),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onSave) {
-                Icon(
-                    Icons.Default.Save,
-                    contentDescription = stringResource(R.string.save_to_session),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(Modifier.tourTarget("scopeActions")) {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = stringResource(R.string.clear),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = onSave) {
+                    Icon(
+                        Icons.Default.Save,
+                        contentDescription = stringResource(R.string.save_to_session),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
     )

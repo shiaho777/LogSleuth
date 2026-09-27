@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
+import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 
 /**
  * Guided 3-step bug-report flow: pick app → reproduce while recording →
@@ -70,6 +73,31 @@ fun ReportScreen(
 ) {
     val ui by viewModel.ui.collectAsState()
 
+    // Tour hook: the overlay picks the first app and steps the wizard
+    // forward so the user sees the reproduce stage, then backs out.
+    val tour = LocalTourController.current
+    DisposableEffect(Unit) {
+        var steppedByTour = false
+        tour.actions["reportDemo"] = {
+            val s = viewModel.ui.value
+            if (s.step == 1 && s.selectedApp == null && s.apps.isNotEmpty()) {
+                viewModel.selectApp(s.apps.first())
+                viewModel.nextStep()
+                steppedByTour = true
+            }
+        }
+        tour.actions["reportUndemo"] = {
+            if (steppedByTour) viewModel.prevStep()
+        }
+        tour.actions["leave.report"] = {
+            if (steppedByTour) viewModel.prevStep()
+        }
+        onDispose {
+            listOf("reportDemo", "reportUndemo", "leave.report")
+                .forEach { tour.actions.remove(it) }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text(stringResource(R.string.nav_report)) })
@@ -79,6 +107,7 @@ fun ReportScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .tourTarget("reportContent")
                 .padding(horizontal = 16.dp),
         ) {
             StepHeader(step = ui.step)

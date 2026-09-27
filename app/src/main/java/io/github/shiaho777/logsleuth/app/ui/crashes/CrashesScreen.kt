@@ -59,6 +59,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,6 +87,7 @@ fun CrashesScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        Box(Modifier.fillMaxSize().tourTarget("crashesContent")) {
         if (shown.isEmpty()) {
             EmptyState(
                 text = stringResource(R.string.crashes_empty),
@@ -135,6 +137,7 @@ fun CrashesScreen(
                     }
                 }
             }
+        }
         }
     }
 }
