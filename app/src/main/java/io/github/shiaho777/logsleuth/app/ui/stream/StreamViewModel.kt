@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
+import io.github.shiaho777.logsleuth.app.core.apps.groupEntriesByApp
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -53,6 +56,8 @@ data class StreamUiState(
     val searchHitIndex: Int = -1,
     /** Session just finished — prompt the user to share it. */
     val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
+    /** [finishedSession] came from a save-to-session snapshot, not a recording. */
+    val finishedSnapshot: Boolean = false,
     /** How many of [finishedSession]'s lines were buffered before start. */
     val finishedBackfill: Long = 0,
     /** Floating recording controls are shown over other apps. */
@@ -255,6 +260,9 @@ class StreamViewModel @Inject constructor(
     fun clear() {
         viewModelScope.launch {
             engine.clearBuffer()
+            // `staged` holds in-flight emissions between the collector and the
+            // batch flush — without it a clear would let ~120ms of lines return.
+            stagedMutex.withLock { staged.clear() }
             listMutex.withLock {
                 all.clear()
                 visible.clear()
@@ -262,6 +270,76 @@ class StreamViewModel @Inject constructor(
                 publishLocked()
             }
             _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList()) }
+        }
+    }
+
+    /**
+     * Per-app aggregation of the current buffer for the scope pickers —
+     * computed on demand (dialog open), not per publish, since a full
+     * 20k-entry scan per batch would be pure waste.
+     */
+    suspend fun appGroups(): List<io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup> {
+        val entries = listMutex.withLock { all.map { it.entry } + pending }
+        val launchable = installedApps.load().mapTo(HashSet()) { it.packageName }
+        val pm = context.packageManager
+        return withContext(Dispatchers.Default) {
+            groupEntriesByApp(
+                entries = entries,
+                unattributedLabel = context.getString(R.string.scope_unattributed),
+            ) { uid ->
+                val pkgs = runCatching { pm.getPackagesForUid(uid)?.toList() }
+                    .getOrNull().orEmpty()
+                val pkg = pkgs.firstOrNull { it in launchable } ?: pkgs.firstOrNull()
+                val label = pkg?.let {
+                    runCatching {
+                        pm.getApplicationLabel(pm.getApplicationInfo(it, 0)).toString()
+                    }.getOrNull()
+                } ?: "UID $uid"
+                pkg to label
+            }
+        }
+    }
+
+    /** Removes entries belonging to [uids] (null uid = unattributed group). */
+    fun clearApps(uids: Set<Int?>) {
+        viewModelScope.launch {
+            stagedMutex.withLock { staged.removeAll { it.uid in uids } }
+            listMutex.withLock {
+                all.removeAll { it.entry.uid in uids }
+                visible.removeAll { it.entry.uid in uids }
+                pending.removeAll { it.uid in uids }
+                publishLocked()
+            }
+        }
+    }
+
+    /**
+     * Writes the current buffer (or only the [uids] subset; null = all) to a
+     * finished session, then surfaces the share sheet as with a recording.
+     */
+    fun saveToSession(uids: Set<Int?>? = null) {
+        viewModelScope.launch {
+            val entries = listMutex.withLock {
+                // Include `pending` — paused lines are still part of the stream
+                // the user sees (they surface on resume) and belong in a
+                // "save everything" snapshot. `staged` is a <120ms window and
+                // is intentionally left out.
+                (all.filter { uids == null || it.entry.uid in uids }.map { it.entry } +
+                    pending.filter { uids == null || it.uid in uids })
+                    .sortedBy { it.seq }
+            }
+            recordingManager.snapshotToSession(entries).onSuccess { id ->
+                val session = sessionDao.getById(id)
+                if (session != null) {
+                    _ui.update {
+                        it.copy(
+                            finishedSession = session,
+                            finishedBackfill = 0,
+                            finishedSnapshot = true,
+                        )
+                    }
+                }
+            }
         }
     }
 
