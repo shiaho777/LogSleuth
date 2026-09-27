@@ -212,4 +212,43 @@
     <string name="scope_loading">统计中…</string>
     <string name="scope_unattributed">未归属</string>
 
+    <!-- 引导浮层（在真实界面上逐步高亮） -->
+    <string name="tour_skip">跳过</string>
+    <string name="tour_next">下一步</string>
+    <string name="tour_done">完成</string>
+    <string name="tour_intro_title">欢迎使用 LogSleuth</string>
+    <string name="tour_intro_desc">快速上手实时日志流——点击任意位置进入下一步。</string>
+    <string name="tour_filter_title">过滤栏</string>
+    <string name="tour_filter_desc">按级别、应用或预设收窄日志流。点下一步看它会自己展开。</string>
+    <string name="tour_fields_title">详细过滤</string>
+    <string name="tour_fields_desc">过滤栏刚刚自己展开了——关键词、tag、排除、正则开关，还能把组合存成预设。</string>
+    <string name="tour_engine_title">引擎状态</string>
+    <string name="tour_engine_desc">这颗芯片显示 logcat 连接状态：推流中、重连中或已停止。断开会自动恢复。</string>
+    <string name="tour_pause_title">暂停</string>
+    <string name="tour_pause_desc">看——流刚刚被暂停了：画面定格方便细读，新日志仍在后台继续缓冲。</string>
+    <string name="tour_paused_title">暂停期间</string>
+    <string name="tour_paused_desc">这条横幅会累计后台仍在到达的行数。点恢复（或进入下一步）即可瞬间追平。</string>
+    <string name="tour_search_title">搜索</string>
+    <string name="tour_search_desc">搜索栏刚刚被打开：输入关键词后可用上一条/下一条在整个缓冲区中跳转。</string>
+    <string name="tour_bubble_title">悬浮球</string>
+    <string name="tour_bubble_desc">在其他应用里也能盯着崩溃——全局悬浮球会实时提示。</string>
+    <string name="tour_scope_title">清理与保存</string>
+    <string name="tour_scope_desc">清空缓冲区，或把当前内容快照成会话——可全部操作，也可只选指定应用。下一步看实际效果。</string>
+    <string name="tour_scope_demo_desc">范围弹窗刚刚自己打开了——可选"全部"，或按应用查看右侧的日志统计。</string>
+    <string name="tour_select_title">多选模式</string>
+    <string name="tour_select_desc">长按刚刚触发了多选——行首出现勾选框，底部这条操作栏可复制或取消。点按行可展开全文。</string>
+    <string name="tour_fab_title">跳转按钮</string>
+    <string name="tour_fab_desc">列表刚刚向上滚了一屏：↓ 回到实时底部，↑ 跳到缓冲区最老的一行。</string>
+    <string name="tour_sessions_title">会话</string>
+    <string name="tour_sessions_desc">所有录制和保存的快照都在这里——点开即可回放，滑动可删除。</string>
+    <string name="tour_report_title">报告</string>
+    <string name="tour_report_desc">选择一个应用后，LogSleuth 会聚合它的日志统计——级别分布、高频 tag、错误爆发。</string>
+    <string name="tour_crashes_title">崩溃</string>
+    <string name="tour_crashes_desc">检测到的崩溃与 ANR 会自动收集在这里——展开卡片可查看完整堆栈。</string>
+    <string name="tour_settings_title">设置</string>
+    <string name="tour_settings_desc">缓冲区大小、录制上限、崩溃通知、语言、主题——以及本引导的重看入口。</string>
+    <string name="tour_done_title">上手完成</string>
+    <string name="tour_done_desc">随时可在 设置 → 关于 中重看本引导。祝捉虫愉快！</string>
+    <string name="settings_replay_guide">重看使用引导</string>
+
 </resources>

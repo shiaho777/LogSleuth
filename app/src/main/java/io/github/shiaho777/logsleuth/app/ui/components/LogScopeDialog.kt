@@ -71,8 +71,11 @@ fun LogScopeDialog(
     totalLines: Int,
     onDismiss: () -> Unit,
     onConfirm: (Set<Int?>?) -> Unit,
+    // Opens straight into the per-app two-column view — used by the tour
+    // to demo the rich layout instead of the plain "All" mode.
+    initialPerApp: Boolean = false,
 ) {
-    var perApp by remember { mutableStateOf(false) }
+    var perApp by remember { mutableStateOf(initialPerApp) }
     var selected by remember { mutableStateOf(setOf<Int?>()) }
     var focusedUid by remember { mutableStateOf<Int?>(null) }
     val focused = groups?.firstOrNull { it.uid == focusedUid } ?: groups?.firstOrNull()

@@ -40,6 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,8 @@ import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
+import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
+import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +73,22 @@ fun FilterBar(
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var showAppPicker by remember { mutableStateOf(false) }
+
+    // Tour hooks: let the guided tour expand the detail row itself.
+    val tour = LocalTourController.current
+    DisposableEffect(Unit) {
+        var expandedByTour = false
+        tour.actions["filterExpand"] = {
+            if (!expanded) { expanded = true; expandedByTour = true }
+        }
+        tour.actions["filterCollapse"] = {
+            if (expandedByTour) expanded = false
+        }
+        onDispose {
+            tour.actions.remove("filterExpand")
+            tour.actions.remove("filterCollapse")
+        }
+    }
 
     Surface(tonalElevation = 2.dp) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -134,7 +153,10 @@ fun FilterBar(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut(),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(
+                    Modifier.tourTarget("filterFields"),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     FilterTextField(
                         value = filter.query,
                         onValueChange = { onFilterChange(filter.copy(query = it)) },
