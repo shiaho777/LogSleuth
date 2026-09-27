@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -392,33 +391,20 @@ fun StreamScreen(
                     enter = scaleIn(),
                     exit = scaleOut(),
                 ) {
-                    // Badge anchors to the FAB itself, not the icon: BadgedBox
-                    // extends content rightward past the anchor's end, so a long
-                    // "+N" pill would stick out past the FAB edge and clip
-                    // against the screen edge (FAB sits only 16dp inside).
-                    Box {
-                        FloatingActionButton(
-                            onClick = {
-                                followTail = true
-                                scope.launch {
-                                    listState.animateScrollToItem(ui.entries.lastIndex)
-                                }
-                            },
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ) {
-                            Icon(
-                                Icons.Default.KeyboardArrowDown,
-                                contentDescription = stringResource(R.string.scroll_bottom),
-                            )
-                        }
-                        if (ui.pausedIncoming > 0) {
-                            Badge(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 4.dp, y = (-8).dp),
-                            ) { Text("+${ui.pausedIncoming}") }
-                        }
+                    FloatingActionButton(
+                        onClick = {
+                            followTail = true
+                            scope.launch {
+                                listState.animateScrollToItem(ui.entries.lastIndex)
+                            }
+                        },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Icon(
+                            Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.scroll_bottom),
+                        )
                     }
                 }
             }
