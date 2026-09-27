@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
-    @Query("SELECT * FROM sessions ORDER BY startedAt DESC")
+    // id DESC = creation order. Snapshots save a buffer whose startedAt
+    // can be far in the past — ordering by it sinks a just-saved row.
+    @Query("SELECT * FROM sessions ORDER BY id DESC")
     fun observeAll(): Flow<List<SessionEntity>>
 
     @Query("SELECT * FROM sessions WHERE id = :id")
