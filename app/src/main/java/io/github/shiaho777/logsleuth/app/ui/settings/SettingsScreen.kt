@@ -50,6 +50,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit,
+    onOpenGuide: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -283,6 +284,9 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    TextButton(onClick = onOpenGuide) {
+                        Text(stringResource(R.string.settings_replay_guide))
+                    }
                 }
             }
         }

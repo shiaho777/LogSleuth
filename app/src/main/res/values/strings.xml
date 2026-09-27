@@ -212,4 +212,36 @@
     <string name="scope_loading">Counting…</string>
     <string name="scope_unattributed">Unattributed</string>
 
+    <!-- Feature tour -->
+    <string name="guide_skip">Skip</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_done">Get started</string>
+    <string name="guide_welcome_title">Welcome to LogSleuth</string>
+    <string name="guide_welcome_desc">A root-free logcat inspector — live stream, recordings, crashes, and a floating viewer. All local, always.</string>
+    <string name="guide_stream_title">Live stream</string>
+    <string name="guide_stream_desc">Logs arrive in real time with level colors, pid/tid and tags.</string>
+    <string name="guide_stream_b1">Follows the tail — pull down to browse freely</string>
+    <string name="guide_stream_b2">Pause freezes the flow, resumes with one tap</string>
+    <string name="guide_stream_b3">Search highlights every match instantly</string>
+    <string name="guide_filter_title">Filters &amp; presets</string>
+    <string name="guide_filter_desc">Narrow the firehose down to exactly what you are hunting.</string>
+    <string name="guide_filter_b1">Filter by level, keyword, tag or regex</string>
+    <string name="guide_filter_b2">Scope to one app via its uid</string>
+    <string name="guide_filter_b3">Save combos as presets for one-tap reuse</string>
+    <string name="guide_sessions_title">Record &amp; replay</string>
+    <string name="guide_sessions_desc">Capture sessions, replay them, and share them anywhere.</string>
+    <string name="guide_sessions_b1">Record live, or snapshot the buffer to a session</string>
+    <string name="guide_sessions_b2">Clear or save — the picker can scope per app</string>
+    <string name="guide_sessions_b3">Replay with full filtering; share as ZIP or TXT</string>
+    <string name="guide_crashes_title">Crash &amp; ANR watch</string>
+    <string name="guide_crashes_desc">Fatal crashes and ANRs are caught for you, no babysitting.</string>
+    <string name="guide_crashes_b1">Crashes are detected and listed automatically</string>
+    <string name="guide_crashes_b2">A notification lands the moment one fires</string>
+    <string name="guide_crashes_b3">Tap it to jump straight into the session</string>
+    <string name="guide_bubble_title">Floating bubble</string>
+    <string name="guide_bubble_desc">A bubble that keeps the stream one glance away.</string>
+    <string name="guide_bubble_b1">Peek at live logs over any app</string>
+    <string name="guide_bubble_b2">Toggle it from the top bar or Settings</string>
+    <string name="settings_replay_guide">Replay the feature tour</string>
+
 </resources>

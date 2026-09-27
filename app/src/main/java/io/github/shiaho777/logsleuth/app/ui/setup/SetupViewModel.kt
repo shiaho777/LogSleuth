@@ -78,7 +78,9 @@ class SetupViewModel @Inject constructor(
     }
 
     fun markSetupCompleted() {
-        viewModelScope.launch { settingsRepository.setSetupCompleted(true) }
+        // Repo scope, not viewModelScope: onDone() pops this screen and the
+        // ViewModel dies before a viewModelScope write could land.
+        settingsRepository.setSetupCompletedAsync(true)
     }
 
     fun setLanguage(value: String) = viewModelScope.launch {

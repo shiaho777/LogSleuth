@@ -39,6 +39,7 @@ import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
+import io.github.shiaho777.logsleuth.app.ui.guide.GuideScreen
 import io.github.shiaho777.logsleuth.app.ui.report.ReportScreen
 import io.github.shiaho777.logsleuth.app.ui.sessiondetail.SessionDetailScreen
 import io.github.shiaho777.logsleuth.app.ui.sessions.SessionsScreen
@@ -55,8 +56,10 @@ object Routes {
     const val CRASHES = "crashes"
     const val FILTERS = "filters"
     const val SETTINGS = "settings"
+    const val GUIDE = "guide?firstRun={firstRun}"
 
     fun sessionDetail(sessionId: Long) = "session/$sessionId"
+    fun guide(firstRun: Boolean = false) = "guide?firstRun=$firstRun"
 }
 
 private data class TopLevelDestination(
@@ -82,6 +85,7 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 fun LogSleuthNavHost(
     navController: NavHostController,
     startDestination: String,
+    guideCompleted: Boolean = true,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -143,8 +147,37 @@ fun LogSleuthNavHost(
                 ) {
                     composable(Routes.SETUP) {
                         SetupScreen(onDone = {
-                            navController.navigate(Routes.STREAM) {
+                            // First run continues into the feature tour;
+                            // re-opening the wizard from Settings goes home.
+                            val target = if (guideCompleted) {
+                                Routes.STREAM
+                            } else {
+                                Routes.guide(firstRun = true)
+                            }
+                            navController.navigate(target) {
                                 popUpTo(Routes.SETUP) { inclusive = true }
+                            }
+                        })
+                    }
+                    composable(
+                        route = Routes.GUIDE,
+                        arguments = listOf(
+                            navArgument("firstRun") {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                        ),
+                    ) { entry ->
+                        val firstRun = entry.arguments?.getBoolean("firstRun") == true
+                        GuideScreen(onDone = {
+                            if (firstRun) {
+                                // Replace everything — Back must not fall
+                                // back into a finished tour.
+                                navController.navigate(Routes.STREAM) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            } else {
+                                navController.popBackStack()
                             }
                         })
                     }
@@ -184,6 +217,9 @@ fun LogSleuthNavHost(
                         SettingsScreen(
                             onBack = { navController.popBackStack() },
                             onOpenSetup = { navController.navigate(Routes.SETUP) },
+                            onOpenGuide = {
+                                navController.navigate(Routes.guide(firstRun = false))
+                            },
                         )
                     }
                 }

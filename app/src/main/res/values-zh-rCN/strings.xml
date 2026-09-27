@@ -212,4 +212,36 @@
     <string name="scope_loading">统计中…</string>
     <string name="scope_unattributed">未归属</string>
 
+    <!-- 功能引导 -->
+    <string name="guide_skip">跳过</string>
+    <string name="guide_next">下一步</string>
+    <string name="guide_done">开始使用</string>
+    <string name="guide_welcome_title">欢迎使用 LogSleuth</string>
+    <string name="guide_welcome_desc">免 Root 的日志查看器——实时流、会话录制、崩溃捕获、悬浮窗，全程本地完成。</string>
+    <string name="guide_stream_title">实时日志流</string>
+    <string name="guide_stream_desc">日志实时滚动，级别着色、pid/tid、tag 一目了然。</string>
+    <string name="guide_stream_b1">自动跟随新日志，下滑即自由浏览</string>
+    <string name="guide_stream_b2">暂停冻结滚动，点按恢复</string>
+    <string name="guide_stream_b3">搜索即时高亮全部命中</string>
+    <string name="guide_filter_title">过滤与预设</string>
+    <string name="guide_filter_desc">从海量日志里精确圈出你要找的内容。</string>
+    <string name="guide_filter_b1">按级别、关键字、tag 或正则过滤</string>
+    <string name="guide_filter_b2">按应用 uid 圈定范围</string>
+    <string name="guide_filter_b3">常用组合保存为预设，一键复用</string>
+    <string name="guide_sessions_title">录制与回放</string>
+    <string name="guide_sessions_desc">录制会话、随时回放、导出分享。</string>
+    <string name="guide_sessions_b1">可后台录制，也可把当前缓冲存成会话</string>
+    <string name="guide_sessions_b2">清理与保存都支持按应用圈选</string>
+    <string name="guide_sessions_b3">回放带完整过滤，可导出 ZIP/TXT</string>
+    <string name="guide_crashes_title">崩溃与 ANR 监控</string>
+    <string name="guide_crashes_desc">崩溃和 ANR 自动捕获，无需盯着屏幕。</string>
+    <string name="guide_crashes_b1">崩溃自动检测并入列表</string>
+    <string name="guide_crashes_b2">发生时立即推送通知</string>
+    <string name="guide_crashes_b3">点通知直达对应会话</string>
+    <string name="guide_bubble_title">悬浮球</string>
+    <string name="guide_bubble_desc">悬浮球让日志流抬眼可见。</string>
+    <string name="guide_bubble_b1">在任何应用上方实时看日志</string>
+    <string name="guide_bubble_b2">顶栏或设置中可随时开关</string>
+    <string name="settings_replay_guide">重看使用引导</string>
+
 </resources>

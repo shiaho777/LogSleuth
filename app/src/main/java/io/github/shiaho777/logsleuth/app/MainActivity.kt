@@ -87,9 +87,14 @@ class MainActivity : ComponentActivity() {
                         val start = when {
                             settings?.setupCompleted != true -> Routes.SETUP
                             intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
+                            settings?.guideCompleted != true -> Routes.guide(firstRun = true)
                             else -> Routes.STREAM
                         }
-                        LogSleuthNavHost(navController = navController, startDestination = start)
+                        LogSleuthNavHost(
+                            navController = navController,
+                            startDestination = start,
+                            guideCompleted = settings?.guideCompleted == true,
+                        )
                     }
                 }
             }

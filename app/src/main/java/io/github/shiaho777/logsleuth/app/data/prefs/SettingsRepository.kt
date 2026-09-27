@@ -6,8 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -22,6 +26,8 @@ data class Settings(
     val logTextScale: Int = 1,
     /** Show the setup wizard until the user has granted some access once. */
     val setupCompleted: Boolean = false,
+    /** Feature tour has been seen once (skip and finish both count). */
+    val guideCompleted: Boolean = false,
     /** In-app language: "system" | "en" | "zh-CN" (see AppLocales). */
     val language: String = AppLocales.SYSTEM,
     /** Recordings auto-stop at this size so a long session can't fill storage. */
@@ -32,6 +38,10 @@ data class Settings(
 
 class SettingsRepository(private val context: Context) {
 
+    // Fire-and-forget writes that must survive the caller's teardown —
+    // e.g. marking the guide done while the screen is being popped.
+    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private object Keys {
         val BUFFER_SIZE = intPreferencesKey("buffer_size")
         val CRASH_NOTIFICATIONS = booleanPreferencesKey("crash_notifications")
@@ -39,6 +49,7 @@ class SettingsRepository(private val context: Context) {
         val THEME = stringPreferencesKey("theme")
         val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
+        val GUIDE_COMPLETED = booleanPreferencesKey("guide_completed")
         val LANGUAGE = stringPreferencesKey("language")
         val RECORDING_MAX_MB = intPreferencesKey("recording_max_mb")
         val RECORDING_MAX_HOURS = intPreferencesKey("recording_max_hours")
@@ -52,6 +63,7 @@ class SettingsRepository(private val context: Context) {
             theme = p[Keys.THEME] ?: "system",
             logTextScale = p[Keys.LOG_TEXT_SCALE] ?: 1,
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
+            guideCompleted = p[Keys.GUIDE_COMPLETED] ?: false,
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
             recordingMaxMb = p[Keys.RECORDING_MAX_MB] ?: 64,
             recordingMaxHours = p[Keys.RECORDING_MAX_HOURS] ?: 0,
@@ -75,6 +87,22 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSetupCompleted(value: Boolean) =
         context.dataStore.edit { it[Keys.SETUP_COMPLETED] = value }
+
+    /** Same durable-write contract as [setGuideCompletedAsync]. */
+    fun setSetupCompletedAsync(value: Boolean) {
+        writeScope.launch { setSetupCompleted(value) }
+    }
+
+    suspend fun setGuideCompleted(value: Boolean) =
+        context.dataStore.edit { it[Keys.GUIDE_COMPLETED] = value }
+
+    /**
+     * Non-suspending variant: runs on this repo's own scope so it cannot be
+     * cancelled by the caller's ViewModel/composition tearing down mid-write.
+     */
+    fun setGuideCompletedAsync(value: Boolean) {
+        writeScope.launch { setGuideCompleted(value) }
+    }
 
     suspend fun setRecordingMaxMb(value: Int) =
         context.dataStore.edit { it[Keys.RECORDING_MAX_MB] = value.coerceIn(8, 512) }
