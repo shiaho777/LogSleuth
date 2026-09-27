@@ -197,4 +197,18 @@
     <string name="crash_share">Share</string>
 
     <!-- Setup next step -->
+    <!-- Clear / save scope picker -->
+    <string name="clear_logs_title">Clear logs</string>
+    <string name="save_session_title">Save to session</string>
+    <string name="save_to_session">Save to session</string>
+    <string name="snapshot_saved">Session saved</string>
+    <string name="scope_all">All (%1$d lines)</string>
+    <string name="scope_per_app">Per app</string>
+    <string name="scope_lines">%1$d lines</string>
+    <string name="scope_errors">%1$d errors</string>
+    <string name="scope_warns">%1$d warnings</string>
+    <string name="scope_empty">No log lines yet</string>
+    <string name="scope_loading">Counting…</string>
+    <string name="scope_unattributed">Unattributed</string>
+
 </resources>

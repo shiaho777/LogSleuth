@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Badge
@@ -90,10 +91,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
+import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
@@ -159,6 +162,13 @@ fun StreamScreen(
     val selHi = maxOf(selAnchor, selEnd)
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
+
+    // Clear / save scope picker — one shared dialog, two actions.
+    var scopeDialog by remember { mutableStateOf<ScopeAction?>(null) }
+    var scopeGroups by remember { mutableStateOf<List<AppLogGroup>?>(null) }
+    LaunchedEffect(scopeDialog) {
+        if (scopeDialog != null) scopeGroups = viewModel.appGroups()
+    }
 
     // While pinned, glide toward the stream's end. Per-publish scrollToItem
     // snaps and per-publish animateScrollToItem restarts a fresh animation
@@ -233,7 +243,8 @@ fun StreamScreen(
                             context.startActivity(viewModel.overlaySettingsIntent())
                         }
                     },
-                    onClear = viewModel::clear,
+                    onClear = { scopeDialog = ScopeAction.CLEAR },
+                    onSave = { scopeDialog = ScopeAction.SAVE },
                 )
             }
         },
@@ -376,16 +387,57 @@ fun StreamScreen(
         listState.animateScrollToItem(target)
     }
 
+    // Shared scope picker — clear or save, all or a checked app subset.
+    scopeDialog?.let { action ->
+        LogScopeDialog(
+            title = stringResource(
+                if (action == ScopeAction.CLEAR) {
+                    R.string.clear_logs_title
+                } else {
+                    R.string.save_session_title
+                },
+            ),
+            icon = if (action == ScopeAction.CLEAR) {
+                Icons.Default.Clear
+            } else {
+                Icons.Default.Save
+            },
+            confirmLabel = stringResource(
+                if (action == ScopeAction.CLEAR) R.string.clear else R.string.save,
+            ),
+            confirmTint = if (action == ScopeAction.CLEAR) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
+            groups = scopeGroups,
+            totalLines = ui.entries.size,
+            onDismiss = { scopeDialog = null },
+            onConfirm = { uids ->
+                if (action == ScopeAction.CLEAR) {
+                    if (uids == null) viewModel.clear() else viewModel.clearApps(uids)
+                } else {
+                    viewModel.saveToSession(uids)
+                }
+                scopeDialog = null
+            },
+        )
+    }
+
     // Recording finished → offer to share immediately.
     ui.finishedSession?.let { session ->
         RecordingSavedSheet(
             session = session,
             backfill = ui.finishedBackfill,
+            isSnapshot = ui.finishedSnapshot,
             onShare = { viewModel.shareFinishedSession(it) },
             onDismiss = viewModel::dismissFinishedSession,
         )
     }
 }
+
+/** Which top-bar action opened the shared scope picker. */
+private enum class ScopeAction { CLEAR, SAVE }
 
 /** Slim banner shown while a recording is active. */
 @Composable
@@ -475,6 +527,7 @@ private fun StreamTopBar(
     onSearch: () -> Unit,
     onBubbleToggle: () -> Unit,
     onClear: () -> Unit,
+    onSave: () -> Unit,
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.app_name)) },
@@ -511,6 +564,13 @@ private fun StreamTopBar(
                 Icon(
                     Icons.Default.Clear,
                     contentDescription = stringResource(R.string.clear),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onSave) {
+                Icon(
+                    Icons.Default.Save,
+                    contentDescription = stringResource(R.string.save_to_session),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -725,6 +785,7 @@ private fun PausedBanner(incoming: Int, onResume: () -> Unit) {
 private fun RecordingSavedSheet(
     session: io.github.shiaho777.logsleuth.app.data.db.SessionEntity,
     backfill: Long,
+    isSnapshot: Boolean = false,
     onShare: (io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -743,7 +804,9 @@ private fun RecordingSavedSheet(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                stringResource(R.string.recording_saved),
+                stringResource(
+                    if (isSnapshot) R.string.snapshot_saved else R.string.recording_saved,
+                ),
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(

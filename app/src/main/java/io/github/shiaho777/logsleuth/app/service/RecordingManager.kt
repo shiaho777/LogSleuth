@@ -5,6 +5,7 @@ import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
@@ -210,6 +211,42 @@ class RecordingManager @Inject constructor(
             runCatching { writer?.close() }
             writer = null
         }
+
+    /**
+     * Writes an already-buffered set of entries as a finished session —
+     * "save current view to Sessions" without ever recording live. Uses the
+     * same file format as a recording (comment header + raw lines) so the
+     * replay path reads it identically.
+     */
+    suspend fun snapshotToSession(
+        entries: List<LogcatEntry>,
+        name: String? = null,
+    ): Result<Long> = runCatching {
+        val dir = File(context.filesDir, "recordings").apply { mkdirs() }
+        val file = File(dir, "session_${System.currentTimeMillis()}.log")
+        val header = buildString {
+            appendLine("# LogSleuth session (snapshot)")
+            appendLine("# saved: ${java.time.Instant.now()}")
+            appendLine("# device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+            appendLine("# android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})")
+            appendLine("# access: ${engine.access.value.kind}")
+        }
+        file.bufferedWriter(Charsets.UTF_8, 64 * 1024).use { w ->
+            w.write(header)
+            for (e in entries) w.appendLine(e.raw)
+        }
+        val now = System.currentTimeMillis()
+        sessionDao.insert(
+            SessionEntity(
+                name = name ?: defaultName(),
+                filePath = file.absolutePath,
+                startedAt = entries.firstOrNull()?.timestampMillis ?: now,
+                endedAt = entries.lastOrNull()?.timestampMillis ?: now,
+                lineCount = entries.size.toLong(),
+                accessKind = engine.access.value.kind.name,
+            ),
+        )
+    }
 
     suspend fun addBookmark() {
         engine.addBookmark()
