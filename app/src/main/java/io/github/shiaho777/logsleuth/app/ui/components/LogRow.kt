@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.ui.components
 
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -143,6 +144,17 @@ fun LogRow(
 
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val icon = LocalAppIconCache.current?.iconFor(entry.uid)
+                if (icon != null) {
+                    Image(
+                        bitmap = icon,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(13.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                    )
+                }
                 Text(
                     text = timeText,
                     style = logMetaStyle(scale),
@@ -223,6 +235,16 @@ private fun EntryDetailSheet(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LevelBadge(entry.level)
+                LocalAppIconCache.current?.iconFor(entry.uid)?.let { icon ->
+                    Spacer(Modifier.width(8.dp))
+                    Image(
+                        bitmap = icon,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = entry.tag.ifEmpty { stringResource(R.string.entry_detail) },

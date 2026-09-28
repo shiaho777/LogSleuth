@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
@@ -27,6 +29,8 @@ import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
+import io.github.shiaho777.logsleuth.app.ui.components.AppIconCache
+import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import io.github.shiaho777.logsleuth.app.ui.navigation.LogSleuthNavHost
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
@@ -82,7 +86,14 @@ class MainActivity : ComponentActivity() {
                     2 -> 1.15f
                     else -> 1f
                 }
-                CompositionLocalProvider(LocalLogTextScale provides logScale) {
+                val iconScope = rememberCoroutineScope()
+                val iconCache = remember {
+                    AppIconCache(applicationContext, iconScope)
+                }
+                CompositionLocalProvider(
+                    LocalLogTextScale provides logScale,
+                    LocalAppIconCache provides iconCache,
+                ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         val start = when {
                             settings?.setupCompleted != true -> Routes.SETUP
