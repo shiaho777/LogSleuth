@@ -56,13 +56,19 @@ internal object LogSharer {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val chooser = Intent.createChooser(send, "Share logs")
-        if (context !is android.app.Activity) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         // startActivity must be called from the main thread; the SDK's writer
         // executor is a background thread. Hop over via the main looper.
+        // The receiver is always the application context — the calling
+        // Activity may be gone by the time the zip is ready — so NEW_TASK
+        // is unconditional. Checking the caller's type instead would crash
+        // with AndroidRuntimeException.
         val appContext = context.applicationContext
         val main = android.os.Handler(android.os.Looper.getMainLooper())
-        main.post { appContext.startActivity(chooser) }
+        main.post {
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            appContext.startActivity(chooser)
+        }
     }
 
     private fun deviceInfo(context: Context): String = buildString {
