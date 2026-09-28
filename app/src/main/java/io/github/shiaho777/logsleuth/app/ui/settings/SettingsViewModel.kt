@@ -9,6 +9,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
+import io.github.shiaho777.logsleuth.app.core.update.ReleaseInfo
+import io.github.shiaho777.logsleuth.app.core.update.UpdateManager
 import io.github.shiaho777.logsleuth.app.data.prefs.Settings
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.BubbleService
@@ -23,6 +25,7 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
     private val engine: LogcatEngine,
+    private val updateManager: UpdateManager,
 ) : ViewModel() {
 
     val settings: StateFlow<Settings?> = settingsRepository.settings
@@ -84,4 +87,25 @@ class SettingsViewModel @Inject constructor(
     )
 
     fun canDrawOverlays(): Boolean = AndroidSettings.canDrawOverlays(context)
+
+    // ---------------- GitHub / update card ----------------
+
+    val update = updateManager.state
+    fun checkUpdates() = updateManager.checkNow()
+    fun downloadRelease(r: ReleaseInfo) = updateManager.start(r)
+    fun pauseDownload() = updateManager.pause()
+    fun resumeDownload() = updateManager.resume()
+    fun cancelDownload() = updateManager.cancelDownload()
+    fun openRepoIntent(): Intent = updateManager.repoIntent()
+    fun openReleaseIntent(r: ReleaseInfo): Intent = updateManager.openReleaseIntent(r)
+
+    /** Install, or route the user to the "install unknown apps" grant first. */
+    fun installDownloaded() {
+        val file = updateManager.state.value.dlFile ?: return
+        if (updateManager.canInstallUnknownApps()) {
+            context.startActivity(updateManager.installIntent(file))
+        } else {
+            context.startActivity(updateManager.unknownSourcesIntent())
+        }
+    }
 }

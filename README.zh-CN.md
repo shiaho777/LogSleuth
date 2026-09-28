@@ -34,6 +34,7 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具,包含两种模式:
 | 崩溃 / ANR 侦测 | 自动高亮 `FATAL EXCEPTION`、原生 `Fatal signal` 与 ANR 并通知 |
 | 时间戳书签 | 可选悬浮气泡,出问题那一刻一键打点 |
 | 导出分享 | 导出 `.txt` 或 `.zip`(附设备信息)发给开发者 |
+| 应用内更新 | 检查 GitHub Release,APK 断点续传下载,下载完直接安装 |
 
 ### 2. 内嵌 SDK(`logsleuth-sdk`)
 
