@@ -34,6 +34,7 @@ A polished, Logcat-style live log viewer for the whole device — no root requir
 | Crash & ANR detection | Highlights `FATAL EXCEPTION`, native `Fatal signal` and ANR events, notifies you |
 | Bookmarks | Optional floating bubble to timestamp "the problem happened NOW" |
 | Export | Share sessions as `.txt` or `.zip` with device info attached |
+| In-app updates | Check GitHub Releases, download APKs with pause/resume, install in place |
 
 ### 2. Embedded SDK (`logsleuth-sdk`)
 

@@ -291,6 +291,19 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            val updateState by viewModel.update.collectAsState()
+            UpdateCard(
+                state = updateState,
+                onCheck = viewModel::checkUpdates,
+                onDownload = viewModel::downloadRelease,
+                onPause = viewModel::pauseDownload,
+                onResume = viewModel::resumeDownload,
+                onCancel = viewModel::cancelDownload,
+                onInstall = viewModel::installDownloaded,
+                onOpenRepo = { context.startActivity(viewModel.openRepoIntent()) },
+                onOpenRelease = { context.startActivity(viewModel.openReleaseIntent(it)) },
+            )
         }
     }
 }

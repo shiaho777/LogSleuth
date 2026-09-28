@@ -251,4 +251,24 @@
     <string name="tour_done_desc">随时可在 设置 → 关于 中重看本引导。祝捉虫愉快！</string>
     <string name="settings_replay_guide">重看使用引导</string>
 
+    <!-- GitHub / update card -->
+    <string name="update_card_title">GitHub 开源仓库</string>
+    <string name="update_card_subtitle">shiaho777/LogSleuth · Apache License 2.0</string>
+    <string name="update_check">检查更新</string>
+    <string name="update_checking">正在检查…</string>
+    <string name="update_up_to_date">已是最新版本</string>
+    <string name="update_failed">检查失败 — %1$s</string>
+    <string name="update_available">发现新版本：%1$s</string>
+    <string name="update_no_apk">该版本没有 APK 附件——请前往 GitHub 获取</string>
+    <string name="update_download">下载</string>
+    <string name="update_pause">暂停</string>
+    <string name="update_resume">继续</string>
+    <string name="update_cancel">取消</string>
+    <string name="update_install">安装 %1$s</string>
+    <string name="update_progress">%1$s / %2$s · %3$s</string>
+    <string name="update_status_paused">已暂停</string>
+    <string name="update_status_done">已完成</string>
+    <string name="update_status_failed">失败</string>
+    <string name="update_history">历史版本</string>
+
 </resources>
