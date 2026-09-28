@@ -274,27 +274,31 @@ private fun VersionHistory(
     onOpenRelease: (ReleaseInfo) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable { open = !open }
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(R.string.update_history),
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    AnimatedVisibility(open) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            releases.forEach { r ->
+    // Header + disclosure live in one Column so they count as a single child
+    // of the card's spacedBy parent — otherwise the parent's 10dp gap lands
+    // between header and content and snaps shut at the end of the collapse.
+    Column {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { open = !open }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.update_history),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        AnimatedVisibility(open) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                releases.forEach { r ->
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -330,6 +334,7 @@ private fun VersionHistory(
                             )
                         }
                     }
+                }
                 }
             }
         }
