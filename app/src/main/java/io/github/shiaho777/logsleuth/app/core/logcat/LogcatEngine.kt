@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
+import android.util.Log
 import io.github.shiaho777.logsleuth.app.core.detect.CrashDetector
 import io.github.shiaho777.logsleuth.app.core.detect.CrashSignal
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
@@ -27,6 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+private const val TAG = "LogcatEngine"
+
 /**
  * Single owner of the logcat process. Consumers (stream UI, recording
  * service) attach/detach; the process runs while at least one consumer is
@@ -46,6 +49,11 @@ class LogcatEngine @Inject constructor(
     settingsRepository: SettingsRepository,
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
+
+    /** Last stream failure detail (e.g. "logcat exited 1: Permission
+     *  denied") for the UI to surface; null when healthy/not granted. */
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
     /**
      * A buffer snapshot plus the sequence watermark at the time it was taken.
@@ -151,6 +159,7 @@ class LogcatEngine @Inject constructor(
         // re-enter startStreamLocked while this monitor is already held and
         // leave a second stream's Job orphaned.
         _access.value = accessChecker.currentState()
+        _lastError.value = null
         if (!_access.value.granted) {
             _state.value = State.ERROR
             return
@@ -179,8 +188,10 @@ class LogcatEngine @Inject constructor(
                 if (consumers > 0) scheduleReconnect()
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e(TAG, "logcat stream failed", e)
                 if (consumers > 0) {
+                    _lastError.value = e.message ?: e.javaClass.simpleName
                     _state.value = State.ERROR
                     scheduleReconnect()
                 }
@@ -188,6 +199,11 @@ class LogcatEngine @Inject constructor(
                 assembler.flush()?.let { dispatch(it, crashDetector) }
                 crashDetector.flush()?.let { onCrash(it) }
                 if (_state.value != State.ERROR) _state.value = State.STOPPED
+                // Free the slot so scheduleReconnect/acquireClient can
+                // actually restart — callers assign streamJob while holding
+                // this monitor, so this null-out always lands after the
+                // assignment (and only on a finished job).
+                synchronized(this@LogcatEngine) { streamJob = null }
             }
         }
     }

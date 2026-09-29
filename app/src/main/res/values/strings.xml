@@ -152,6 +152,7 @@
     <string name="engine_connecting">Connecting…</string>
     <string name="engine_stopped">Stopped</string>
     <string name="engine_error">Stream error</string>
+    <string name="stream_error_detail">Stream failed: %1$s</string>
 
     <!-- Entry detail -->
     <string name="entry_detail">Log entry</string>

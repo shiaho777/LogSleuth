@@ -152,6 +152,7 @@
     <string name="engine_connecting">连接中…</string>
     <string name="engine_stopped">已停止</string>
     <string name="engine_error">流出错</string>
+    <string name="stream_error_detail">流出错：%1$s</string>
 
     <!-- 日志详情 -->
     <string name="entry_detail">日志详情</string>

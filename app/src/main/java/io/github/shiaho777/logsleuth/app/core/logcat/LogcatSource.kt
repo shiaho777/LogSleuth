@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
@@ -53,6 +54,9 @@ private fun streamProcess(start: () -> Process): Flow<String> = callbackFlow {
     }
 
     val reader = process.inputStream.bufferedReader()
+    // A few tail lines: stderr is merged into stdout, so a fast death
+    // ("Permission denied", an unsupported flag) leaves its reason here.
+    val tail = ArrayDeque<String>(4)
     val job = launch(Dispatchers.IO) {
         try {
             while (isActive) {
@@ -60,8 +64,23 @@ private fun streamProcess(start: () -> Process): Flow<String> = callbackFlow {
                 // Blocking send: under bursts the reader slows down and the
                 // logcat pipe backs up instead of silently dropping lines.
                 trySendBlocking(line)
+                if (tail.size == 3) tail.removeFirst()
+                tail.addLast(line)
             }
-            close()
+            // A logcat that exits instantly with an error otherwise reads
+            // as clean EOF — surface the real cause instead. Skip the
+            // check when the loop ended via cancellation: we destroyed
+            // the process ourselves, so a nonzero exit is expected.
+            if (!isActive) {
+                close()
+            } else {
+                val exited = process.waitFor(300, TimeUnit.MILLISECONDS)
+                if (!exited || process.exitValue() == 0) {
+                    close()
+                } else {
+                    close(LogcatDiedException(process.exitValue(), tail.toList()))
+                }
+            }
         } catch (t: Throwable) {
             // Destroying the process closes the stream: that is a normal shutdown.
             if (isActive) close(t) else close()
@@ -74,3 +93,10 @@ private fun streamProcess(start: () -> Process): Flow<String> = callbackFlow {
         runCatching { process.destroy() }
     }
 }
+
+/** logcat exited on its own with a nonzero code; [message] carries the
+ *  merged-stderr tail (e.g. "Permission denied"). */
+class LogcatDiedException(exitCode: Int, lastLines: List<String>) : java.io.IOException(
+    "logcat exited $exitCode" +
+        if (lastLines.isEmpty()) "" else ": ${lastLines.joinToString(" ⏎ ")}",
+)

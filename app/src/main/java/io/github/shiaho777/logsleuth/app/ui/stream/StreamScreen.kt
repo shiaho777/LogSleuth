@@ -502,7 +502,14 @@ fun StreamScreen(
                     )
 
                     ui.entries.isEmpty() -> EmptyState(
-                        text = stringResource(R.string.empty_logs),
+                        // A failed stream shows its real cause here —
+                        // "logcat exited 1: Permission denied" tells the
+                        // user something a bare badge never could.
+                        text = if (ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null) {
+                            stringResource(R.string.stream_error_detail, ui.lastError!!)
+                        } else {
+                            stringResource(R.string.empty_logs)
+                        },
                     )
 
                     else -> LogList(

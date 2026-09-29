@@ -41,16 +41,23 @@ class ShizukuManager(private val context: Context) {
     private val permissionResultListener = Shizuku.OnRequestPermissionResultListener { _, _ -> refresh() }
 
     fun isInstalled(): Boolean = try {
-        context.packageManager.getProviderInfo(
-            android.content.ComponentName(
-                "moe.shizuku.privileged.api",
-                "rikka.shizuku.ShizukuProvider",
-            ),
-            0,
-        )
+        // Package check first — forks may rename the provider class while
+        // keeping the package name.
+        context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
         true
     } catch (_: PackageManager.NameNotFoundException) {
-        false
+        try {
+            context.packageManager.getProviderInfo(
+                android.content.ComponentName(
+                    "moe.shizuku.privileged.api",
+                    "rikka.shizuku.ShizukuProvider",
+                ),
+                0,
+            )
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 
     /** Registers listeners and computes the initial status. Call once at app start. */
