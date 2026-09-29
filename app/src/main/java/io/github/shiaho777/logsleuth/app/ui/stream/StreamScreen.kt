@@ -604,6 +604,18 @@ fun StreamScreen(
             groups = scopeGroups,
             totalLines = ui.entries.size,
             initialPerApp = scopeStartPerApp,
+            // Step 10 hides the overlay card, and this Dialog's own window
+            // covers the scrim anyway — the only place tour chrome can
+            // show is inside the demo dialog itself.
+            tourCaption = if (scopeByTour) {
+                stringResource(
+                    R.string.tour_scope_demo_caption,
+                    tour.stepIndex + 1,
+                    tour.stepCount,
+                )
+            } else {
+                null
+            },
             onDismiss = {
                 // A tour-opened demo dialog that the user closes counts
                 // as "next step" — the dialog window eats the tap that

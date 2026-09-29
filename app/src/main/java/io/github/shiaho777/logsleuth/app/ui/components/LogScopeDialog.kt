@@ -74,6 +74,10 @@ fun LogScopeDialog(
     // Opens straight into the per-app two-column view — used by the tour
     // to demo the rich layout instead of the plain "All" mode.
     initialPerApp: Boolean = false,
+    // Non-null while this dialog IS the tour beat: a banner pinned under
+    // the title, since the overlay's card/scrim sits in the activity
+    // window behind this Dialog and can't show tour chrome itself.
+    tourCaption: String? = null,
 ) {
     var perApp by remember { mutableStateOf(initialPerApp) }
     var selected by remember { mutableStateOf(setOf<Int?>()) }
@@ -95,6 +99,21 @@ fun LogScopeDialog(
                     Icon(icon, contentDescription = null, tint = confirmTint)
                     Spacer(Modifier.width(10.dp))
                     Text(title, style = MaterialTheme.typography.titleMedium)
+                }
+
+                if (tourCaption != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text(
+                            text = tourCaption,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(12.dp))
