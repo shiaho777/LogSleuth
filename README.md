@@ -13,15 +13,15 @@ On a mission to be the easiest and most delightful logging tool on Android.
 
 | Live logcat stream | Search & hit jumps | Filters & presets |
 | :---: | :---: | :---: |
-| ![Live Stream](docs/screenshots/01-live-stream.png) | ![Search](docs/screenshots/07-search.png) | ![Filters](docs/screenshots/02-filters.png) |
+| <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" alt="Live Stream" width="280"></a> | <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" alt="Search" width="280"></a> | <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" alt="Filters" width="280"></a> |
 | **Crash & ANR detection** | **Log entry detail** | **Multi-select & copy** |
-| ![Crashes](docs/screenshots/03-crashes.png) | ![Entry detail](docs/screenshots/08-entry-detail.png) | ![Selection](docs/screenshots/09-selection.png) |
+| <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" alt="Crashes" width="280"></a> | <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" alt="Entry detail" width="280"></a> | <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" alt="Selection" width="280"></a> |
 | **Per-app scope picker** | **Recording sessions** | **Session replay** |
-| ![Scope picker](docs/screenshots/10-scope-picker.png) | ![Recording](docs/screenshots/04-sessions.png) | ![Replay](docs/screenshots/05-session-replay.png) |
+| <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" alt="Scope picker" width="280"></a> | <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" alt="Recording" width="280"></a> | <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" alt="Replay" width="280"></a> |
 | **Guided report & export** | **Save & share** | **Setup & grants** |
-| ![Report](docs/screenshots/12-report.png) | ![Share](docs/screenshots/15-share-sheet.png) | ![Setup](docs/screenshots/11-setup.png) |
+| <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" alt="Report" width="280"></a> | <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" alt="Share" width="280"></a> | <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" alt="Setup" width="280"></a> |
 | **Settings & in-app updates** | **Guided tour** | **Embedded SDK sample** |
-| ![Settings](docs/screenshots/13-settings.png) | ![Tour](docs/screenshots/14-tour.png) | ![SDK Sample](docs/screenshots/06-sdk-sample.png) |
+| <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" alt="Settings" width="280"></a> | <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" alt="Tour" width="280"></a> | <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" alt="SDK Sample" width="280"></a> |
 
 ## What is LogSleuth?
 
