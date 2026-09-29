@@ -11,11 +11,17 @@ On a mission to be the easiest and most delightful logging tool on Android.
 
 ## Screenshots
 
-| Live logcat stream | Filters & Presets | Crash & ANR detection |
+| Live logcat stream | Search & hit jumps | Filters & presets |
 | :---: | :---: | :---: |
-| ![Live Stream](docs/screenshots/01-live-stream.png) | ![Filters](docs/screenshots/02-filters.png) | ![Crashes](docs/screenshots/03-crashes.png) |
-| **Recording sessions** | **Session replay** | **Embedded SDK sample** |
-| ![Recording](docs/screenshots/04-sessions.png) | ![Replay](docs/screenshots/05-session-replay.png) | ![SDK Sample](docs/screenshots/06-sdk-sample.png) |
+| ![Live Stream](docs/screenshots/01-live-stream.png) | ![Search](docs/screenshots/07-search.png) | ![Filters](docs/screenshots/02-filters.png) |
+| **Crash & ANR detection** | **Log entry detail** | **Multi-select & copy** |
+| ![Crashes](docs/screenshots/03-crashes.png) | ![Entry detail](docs/screenshots/08-entry-detail.png) | ![Selection](docs/screenshots/09-selection.png) |
+| **Per-app scope picker** | **Recording sessions** | **Session replay** |
+| ![Scope picker](docs/screenshots/10-scope-picker.png) | ![Recording](docs/screenshots/04-sessions.png) | ![Replay](docs/screenshots/05-session-replay.png) |
+| **Guided report & export** | **Save & share** | **Setup & grants** |
+| ![Report](docs/screenshots/12-report.png) | ![Share](docs/screenshots/15-share-sheet.png) | ![Setup](docs/screenshots/11-setup.png) |
+| **Settings & in-app updates** | **Guided tour** | **Embedded SDK sample** |
+| ![Settings](docs/screenshots/13-settings.png) | ![Tour](docs/screenshots/14-tour.png) | ![SDK Sample](docs/screenshots/06-sdk-sample.png) |
 
 ## What is LogSleuth?
 

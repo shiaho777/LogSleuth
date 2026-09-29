@@ -11,11 +11,17 @@
 
 ## 截图
 
-| 实时日志流 | 过滤与预设 | 崩溃 / ANR 侦测 |
+| 实时日志流 | 搜索与命中跳转 | 过滤与预设 |
 | :---: | :---: | :---: |
-| ![实时日志流](docs/screenshots/01-live-stream.png) | ![过滤](docs/screenshots/02-filters.png) | ![崩溃侦测](docs/screenshots/03-crashes.png) |
-| **录制会话** | **会话回放** | **内嵌 SDK 示例** |
-| ![录制](docs/screenshots/04-sessions.png) | ![回放](docs/screenshots/05-session-replay.png) | ![SDK 示例](docs/screenshots/06-sdk-sample.png) |
+| ![实时日志流](docs/screenshots/01-live-stream.png) | ![搜索](docs/screenshots/07-search.png) | ![过滤](docs/screenshots/02-filters.png) |
+| **崩溃 / ANR 侦测** | **日志详情** | **多选与复制** |
+| ![崩溃侦测](docs/screenshots/03-crashes.png) | ![日志详情](docs/screenshots/08-entry-detail.png) | ![多选](docs/screenshots/09-selection.png) |
+| **按应用范围选择** | **录制会话** | **会话回放** |
+| ![范围选择](docs/screenshots/10-scope-picker.png) | ![录制](docs/screenshots/04-sessions.png) | ![回放](docs/screenshots/05-session-replay.png) |
+| **报告向导与导出** | **保存与分享** | **权限向导** |
+| ![报告向导](docs/screenshots/12-report.png) | ![分享](docs/screenshots/15-share-sheet.png) | ![权限向导](docs/screenshots/11-setup.png) |
+| **设置与应用内更新** | **使用引导** | **内嵌 SDK 示例** |
+| ![设置](docs/screenshots/13-settings.png) | ![使用引导](docs/screenshots/14-tour.png) | ![SDK 示例](docs/screenshots/06-sdk-sample.png) |
 
 ## LogSleuth 是什么?
 
