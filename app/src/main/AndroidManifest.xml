@@ -21,6 +21,11 @@
     <!-- Shizuku + app-picker visibility -->
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
+        <!-- Provider-authority query is what the Shizuku binder handshake
+             resolves; the package query alone is not enough on some builds. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="moe.shizuku.ShizukuProvider" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

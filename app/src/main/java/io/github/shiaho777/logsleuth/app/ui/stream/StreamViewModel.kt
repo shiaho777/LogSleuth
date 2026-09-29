@@ -69,6 +69,9 @@ data class StreamUiState(
      * ghost every row at once.
      */
     val bulkAppend: Boolean = false,
+    /** Last stream failure detail (e.g. "logcat exited 1: Permission
+     *  denied"); null while healthy or when access is simply not granted. */
+    val lastError: String? = null,
 )
 
 @HiltViewModel
@@ -110,6 +113,7 @@ class StreamViewModel @Inject constructor(
         }
         viewModelScope.launch { engine.access.collect { a -> _ui.update { it.copy(access = a) } } }
         viewModelScope.launch { engine.state.collect { s -> _ui.update { it.copy(engineState = s) } } }
+        viewModelScope.launch { engine.lastError.collect { e -> _ui.update { it.copy(lastError = e) } } }
         viewModelScope.launch {
             var wasRecording = false
             var lastSessionId: Long? = null
