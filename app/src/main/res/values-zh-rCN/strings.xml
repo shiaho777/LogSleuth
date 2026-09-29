@@ -236,6 +236,7 @@
     <string name="tour_scope_title">清理与保存</string>
     <string name="tour_scope_desc">清空缓冲区，或把当前内容快照成会话——可全部操作，也可只选指定应用。下一步看实际效果。</string>
     <string name="tour_scope_demo_desc">范围弹窗刚刚自己打开了——可选"全部"，或按应用查看右侧的日志统计。</string>
+    <string name="tour_scope_demo_caption">使用引导 %1$d/%2$d · 演示中——点按弹窗外部继续</string>
     <string name="tour_select_title">多选模式</string>
     <string name="tour_select_desc">长按刚刚触发了多选——行首出现勾选框，底部这条操作栏可复制或取消。点按行可展开全文。</string>
     <string name="tour_fab_title">跳转按钮</string>

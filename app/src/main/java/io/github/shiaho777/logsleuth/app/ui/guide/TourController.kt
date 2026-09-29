@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,6 +26,22 @@ class TourController {
     /** Auto-trigger guard: the flag-only auto-start fires at most once. */
     var hasRun by mutableStateOf(false)
         private set
+
+    /**
+     * Current beat index / total steps, published by the overlay as each
+     * step starts. Hands-free beats hide the overlay card, so a screen's
+     * own demo UI (the scope dialog) reads this to badge itself as tour
+     * content — "step 10/17, live demo".
+     */
+    var stepIndex by mutableIntStateOf(0)
+        private set
+    var stepCount by mutableIntStateOf(0)
+        private set
+
+    fun publishStep(index: Int, count: Int) {
+        stepIndex = index
+        stepCount = count
+    }
 
     /** Key → bounds in root coordinates, updated on every layout pass. */
     val targets = mutableStateMapOf<String, Rect>()

@@ -191,6 +191,7 @@ fun TourOverlay(
         onDispose { controller.fireAll("leave.") }
     }
     LaunchedEffect(index) {
+        controller.publishStep(index, steps.size)
         if (step.route != null) {
             onNavigate(step.route)
             delay(380)

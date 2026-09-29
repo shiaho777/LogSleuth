@@ -236,6 +236,7 @@
     <string name="tour_scope_title">Clear &amp; save</string>
     <string name="tour_scope_desc">Wipe the buffer or snapshot it into a session — either for everything, or just the apps you pick. Watch it open next.</string>
     <string name="tour_scope_demo_desc">The scope picker opened by itself — All, or per-app with live log stats on the right.</string>
+    <string name="tour_scope_demo_caption">Guided tour %1$d/%2$d · live demo — tap outside the dialog to continue</string>
     <string name="tour_select_title">Multi-select</string>
     <string name="tour_select_desc">Long-press just started — rows show checkmarks and this bar copies or dismisses the selection. Tapping a row expands its full text.</string>
     <string name="tour_fab_title">Jump controls</string>
