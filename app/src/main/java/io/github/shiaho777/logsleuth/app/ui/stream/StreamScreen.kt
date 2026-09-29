@@ -104,6 +104,7 @@ import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,7 +145,6 @@ fun StreamScreen(
     // under a held finger but produce no finger motion, so neither can
     // fake or mask a user pull.
     var followTail by remember { mutableStateOf(true) }
-    var autoScrolling by remember { mutableStateOf(false) }
     var pullAccum by remember { mutableFloatStateOf(0f) }
     val touchSlop = LocalViewConfiguration.current.touchSlop
 
@@ -281,24 +281,37 @@ fun StreamScreen(
         }
     }
 
-    // While pinned, glide toward the stream's end. Per-publish scrollToItem
-    // snaps and per-publish animateScrollToItem restarts a fresh animation
-    // every ~120ms (velocity resets → lurch); this loop instead removes a
-    // fraction of the remaining distance per frame — critically damped, so
-    // successive batches merge into one continuous glide. Far behind
-    // (initial load, burst backlog) snaps instantly rather than gliding
-    // through thousands of rows.
-    // Keyed on the last entry's seq, not size: once the buffer hits its
-    // cap the size stays constant while content churns — a size-keyed
-    // effect would never re-fire and the list would freeze mid-stream.
-    LaunchedEffect(ui.entries.lastOrNull()?.seq, followTail, ui.paused, selecting) {
-        if (!followTail || ui.paused || selecting || ui.entries.isEmpty()) return@LaunchedEffect
+    // While pinned, glide toward the stream's end as a steady conveyor —
+    // not a per-batch swoop. One loop lives for the whole follow session:
+    // keyed only on pin/pause/selection, never on entries, so each new
+    // publish can't cancel it mid-flight and drop a frame (the old seq-
+    // keyed effect restarted every ~60ms batch and visibly pulsed). The
+    // belt speed tracks the measured arrival rate plus a gentle backlog
+    // drain, saturating at 1100px/s — under steady inflow rows leave at
+    // exactly the pace they arrive, so the motion is uniform, never a
+    // suck-drain-stop pulse. Idle frames just spin instead of exiting,
+    // so a fresh batch finds the belt already alive. A huge backlog
+    // (initial load) still snaps instead of gliding for a second.
+    LaunchedEffect(followTail, ui.paused, selecting) {
+        if (!followTail || ui.paused || selecting) return@LaunchedEffect
+        var v = 0f
+        var inflow = 0f
+        var prevRemaining = Float.NaN
+        var lastMoved = 0f
+        var frameNs = 0L
         while (true) {
+            val nowNs = withFrameNanos { it }
+            val dt = if (frameNs == 0L) {
+                0.0167f
+            } else {
+                ((nowNs - frameNs) / 1e9f).coerceIn(0.001f, 0.05f)
+            }
+            frameNs = nowNs
             val info = listState.layoutInfo
             val items = info.visibleItemsInfo
             val lastIdx = info.totalItemsCount - 1
-            val last = items.lastOrNull() ?: break
-            if (lastIdx < 0) break
+            val last = items.lastOrNull()
+            if (lastIdx < 0 || last == null) continue
             val belowVisible = last.offset + last.size - info.viewportEndOffset
             val remaining = if (last.index == lastIdx) {
                 belowVisible.toFloat()
@@ -306,18 +319,39 @@ fun StreamScreen(
                 val avgRow = items.sumOf { it.size }.toFloat() / items.size
                 belowVisible + (lastIdx - last.index) * avgRow
             }
-            if (remaining <= 1f) break
-            autoScrolling = true
-            try {
-                if (remaining > 4_000f) {
-                    listState.scrollToItem(lastIdx)
-                    break
-                }
-                listState.scroll { scrollBy((remaining * 0.30f).coerceIn(1f, 360f)) }
-            } finally {
-                autoScrolling = false
+            if (remaining > 8_000f) {
+                listState.scrollToItem(lastIdx)
+                v = 0f
+                inflow = 0f
+                prevRemaining = Float.NaN
+                lastMoved = 0f
+                continue
             }
-            withFrameNanos { }
+            // Backlog growth between frames = content that just arrived.
+            // EMA'd into a rate, it lets the belt run at production speed:
+            // rows leave at exactly the pace they arrive — no accelerate-
+            // drain-stop pulsing (the "sucked empty" feel a pure
+            // backlog-driven chase has).
+            val arrived = if (prevRemaining.isNaN()) {
+                0f
+            } else {
+                remaining - prevRemaining + lastMoved
+            }
+            inflow += (arrived / dt - inflow) * (dt * 4f).coerceAtMost(1f)
+            prevRemaining = remaining
+            // Belt = arrival rate + a weak drain on backlog, capped well
+            // below a whoosh: rows linger long enough to read, bursts
+            // catch up gradually instead of yanking the viewport.
+            val targetV = (inflow + remaining * 0.9f).coerceIn(0f, 1_100f)
+            v += (targetV - v) * (dt * 4f).coerceAtMost(1f)
+            if (remaining <= 1f && abs(v) < 20f) {
+                v = 0f
+                lastMoved = 0f
+                continue
+            }
+            var moved = 0f
+            listState.scroll { moved = scrollBy(v * dt) }
+            lastMoved = moved
         }
     }
 
@@ -845,7 +879,12 @@ private fun LogList(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSelectStart(uiEntry.seq)
                 },
-                modifier = Modifier.animateItem(),
+                modifier = Modifier.animateItem(
+                    // Tail-appended rows fade in over a beat instead of
+                    // popping — combined with the chase belt this reads as
+                    // a continuous materialize-and-glide, not a block push.
+                    fadeInSpec = tween(240),
+                ),
             )
         }
     }

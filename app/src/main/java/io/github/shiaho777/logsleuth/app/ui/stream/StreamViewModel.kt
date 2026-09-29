@@ -159,7 +159,11 @@ class StreamViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.Default) {
             while (true) {
-                delay(120)
+                // ~34ms publishes (~every other frame) keep batches at
+                // 1-2 rows: new lines materialize individually and the
+                // chase drains a near-constant trickle — a conveyor, not
+                // discrete pushes.
+                delay(34)
                 drainStaged()
             }
         }
