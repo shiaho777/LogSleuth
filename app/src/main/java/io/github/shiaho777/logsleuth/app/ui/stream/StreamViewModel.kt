@@ -62,6 +62,13 @@ data class StreamUiState(
     val finishedBackfill: Long = 0,
     /** Floating recording controls are shown over other apps. */
     val bubbleEnabled: Boolean = false,
+    /**
+     * True while [entries] was just rewritten by a bulk wave (startup
+     * backfill, flood batch, refilter, clear) — the list suppresses
+     * per-row entrance fades for that wave or a 20k-line reload would
+     * ghost every row at once.
+     */
+    val bulkAppend: Boolean = false,
 )
 
 @HiltViewModel
@@ -137,14 +144,16 @@ class StreamViewModel @Inject constructor(
             _ui.update { it.copy(apps = installedApps.load()) }
         }
 
-        // Collector: stage entries; a ticker publishes them in ~120ms batches
-        // so a busy logcat cannot trigger a recompose per line.
+        // Collector: stage entries; a ticker publishes them every ~34ms so
+        // a busy logcat cannot trigger a recompose per line. On Default —
+        // the snapshot path filter-matches up to bufferCap entries and must
+        // not run on the main thread (it froze cold/warm starts).
         //
         // onSubscription runs after this subscriber is registered but before
         // it receives anything: the snapshot taken inside therefore covers
         // every emission this subscription could miss, and seq dedup drops
         // entries already included in it. No gap, no duplicates.
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             var snapshotSeq = 0L
             engine.entries
                 .onSubscription {
@@ -180,13 +189,17 @@ class StreamViewModel @Inject constructor(
                 if (compiled.matches(e)) visible.add(uiEntry)
             }
             trimLocked()
-            publishLocked()
+            publishLocked(bulk = true)
+            bulkPending = false
         }
     }
 
+    private var bulkPending = false
+    private var lastBulkPublishMs = 0L
+
     private suspend fun drainStaged() {
         val batch = stagedMutex.withLock {
-            if (staged.isEmpty()) return
+            if (staged.isEmpty() && !bulkPending) return
             ArrayList(staged).also { staged.clear() }
         }
         val compiled = currentCompiled()
@@ -211,7 +224,22 @@ class StreamViewModel @Inject constructor(
                 pending.subList(0, pending.size - bufferCap).clear()
             }
             trimLocked()
-            if (!pausedNow && addedVisible > 0) publishLocked()
+            if (!pausedNow && (addedVisible > 0 || bulkPending)) {
+                // During a flood (tens of rows per tick) publish at ~5Hz
+                // instead of every 34ms — the chase stays pinned either
+                // way, and skipping intermediate recompositions is what
+                // keeps a 20k-line backfill from strobe-lagging. The last
+                // wave flushes on the next tick via bulkPending.
+                val now = android.os.SystemClock.uptimeMillis()
+                val bulk = bulkPending || addedVisible > 24
+                if (!bulk || now - lastBulkPublishMs >= 200) {
+                    publishLocked(bulk)
+                    if (bulk) lastBulkPublishMs = now
+                    bulkPending = false
+                } else {
+                    bulkPending = true
+                }
+            }
         }
         if (pausedNow) {
             _ui.update { it.copy(pausedIncoming = it.pausedIncoming + batch.size) }
@@ -225,10 +253,11 @@ class StreamViewModel @Inject constructor(
 
     private fun trimLocked() = evictOverflow(all, visible, bufferCap)
 
-    /** Call with [listMutex] held. */
-    private fun publishLocked() {
+    /** Call with [listMutex] held. [bulk] = the publish rewrote a large
+     * chunk of the list — rows suppress their entrance fade for that wave. */
+    private fun publishLocked(bulk: Boolean = false) {
         val snapshot = ArrayList(visible)
-        _ui.update { it.copy(entries = snapshot) }
+        _ui.update { it.copy(entries = snapshot, bulkAppend = bulk) }
     }
 
     private fun currentCompiled(): CompiledFilter =
@@ -238,13 +267,13 @@ class StreamViewModel @Inject constructor(
 
     fun setFilter(filter: LogFilter) {
         _ui.update { it.copy(filter = filter, regexInvalid = false) }
-        viewModelScope.launch { refilter() }
+        viewModelScope.launch(Dispatchers.Default) { refilter() }
     }
 
     fun setPaused(paused: Boolean) {
         _ui.update { it.copy(paused = paused) }
         if (!paused) {
-            viewModelScope.launch {
+            viewModelScope.launch(Dispatchers.Default) {
                 val compiled = currentCompiled()
                 listMutex.withLock {
                     for (e in pending) {
@@ -254,7 +283,7 @@ class StreamViewModel @Inject constructor(
                     }
                     pending.clear()
                     trimLocked()
-                    publishLocked()
+                    publishLocked(bulk = true)
                 }
                 _ui.update { it.copy(pausedIncoming = 0) }
             }
@@ -271,7 +300,8 @@ class StreamViewModel @Inject constructor(
                 all.clear()
                 visible.clear()
                 pending.clear()
-                publishLocked()
+                bulkPending = false
+                publishLocked(bulk = true)
             }
             _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList()) }
         }
@@ -306,13 +336,13 @@ class StreamViewModel @Inject constructor(
 
     /** Removes entries belonging to [uids] (null uid = unattributed group). */
     fun clearApps(uids: Set<Int?>) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             stagedMutex.withLock { staged.removeAll { it.uid in uids } }
             listMutex.withLock {
                 all.removeAll { it.entry.uid in uids }
                 visible.removeAll { it.entry.uid in uids }
                 pending.removeAll { it.uid in uids }
-                publishLocked()
+                publishLocked(bulk = true)
             }
         }
     }
@@ -322,7 +352,7 @@ class StreamViewModel @Inject constructor(
      * finished session, then surfaces the share sheet as with a recording.
      */
     fun saveToSession(uids: Set<Int?>? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             val entries = listMutex.withLock {
                 // Include `pending` — paused lines are still part of the stream
                 // the user sees (they surface on resume) and belong in a
@@ -455,7 +485,7 @@ class StreamViewModel @Inject constructor(
         val compiled = CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
         listMutex.withLock {
             visible = all.filterTo(ArrayList()) { compiled.matches(it.entry) }
-            publishLocked()
+            publishLocked(bulk = true)
         }
         _ui.update { it.copy(regexInvalid = compiled.regexInvalid) }
     }

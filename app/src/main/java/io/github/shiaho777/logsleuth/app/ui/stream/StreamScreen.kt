@@ -900,7 +900,10 @@ private fun LogList(
                     // Tail-appended rows fade in over a beat instead of
                     // popping — combined with the chase belt this reads as
                     // a continuous materialize-and-glide, not a block push.
-                    fadeInSpec = tween(240),
+                    // Bulk waves (startup backfill, floods, refilter) skip
+                    // the fade entirely: thousands of rows ghosting at once
+                    // is what made cold starts look janky.
+                    fadeInSpec = if (ui.bulkAppend) null else tween(240),
                 ),
             )
         }
