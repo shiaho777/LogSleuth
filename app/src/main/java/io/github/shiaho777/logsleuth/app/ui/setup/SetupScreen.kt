@@ -52,7 +52,9 @@ fun SetupScreen(
     // Auto-forward only during first-run setup: when the wizard is re-opened
     // from Settings while a grant already exists, the user wants to *see* the
     // status/next-step cards, not get bounced straight to the stream.
-    if (state.granted && settings?.setupCompleted != true) {
+    // `settings` starts as null until DataStore emits — `!= true` would fire
+    // on that null frame and bounce reopen-from-Settings to the stream.
+    if (state.granted && settings?.setupCompleted == false) {
         // Access became available while on this screen: proceed.
         LaunchedEffect(Unit) {
             viewModel.markSetupCompleted()

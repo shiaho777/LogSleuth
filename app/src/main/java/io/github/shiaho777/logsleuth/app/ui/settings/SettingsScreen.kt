@@ -76,28 +76,54 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.settings_access),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    val accessText = when (access.kind) {
-                        AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
-                        AccessKind.READ_LOGS -> stringResource(R.string.settings_access_adb)
-                        AccessKind.NONE -> stringResource(R.string.no_access_title)
+            // Access + About share one row — each card wraps its own content,
+            // so without weights they'd both hug the left edge.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Card(Modifier.weight(1f)) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_access),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        val accessText = when (access.kind) {
+                            AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
+                            AccessKind.READ_LOGS -> stringResource(R.string.settings_access_adb)
+                            AccessKind.NONE -> stringResource(R.string.no_access_title)
+                        }
+                        Text(
+                            accessText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (access.granted) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        )
+                        TextButton(onClick = onOpenSetup) {
+                            Text(stringResource(R.string.settings_access_open))
+                        }
                     }
-                    Text(
-                        accessText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (access.granted) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                    )
-                    TextButton(onClick = onOpenSetup) {
-                        Text(stringResource(R.string.settings_access_open))
+                }
+                Card(Modifier.weight(1f)) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_about),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onOpenGuide) {
+                            Text(stringResource(R.string.settings_replay_guide))
+                        }
                     }
                 }
             }
@@ -271,23 +297,6 @@ fun SettingsScreen(
                                 shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
                             ) { Text(stringResource(labelRes)) }
                         }
-                    }
-                }
-            }
-
-            Card {
-                Column(Modifier.padding(16.dp)) {
-                    Text(
-                        stringResource(R.string.settings_about),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(onClick = onOpenGuide) {
-                        Text(stringResource(R.string.settings_replay_guide))
                     }
                 }
             }
