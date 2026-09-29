@@ -168,6 +168,11 @@ fun StreamScreen(
     var scopeGroups by remember { mutableStateOf<List<AppLogGroup>?>(null) }
     // Tour demo opens the picker straight into per-app mode.
     var scopeStartPerApp by remember { mutableStateOf(false) }
+    // True while the picker on screen was opened by the tour — dismiss or
+    // confirm then means "done looking" and moves the beat forward, and
+    // confirm never mutates the buffer during the demo. Cleared on every
+    // close path so a later user-opened dialog behaves normally.
+    var scopeByTour by remember { mutableStateOf(false) }
     LaunchedEffect(scopeDialog) {
         if (scopeDialog != null) scopeGroups = viewModel.appGroups()
     }
@@ -181,7 +186,6 @@ fun StreamScreen(
     DisposableEffect(Unit) {
         var pausedByTour = false
         var searchByTour = false
-        var scopeByTour = false
         tour.actions["pauseOn"] = {
             if (!viewModel.ui.value.paused) {
                 viewModel.setPaused(true)
@@ -217,6 +221,7 @@ fun StreamScreen(
         }
         tour.actions["scopeClose"] = {
             if (scopeByTour) {
+                scopeByTour = false
                 scopeDialog = null
                 scopeStartPerApp = false
             }
@@ -263,6 +268,7 @@ fun StreamScreen(
                 viewModel.setSearching(false)
             }
             if (scopeByTour) {
+                scopeByTour = false
                 scopeDialog = null
                 scopeStartPerApp = false
             }
@@ -592,11 +598,22 @@ fun StreamScreen(
             totalLines = ui.entries.size,
             initialPerApp = scopeStartPerApp,
             onDismiss = {
+                // A tour-opened demo dialog that the user closes counts
+                // as "next step" — the dialog window eats the tap that
+                // dismissed it, so without this nudge the beat looks dead.
+                if (scopeByTour) tour.fire("nextStep")
+                scopeByTour = false
                 scopeDialog = null
                 scopeStartPerApp = false
             },
             onConfirm = { uids ->
-                if (action == ScopeAction.CLEAR) {
+                val tourDemo = scopeByTour
+                scopeByTour = false
+                if (tourDemo) {
+                    // Demo mode: closing the picker advances the tour;
+                    // it must never actually wipe or save the buffer.
+                    tour.fire("nextStep")
+                } else if (action == ScopeAction.CLEAR) {
                     if (uids == null) viewModel.clear() else viewModel.clearApps(uids)
                 } else {
                     viewModel.saveToSession(uids)

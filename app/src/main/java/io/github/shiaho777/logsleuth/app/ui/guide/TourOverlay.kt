@@ -156,7 +156,16 @@ fun TourOverlay(
     var index by remember { mutableIntStateOf(0) }
     val step = steps[index]
 
+    // One gesture must move exactly one beat. When a real Dialog sits in
+    // front (the scope-demo step), dismissing it mid-tap can replay the
+    // gesture to the scrim's tap handler, and a tap landing right at an
+    // autoMs boundary can race the timer — both would skip a step without
+    // this guard.
+    val lastAdvanceNs = remember { longArrayOf(0L) }
     fun advance() {
+        val now = System.nanoTime()
+        if (now - lastAdvanceNs[0] < 350_000_000L) return
+        lastAdvanceNs[0] = now
         if (index == steps.size - 1) onFinished() else index++
     }
 
@@ -166,6 +175,15 @@ fun TourOverlay(
     // closes, tail re-engages.
     DisposableEffect(index) {
         onDispose { step.leave?.let(controller::fire) }
+    }
+    // "nextStep" lets a screen's own UI end a hands-free beat: during the
+    // scope-dialog demo the real Dialog window eats the tap that dismisses
+    // it, so the scrim's tap-to-advance never fires — the screen fires
+    // this instead, and dismissing the demo = advancing. Absent it the
+    // step still auto-advances on its timer.
+    DisposableEffect(Unit) {
+        controller.actions["nextStep"] = { advance() }
+        onDispose { controller.actions.remove("nextStep") }
     }
     // Skip/finish at any point → every screen's "leave.*" hook runs so a
     // tour-opened search bar, dialog, pause or selection never lingers.
