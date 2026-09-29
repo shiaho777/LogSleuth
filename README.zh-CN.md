@@ -13,15 +13,15 @@
 
 | 实时日志流 | 搜索与命中跳转 | 过滤与预设 |
 | :---: | :---: | :---: |
-| ![实时日志流](docs/screenshots/01-live-stream.png) | ![搜索](docs/screenshots/07-search.png) | ![过滤](docs/screenshots/02-filters.png) |
+| <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" alt="实时日志流" width="280"></a> | <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" alt="搜索" width="280"></a> | <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" alt="过滤" width="280"></a> |
 | **崩溃 / ANR 侦测** | **日志详情** | **多选与复制** |
-| ![崩溃侦测](docs/screenshots/03-crashes.png) | ![日志详情](docs/screenshots/08-entry-detail.png) | ![多选](docs/screenshots/09-selection.png) |
+| <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" alt="崩溃侦测" width="280"></a> | <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" alt="日志详情" width="280"></a> | <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" alt="多选" width="280"></a> |
 | **按应用范围选择** | **录制会话** | **会话回放** |
-| ![范围选择](docs/screenshots/10-scope-picker.png) | ![录制](docs/screenshots/04-sessions.png) | ![回放](docs/screenshots/05-session-replay.png) |
+| <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" alt="范围选择" width="280"></a> | <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" alt="录制" width="280"></a> | <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" alt="回放" width="280"></a> |
 | **报告向导与导出** | **保存与分享** | **权限向导** |
-| ![报告向导](docs/screenshots/12-report.png) | ![分享](docs/screenshots/15-share-sheet.png) | ![权限向导](docs/screenshots/11-setup.png) |
+| <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" alt="报告向导" width="280"></a> | <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" alt="分享" width="280"></a> | <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" alt="权限向导" width="280"></a> |
 | **设置与应用内更新** | **使用引导** | **内嵌 SDK 示例** |
-| ![设置](docs/screenshots/13-settings.png) | ![使用引导](docs/screenshots/14-tour.png) | ![SDK 示例](docs/screenshots/06-sdk-sample.png) |
+| <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" alt="设置" width="280"></a> | <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" alt="使用引导" width="280"></a> | <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" alt="SDK 示例" width="280"></a> |
 
 ## LogSleuth 是什么?
 
