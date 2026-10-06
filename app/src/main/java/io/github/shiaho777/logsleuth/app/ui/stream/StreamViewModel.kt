@@ -538,3 +538,20 @@ internal fun evictOverflow(
     while (drop < visible.size && visible[drop].seq <= lastEvictedSeq) drop++
     if (drop > 0) visible.subList(0, drop).clear()
 }
+
+/**
+ * Index of [seq] in a seq-ordered list, or of the next surviving line when
+ * [seq] was just trimmed from the front. -1 when nothing at or after [seq]
+ * remains. Keeping this index on screen is what stops a parked viewport
+ * from sliding as the ring buffer drops old lines.
+ */
+internal fun parkedIndex(entries: List<UiLogEntry>, seq: Long): Int {
+    if (entries.isEmpty()) return -1
+    var lo = 0
+    var hi = entries.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (entries[mid].seq < seq) lo = mid + 1 else hi = mid
+    }
+    return if (lo < entries.size) lo else -1
+}

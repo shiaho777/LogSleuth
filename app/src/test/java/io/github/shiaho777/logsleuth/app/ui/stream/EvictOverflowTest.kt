@@ -38,4 +38,23 @@ class EvictOverflowTest {
         assertEquals((5L..9L).toList(), all.map { it.seq })
         assertEquals(emptyList<Long>(), visible.map { it.seq })
     }
+
+    @Test
+    fun `parked index stays on the same line after a prefix drop`() {
+        val entries = (5L..9L).map(::entry)
+        assertEquals(2, parkedIndex(entries, seq = 7))
+    }
+
+    @Test
+    fun `parked index falls forward onto the next surviving line`() {
+        val entries = listOf(entry(5), entry(7), entry(9))
+        assertEquals(1, parkedIndex(entries, seq = 6))
+        assertEquals(0, parkedIndex(entries, seq = 4))
+    }
+
+    @Test
+    fun `parked index is absent when every remaining line is older`() {
+        assertEquals(-1, parkedIndex(emptyList(), seq = 1))
+        assertEquals(-1, parkedIndex(listOf(entry(1), entry(2)), seq = 3))
+    }
 }
