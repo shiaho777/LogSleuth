@@ -69,6 +69,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -119,13 +121,6 @@ fun StreamScreen(
     val haptic = LocalHapticFeedback.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    val isAtBottom by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount == 0 || last >= info.totalItemsCount - 2
-        }
-    }
     val canScrollBack by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 ||
@@ -134,29 +129,69 @@ fun StreamScreen(
     }
 
     // Tail-follow pin — standard chat-log semantics:
-    //   · initial state and every arrival at the bottom re-engage it
-    //     (finger drag to the end, or the ↓ FAB);
-    //   · any deliberate pull toward older entries releases it the
-    //     moment finger travel exceeds touch slop — no full-row
-    //     displacement needed.
-    // Direction comes from FINGER deltas (onUserDrag), never list
-    // position: head eviction moves indices under a held finger but
-    // produces no finger motion, so it cannot fake or mask a user pull.
+    //   · at the newest line, new logs stick to the bottom of the screen;
+    //   · any move toward older lines releases it. The rows on screen then
+    //     stay put — including across ring-buffer trims, which delete a
+    //     prefix and would otherwise slide that same index onto newer lines;
+    //   · scrolling back to the end, or the ↓ FAB, follows again.
+    // A finger delta releases before layout catches up. The scroll position
+    // is the backstop: head eviction does not move firstVisibleItemIndex,
+    // so it cannot look like a user pull.
     var followTail by remember { mutableStateOf(true) }
     var touching by remember { mutableStateOf(false) }
     var pullAccum by remember { mutableFloatStateOf(0f) }
+    var parkedSeq by remember { mutableLongStateOf(-1L) }
+    var parkedOffset by remember { mutableIntStateOf(0) }
     val touchSlop = LocalViewConfiguration.current.touchSlop
-
-    LaunchedEffect(listState) {
-        snapshotFlow { isAtBottom }.collect { atBottom ->
-            if (atBottom) followTail = true
-        }
-    }
 
     // Range selection (long-press + drag): seq bounds of the selected span.
     var selAnchor by remember { mutableStateOf(-1L) }
     var selEnd by remember { mutableStateOf(-1L) }
     val selecting = selAnchor >= 0L
+    val selectingNow by rememberUpdatedState(selecting)
+    val entriesNow by rememberUpdatedState(ui.entries)
+
+    fun parkAt(index: Int, offset: Int) {
+        entriesNow.getOrNull(index)?.let { parkedSeq = it.seq }
+        parkedOffset = offset
+        followTail = false
+    }
+
+    LaunchedEffect(listState) {
+        var prevIdx = listState.firstVisibleItemIndex
+        var prevOff = listState.firstVisibleItemScrollOffset
+        snapshotFlow {
+            Triple(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset,
+                touching,
+            )
+        }.collect { (idx, off, fingerDown) ->
+            val towardOlder = idx < prevIdx || (idx == prevIdx && off < prevOff)
+            if (fingerDown && towardOlder && !selectingNow) parkAt(idx, off)
+            if (!followTail) {
+                entriesNow.getOrNull(idx)?.let { parkedSeq = it.seq }
+                parkedOffset = off
+            }
+            prevIdx = idx
+            prevOff = off
+        }
+    }
+
+    // Settled on the newest line: follow again. Re-arming while the last
+    // couple of rows were merely still visible used to pull the reader
+    // back into the stream.
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            !touching &&
+                !listState.isScrollInProgress &&
+                !listState.canScrollForward &&
+                entriesNow.isNotEmpty()
+        }.collect { atTail ->
+            if (atTail && !selectingNow) followTail = true
+        }
+    }
+
     val selLo = minOf(selAnchor, selEnd)
     val selHi = maxOf(selAnchor, selEnd)
     val clipboard = LocalClipboardManager.current
@@ -287,10 +322,27 @@ fun StreamScreen(
     }
 
     // Pinned tail sticks to the newest line in the same layout pass.
-    // A speed-capped glide held batches below the fold and slid them up
-    // as slabs — that is the "loads in slices" motion. While a finger is
-    // down the pin lets go, so a pull is not fighting a scroll request;
-    // releasing without leaving the tail snaps back here.
+    // While a finger is down the pin lets go, so a pull is not fighting
+    // a scroll request. Once the reader has left the tail, keep the parked
+    // line on screen: trimming the ring buffer deletes a prefix and the
+    // same index would otherwise show newer lines.
+    if (!followTail && !touching && !listState.isScrollInProgress && parkedSeq >= 0L) {
+        val idx = parkedIndex(ui.entries, parkedSeq)
+        if (
+            idx >= 0 &&
+            (listState.firstVisibleItemIndex != idx ||
+                listState.firstVisibleItemScrollOffset != parkedOffset)
+        ) {
+            SideEffect {
+                val kept = ui.entries.getOrNull(idx)?.seq ?: return@SideEffect
+                if (kept != parkedSeq) {
+                    parkedSeq = kept
+                    parkedOffset = 0
+                }
+                listState.requestScrollToItem(idx, parkedOffset)
+            }
+        }
+    }
     if (followTail && !touching && !ui.paused && !selecting && ui.entries.isNotEmpty()) {
         SideEffect {
             listState.requestScrollToItem(ui.entries.lastIndex)
@@ -350,7 +402,7 @@ fun StreamScreen(
                 ) {
                     FloatingActionButton(
                         onClick = {
-                            followTail = false
+                            parkAt(0, 0)
                             scope.launch { listState.scrollToItem(0) }
                         },
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -458,13 +510,16 @@ fun StreamScreen(
                             if (!down) pullAccum = 0f
                         },
                         onUserDrag = { dy ->
-                            // Finger sliding down drags the view toward
-                            // older lines; sliding up toward newer ones
-                            // decays the pull instead of releasing.
-                            pullAccum = if (dy > 0f) pullAccum + dy else 0f
+                            // Finger sliding down moves toward older lines.
+                            // Upward jitter must not wipe the accumulated
+                            // pull, or a real scroll never releases the pin.
+                            if (dy > 0f) pullAccum += dy
                             if (pullAccum > touchSlop && !selecting) {
                                 pullAccum = 0f
-                                followTail = false
+                                parkAt(
+                                    listState.firstVisibleItemIndex,
+                                    listState.firstVisibleItemScrollOffset,
+                                )
                             }
                         },
                     )
@@ -509,7 +564,7 @@ fun StreamScreen(
     // Search-hit jumping. Leave the tail so the pin does not yank back.
     LaunchedEffect(ui.searchHitIndex) {
         val target = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
-        followTail = false
+        parkAt(target, 0)
         listState.scrollToItem(target)
     }
 
