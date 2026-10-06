@@ -74,8 +74,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,7 +104,6 @@ import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
-import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,15 +135,15 @@ fun StreamScreen(
 
     // Tail-follow pin — standard chat-log semantics:
     //   · initial state and every arrival at the bottom re-engage it
-    //     (finger drag to the end, ↓ FAB, or the chase itself);
+    //     (finger drag to the end, or the ↓ FAB);
     //   · any deliberate pull toward older entries releases it the
     //     moment finger travel exceeds touch slop — no full-row
     //     displacement needed.
     // Direction comes from FINGER deltas (onUserDrag), never list
-    // position: head eviction and the chase's own scrolls move indices
-    // under a held finger but produce no finger motion, so neither can
-    // fake or mask a user pull.
+    // position: head eviction moves indices under a held finger but
+    // produces no finger motion, so it cannot fake or mask a user pull.
     var followTail by remember { mutableStateOf(true) }
+    var touching by remember { mutableStateOf(false) }
     var pullAccum by remember { mutableFloatStateOf(0f) }
     val touchSlop = LocalViewConfiguration.current.touchSlop
 
@@ -287,77 +286,14 @@ fun StreamScreen(
         }
     }
 
-    // While pinned, glide toward the stream's end as a steady conveyor —
-    // not a per-batch swoop. One loop lives for the whole follow session:
-    // keyed only on pin/pause/selection, never on entries, so each new
-    // publish can't cancel it mid-flight and drop a frame (the old seq-
-    // keyed effect restarted every ~60ms batch and visibly pulsed). The
-    // belt speed tracks the measured arrival rate plus a gentle backlog
-    // drain, saturating at 1100px/s — under steady inflow rows leave at
-    // exactly the pace they arrive, so the motion is uniform, never a
-    // suck-drain-stop pulse. Idle frames just spin instead of exiting,
-    // so a fresh batch finds the belt already alive. A huge backlog
-    // (initial load) still snaps instead of gliding for a second.
-    LaunchedEffect(followTail, ui.paused, selecting) {
-        if (!followTail || ui.paused || selecting) return@LaunchedEffect
-        var v = 0f
-        var inflow = 0f
-        var prevRemaining = Float.NaN
-        var lastMoved = 0f
-        var frameNs = 0L
-        while (true) {
-            val nowNs = withFrameNanos { it }
-            val dt = if (frameNs == 0L) {
-                0.0167f
-            } else {
-                ((nowNs - frameNs) / 1e9f).coerceIn(0.001f, 0.05f)
-            }
-            frameNs = nowNs
-            val info = listState.layoutInfo
-            val items = info.visibleItemsInfo
-            val lastIdx = info.totalItemsCount - 1
-            val last = items.lastOrNull()
-            if (lastIdx < 0 || last == null) continue
-            val belowVisible = last.offset + last.size - info.viewportEndOffset
-            val remaining = if (last.index == lastIdx) {
-                belowVisible.toFloat()
-            } else {
-                val avgRow = items.sumOf { it.size }.toFloat() / items.size
-                belowVisible + (lastIdx - last.index) * avgRow
-            }
-            if (remaining > 8_000f) {
-                listState.scrollToItem(lastIdx)
-                v = 0f
-                inflow = 0f
-                prevRemaining = Float.NaN
-                lastMoved = 0f
-                continue
-            }
-            // Backlog growth between frames = content that just arrived.
-            // EMA'd into a rate, it lets the belt run at production speed:
-            // rows leave at exactly the pace they arrive — no accelerate-
-            // drain-stop pulsing (the "sucked empty" feel a pure
-            // backlog-driven chase has).
-            val arrived = if (prevRemaining.isNaN()) {
-                0f
-            } else {
-                remaining - prevRemaining + lastMoved
-            }
-            inflow += (arrived / dt - inflow) * (dt * 4f).coerceAtMost(1f)
-            prevRemaining = remaining
-            // Belt = arrival rate + a weak drain on backlog, capped well
-            // below a whoosh: rows linger long enough to read, bursts
-            // catch up gradually instead of yanking the viewport.
-            val targetV = (inflow + remaining * 0.9f).coerceIn(0f, 1_100f)
-            v += (targetV - v) * (dt * 4f).coerceAtMost(1f)
-            if (remaining <= 1f && abs(v) < 20f) {
-                v = 0f
-                lastMoved = 0f
-                continue
-            }
-            var moved = 0f
-            listState.scroll { moved = scrollBy(v * dt) }
-            lastMoved = moved
+    // Pinned tail sticks to the newest line in the same layout pass.
+    // A speed-capped glide held batches below the fold and slid them up
+    // as slabs — that is the "loads in slices" motion. While a finger is
+    // down the pin lets go, so a pull is not fighting a scroll request;
+    // releasing without leaving the tail snaps back here.
+    if (followTail && !touching && !ui.paused && !selecting && ui.entries.isNotEmpty()) {
+        SideEffect {
+            listState.requestScrollToItem(ui.entries.lastIndex)
         }
     }
 
@@ -432,12 +368,7 @@ fun StreamScreen(
                     exit = scaleOut(),
                 ) {
                     FloatingActionButton(
-                        onClick = {
-                            followTail = true
-                            scope.launch {
-                                listState.animateScrollToItem(ui.entries.lastIndex)
-                            }
-                        },
+                        onClick = { followTail = true },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ) {
@@ -522,7 +453,10 @@ fun StreamScreen(
                         selEnd = selEnd,
                         onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
                         onSelectExtend = { seq -> selEnd = seq },
-                        onUserTouch = { down -> if (!down) pullAccum = 0f },
+                        onUserTouch = { down ->
+                            touching = down
+                            if (!down) pullAccum = 0f
+                        },
                         onUserDrag = { dy ->
                             // Finger sliding down drags the view toward
                             // older lines; sliding up toward newer ones
@@ -572,10 +506,11 @@ fun StreamScreen(
         }
     }
 
-    // Search-hit jumping.
+    // Search-hit jumping. Leave the tail so the pin does not yank back.
     LaunchedEffect(ui.searchHitIndex) {
         val target = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
-        listState.animateScrollToItem(target)
+        followTail = false
+        listState.scrollToItem(target)
     }
 
     // Shared scope picker — clear or save, all or a checked app subset.
@@ -749,7 +684,12 @@ private fun StreamTopBar(
     onSave: () -> Unit,
 ) {
     TopAppBar(
-        title = { Text(stringResource(R.string.app_name)) },
+        title = {
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
         ),
@@ -875,9 +815,8 @@ private fun LogList(
                     onUserTouch(true)
                     while (currentEvent.changes.any { it.pressed }) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        // Report the raw finger delta — it is the only
-                        // direction signal that head eviction and the
-                        // tail-follow chase cannot produce.
+                        // Report the raw finger delta. Head eviction moves
+                        // the list under a held finger and is not a pull.
                         val dy = event.changes
                             .sumOf { (it.position.y - it.previousPosition.y).toDouble() }
                             .toFloat()
@@ -900,6 +839,8 @@ private fun LogList(
             key = { index -> ui.entries[index].seq },
         ) { index ->
             val uiEntry = ui.entries[index]
+            // No per-row placement or fade. The viewport pins to the newest
+            // line; a spring on top of that is what opened the empty gap.
             LogRow(
                 entry = uiEntry.entry,
                 highlight = searchQuery.takeIf { it.isNotBlank() },
@@ -915,15 +856,6 @@ private fun LogList(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSelectStart(uiEntry.seq)
                 },
-                modifier = Modifier.animateItem(
-                    // Tail-appended rows fade in over a beat instead of
-                    // popping — combined with the chase belt this reads as
-                    // a continuous materialize-and-glide, not a block push.
-                    // Bulk waves (startup backfill, floods, refilter) skip
-                    // the fade entirely: thousands of rows ghosting at once
-                    // is what made cold starts look janky.
-                    fadeInSpec = if (ui.bulkAppend) null else tween(240),
-                ),
             )
         }
     }

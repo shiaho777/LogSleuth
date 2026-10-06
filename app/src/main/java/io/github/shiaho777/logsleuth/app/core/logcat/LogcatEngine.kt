@@ -30,6 +30,11 @@ import kotlinx.coroutines.sync.withLock
 
 private const val TAG = "LogcatEngine"
 
+/** Log lines older than this (vs stream start) are the buffer dump logcat
+ * prints before following. Recording them again notifies for crashes that
+ * already happened, and a reconnect replays the same lines. */
+private const val CRASH_BACKLOG_GRACE_MS = 5_000L
+
 /**
  * Single owner of the logcat process. Consumers (stream UI, recording
  * service) attach/detach; the process runs while at least one consumer is
@@ -104,6 +109,12 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var backoffMs = 1_000L
 
+    /** Crash signals with an earlier log timestamp are backlog, not live. */
+    @Volatile
+    private var acceptCrashesAfter = Long.MAX_VALUE
+
+    private val crashWriteMutex = Mutex()
+
     init {
         scope.launch {
             settingsRepository.settings.collect {
@@ -174,6 +185,9 @@ class LogcatEngine @Inject constructor(
         streamJob = scope.launch {
             val assembler = EntryAssembler()
             val crashDetector = CrashDetector()
+            // Set before the first line. `logcat` with no `-T` dumps every
+            // buffer it was given, including hours-old crash-buffer fatals.
+            acceptCrashesAfter = System.currentTimeMillis() - CRASH_BACKLOG_GRACE_MS
             try {
                 source.stream().collect { line ->
                     if (_state.compareAndSet(State.STARTING, State.RUNNING)) {
@@ -254,25 +268,38 @@ class LogcatEngine @Inject constructor(
     }
 
     private fun onCrash(signal: CrashSignal) {
+        val threshold = acceptCrashesAfter
         scope.launch {
-            val eventId = crashEventDao.insert(
-                CrashEventEntity(
-                    sessionId = activeSessionId,
-                    time = signal.timeMillis,
-                    pid = signal.pid,
-                    packageName = signal.packageName,
-                    type = signal.type.name,
-                    firstLine = signal.firstLine,
-                    snippet = signal.snippet,
-                ),
-            )
-            if (crashNotifications) {
-                notificationHelper.notifyCrash(signal, eventId)
+            if (signal.timeMillis < threshold) return@launch
+            crashWriteMutex.withLock {
+                if (crashEventDao.findExisting(
+                        time = signal.timeMillis,
+                        pid = signal.pid,
+                        type = signal.type.name,
+                        firstLine = signal.firstLine,
+                    ) != null
+                ) {
+                    return@withLock
+                }
+                val eventId = crashEventDao.insert(
+                    CrashEventEntity(
+                        sessionId = activeSessionId,
+                        time = signal.timeMillis,
+                        pid = signal.pid,
+                        packageName = signal.packageName,
+                        type = signal.type.name,
+                        firstLine = signal.firstLine,
+                        snippet = signal.snippet,
+                    ),
+                )
+                if (crashNotifications) {
+                    notificationHelper.notifyCrash(signal, eventId)
+                }
+                // Non-blocking: with no collector (record-only sessions) a full
+                // buffer would suspend this coroutine forever. Room is the source
+                // of truth, so a dropped live event is harmless.
+                _crashes.tryEmit(signal)
             }
-            // Non-blocking: with no collector (record-only sessions) a full
-            // buffer would suspend this coroutine forever. Room is the source
-            // of truth, so a dropped live event is harmless.
-            _crashes.tryEmit(signal)
         }
     }
 

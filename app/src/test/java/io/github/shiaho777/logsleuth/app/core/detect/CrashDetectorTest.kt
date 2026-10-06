@@ -231,6 +231,89 @@ class CrashDetectorTest {
     }
 
     @Test
+    fun `app main-thread comm is not the package — tombstone names it`() {
+        val d = CrashDetector()
+        // bionic logs /proc/self/comm. ActivityThread renames that to "main",
+        // so every app native crash used to be filed under the app "main".
+        val fatal = "Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 13349 (main), pid 13349 (main)"
+        assertNull(
+            d.onEntry(entry(tag = "libc", level = LogLevel.F, pid = 13349, time = 1_000, message = fatal)),
+        )
+        // Noise between the libc line and crash_dump must not close the block.
+        assertNull(d.onEntry(entry(tag = "Other", level = LogLevel.I, time = 1_200, message = "unrelated")))
+        val signal = d.onEntry(
+            entry(
+                tag = "DEBUG",
+                level = LogLevel.I,
+                pid = 9999,
+                time = 1_500,
+                message = "pid: 13349, tid: 13349, name: main  >>> com.example.real <<<",
+            ),
+        )
+        assertNotNull(signal)
+        signal!!
+        assertEquals(CrashType.NATIVE, signal.type)
+        assertEquals("com.example.real", signal.packageName)
+        assertEquals(13349, signal.pid)
+        assertTrue(signal.snippet.contains("com.example.real"))
+    }
+
+    @Test
+    fun `ANR during the native name wait is still reported`() {
+        val d = CrashDetector(nativeNameWaitMs = 5_000)
+        d.onEntry(
+            entry(
+                tag = "libc",
+                level = LogLevel.F,
+                time = 1_000,
+                message = "Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 9 (main), pid 9 (main)",
+            ),
+        )
+        val anr = d.onEntry(
+            entry(
+                tag = "ActivityManager",
+                time = 1_400,
+                message = "ANR in com.example.slow",
+            ),
+        )
+        assertNotNull(anr)
+        assertEquals(CrashType.ANR, anr!!.type)
+        val native = d.flush()
+        assertNotNull(native)
+        assertEquals(CrashType.NATIVE, native!!.type)
+        assertNull(native.packageName)
+    }
+
+    @Test
+    fun `repeated fatal-signal line is a single crash`() {
+        val d = CrashDetector(nativeNameWaitMs = 1_000)
+        val fatal = "Fatal signal 11 (SIGSEGV), code 1, fault addr 0x0 in tid 5 (main), pid 5 (main)"
+        assertNull(d.onEntry(entry(tag = "libc", level = LogLevel.F, time = 1_000, message = fatal)))
+        // The crash buffer echoes the same libc line.
+        assertNull(d.onEntry(entry(tag = "libc", level = LogLevel.F, time = 1_050, message = fatal)))
+        val signal = d.onEntry(entry(tag = "Other", time = 3_000, message = "later"))
+        assertNotNull(signal)
+        assertEquals(CrashType.NATIVE, signal!!.type)
+        assertNull(d.onEntry(entry(tag = "libc", level = LogLevel.F, time = 3_100, message = fatal)))
+        assertNull(d.flush())
+    }
+
+    @Test
+    fun `non-app comm is kept when there is no package to find`() {
+        val d = CrashDetector()
+        d.onEntry(
+            entry(
+                tag = "libc",
+                level = LogLevel.F,
+                message = "Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 100 (system_server), pid 100 (system_server)",
+            ),
+        )
+        val signal = d.onEntry(entry(tag = "Other", time = 1_100, message = "next"))
+        assertEquals("system_server", signal!!.packageName)
+        assertEquals(100, signal.pid)
+    }
+
+    @Test
     fun `a new fatal line flushes an open native block`() {
         val d = CrashDetector()
         d.onEntry(

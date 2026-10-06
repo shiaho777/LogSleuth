@@ -62,13 +62,6 @@ data class StreamUiState(
     val finishedBackfill: Long = 0,
     /** Floating recording controls are shown over other apps. */
     val bubbleEnabled: Boolean = false,
-    /**
-     * True while [entries] was just rewritten by a bulk wave (startup
-     * backfill, flood batch, refilter, clear) — the list suppresses
-     * per-row entrance fades for that wave or a 20k-line reload would
-     * ghost every row at once.
-     */
-    val bulkAppend: Boolean = false,
     /** Last stream failure detail (e.g. "logcat exited 1: Permission
      *  denied"); null while healthy or when access is simply not granted. */
     val lastError: String? = null,
@@ -148,7 +141,7 @@ class StreamViewModel @Inject constructor(
             _ui.update { it.copy(apps = installedApps.load()) }
         }
 
-        // Collector: stage entries; a ticker publishes them every ~34ms so
+        // Collector: stage entries; a ticker publishes them once per frame so
         // a busy logcat cannot trigger a recompose per line. On Default —
         // the snapshot path filter-matches up to bufferCap entries and must
         // not run on the main thread (it froze cold/warm starts).
@@ -172,11 +165,11 @@ class StreamViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.Default) {
             while (true) {
-                // ~34ms publishes (~every other frame) keep batches at
-                // 1-2 rows: new lines materialize individually and the
-                // chase drains a near-constant trickle — a conveyor, not
-                // discrete pushes.
-                delay(34)
+                // One publish per frame. Holding a flood for 200ms and then
+                // revealing it is the slice-by-slice load. Lines that
+                // arrived since the last frame show up together, already
+                // at the tail.
+                delay(16)
                 drainStaged()
             }
         }
@@ -193,17 +186,13 @@ class StreamViewModel @Inject constructor(
                 if (compiled.matches(e)) visible.add(uiEntry)
             }
             trimLocked()
-            publishLocked(bulk = true)
-            bulkPending = false
+            publishLocked()
         }
     }
 
-    private var bulkPending = false
-    private var lastBulkPublishMs = 0L
-
     private suspend fun drainStaged() {
         val batch = stagedMutex.withLock {
-            if (staged.isEmpty() && !bulkPending) return
+            if (staged.isEmpty()) return
             ArrayList(staged).also { staged.clear() }
         }
         val compiled = currentCompiled()
@@ -228,22 +217,7 @@ class StreamViewModel @Inject constructor(
                 pending.subList(0, pending.size - bufferCap).clear()
             }
             trimLocked()
-            if (!pausedNow && (addedVisible > 0 || bulkPending)) {
-                // During a flood (tens of rows per tick) publish at ~5Hz
-                // instead of every 34ms — the chase stays pinned either
-                // way, and skipping intermediate recompositions is what
-                // keeps a 20k-line backfill from strobe-lagging. The last
-                // wave flushes on the next tick via bulkPending.
-                val now = android.os.SystemClock.uptimeMillis()
-                val bulk = bulkPending || addedVisible > 24
-                if (!bulk || now - lastBulkPublishMs >= 200) {
-                    publishLocked(bulk)
-                    if (bulk) lastBulkPublishMs = now
-                    bulkPending = false
-                } else {
-                    bulkPending = true
-                }
-            }
+            if (!pausedNow && addedVisible > 0) publishLocked()
         }
         if (pausedNow) {
             _ui.update { it.copy(pausedIncoming = it.pausedIncoming + batch.size) }
@@ -257,11 +231,10 @@ class StreamViewModel @Inject constructor(
 
     private fun trimLocked() = evictOverflow(all, visible, bufferCap)
 
-    /** Call with [listMutex] held. [bulk] = the publish rewrote a large
-     * chunk of the list — rows suppress their entrance fade for that wave. */
-    private fun publishLocked(bulk: Boolean = false) {
+    /** Call with [listMutex] held. */
+    private fun publishLocked() {
         val snapshot = ArrayList(visible)
-        _ui.update { it.copy(entries = snapshot, bulkAppend = bulk) }
+        _ui.update { it.copy(entries = snapshot) }
     }
 
     private fun currentCompiled(): CompiledFilter =
@@ -287,7 +260,7 @@ class StreamViewModel @Inject constructor(
                     }
                     pending.clear()
                     trimLocked()
-                    publishLocked(bulk = true)
+                    publishLocked()
                 }
                 _ui.update { it.copy(pausedIncoming = 0) }
             }
@@ -298,14 +271,13 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch {
             engine.clearBuffer()
             // `staged` holds in-flight emissions between the collector and the
-            // batch flush — without it a clear would let ~120ms of lines return.
+            // next frame flush — without it a clear would let those lines return.
             stagedMutex.withLock { staged.clear() }
             listMutex.withLock {
                 all.clear()
                 visible.clear()
                 pending.clear()
-                bulkPending = false
-                publishLocked(bulk = true)
+                publishLocked()
             }
             _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList()) }
         }
@@ -346,7 +318,7 @@ class StreamViewModel @Inject constructor(
                 all.removeAll { it.entry.uid in uids }
                 visible.removeAll { it.entry.uid in uids }
                 pending.removeAll { it.uid in uids }
-                publishLocked(bulk = true)
+                publishLocked()
             }
         }
     }
@@ -489,7 +461,7 @@ class StreamViewModel @Inject constructor(
         val compiled = CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
         listMutex.withLock {
             visible = all.filterTo(ArrayList()) { compiled.matches(it.entry) }
-            publishLocked(bulk = true)
+            publishLocked()
         }
         _ui.update { it.copy(regexInvalid = compiled.regexInvalid) }
     }

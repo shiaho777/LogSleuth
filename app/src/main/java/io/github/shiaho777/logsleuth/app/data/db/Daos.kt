@@ -60,6 +60,13 @@ interface CrashEventDao {
     @Insert
     suspend fun insert(entity: CrashEventEntity): Long
 
+    /** Same log line seen again (logcat replays its buffers on every start). */
+    @Query(
+        "SELECT id FROM crash_events WHERE time = :time AND pid = :pid AND type = :type " +
+            "AND firstLine = :firstLine LIMIT 1",
+    )
+    suspend fun findExisting(time: Long, pid: Int, type: String, firstLine: String): Long?
+
     @Query("DELETE FROM crash_events WHERE id = :id")
     suspend fun deleteById(id: Long)
 
