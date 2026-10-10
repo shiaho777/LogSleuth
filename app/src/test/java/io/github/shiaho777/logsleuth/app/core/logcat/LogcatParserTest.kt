@@ -74,6 +74,52 @@ class LogcatParserTest {
     }
 
     @Test
+    fun `parses app uid tokens`() {
+        val compact = LogcatParser.parse(
+            "06-15 11:59:58.123 u0a123  4567  4589 I Tag: from app",
+            now,
+        ) as ParsedLine.Entry
+        assertEquals(10123, compact.entry.uid)
+        assertEquals(4567, compact.entry.pid)
+
+        val underscored = LogcatParser.parse(
+            "06-15 11:59:58.123 u0_a123  4567  4589 I Tag: from app",
+            now,
+        ) as ParsedLine.Entry
+        assertEquals(10123, underscored.entry.uid)
+    }
+
+    @Test
+    fun `parses well-known uid names`() {
+        val parsed = LogcatParser.parse(
+            "06-15 11:59:58.123 system  1234  1234 I ActivityManager: start",
+            now,
+        ) as ParsedLine.Entry
+        assertEquals(1000, parsed.entry.uid)
+        assertEquals("ActivityManager", parsed.entry.tag)
+        assertEquals("start", parsed.entry.message)
+    }
+
+    @Test
+    fun `unknown uid name still starts an entry`() {
+        val parsed = LogcatParser.parse(
+            "06-15 11:59:58.123 oemfoo  9  9 D Tag: kept",
+            now,
+        ) as ParsedLine.Entry
+        assertNull(parsed.entry.uid)
+        assertEquals("kept", parsed.entry.message)
+    }
+
+    @Test
+    fun `parses isolated uid token`() {
+        val parsed = LogcatParser.parse(
+            "06-15 11:59:58.123 u0i15  9  9 D Tag: isolated",
+            now,
+        ) as ParsedLine.Entry
+        assertEquals(99015, parsed.entry.uid)
+    }
+
+    @Test
     fun `non-matching lines are continuations`() {
         assertTrue(LogcatParser.parse("--------- beginning of main", now) is ParsedLine.Continuation)
         assertTrue(LogcatParser.parse("    at com.example.Foo.bar(Foo.kt:12)", now) is ParsedLine.Continuation)

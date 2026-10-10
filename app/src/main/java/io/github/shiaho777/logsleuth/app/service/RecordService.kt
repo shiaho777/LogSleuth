@@ -29,6 +29,8 @@ class RecordService : Service() {
     companion object {
         const val ACTION_START = "io.github.shiaho777.logsleuth.app.action.START_RECORDING"
         const val ACTION_STOP = "io.github.shiaho777.logsleuth.app.action.STOP_RECORDING"
+        const val ACTION_PAUSE = "io.github.shiaho777.logsleuth.app.action.PAUSE_RECORDING"
+        const val ACTION_RESUME = "io.github.shiaho777.logsleuth.app.action.RESUME_RECORDING"
         const val ACTION_BOOKMARK = "io.github.shiaho777.logsleuth.app.action.BOOKMARK"
         const val EXTRA_FILTER_PACKAGE = "extra_filter_package"
         const val EXTRA_FILTER_LEVEL = "extra_filter_level"
@@ -104,6 +106,10 @@ class RecordService : Service() {
                 }
             }
 
+            ACTION_PAUSE -> recordingManager.pause()
+
+            ACTION_RESUME -> recordingManager.resume()
+
             ACTION_BOOKMARK -> {
                 scope.launch { recordingManager.addBookmark() }
             }
@@ -132,19 +138,23 @@ class RecordService : Service() {
     private fun observeRecording() {
         scope.launch {
             var lastNotifyAt = 0L
+            var lastPaused: Boolean? = null
             recordingManager.state.collectLatest { state ->
                 if (!state.isRecording) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 } else {
                     // Posting a notification is expensive; throttle to ~1/second.
+                    // A pause flip updates immediately so the action label matches.
                     val now = SystemClock.elapsedRealtime()
-                    if (now - lastNotifyAt >= 1_000L) {
+                    val pausedChanged = lastPaused != state.paused
+                    if (pausedChanged || now - lastNotifyAt >= 1_000L) {
                         lastNotifyAt = now
+                        lastPaused = state.paused
                         val nm = getSystemService(android.app.NotificationManager::class.java)
                         nm.notify(
                             NotificationHelper.ID_RECORDING,
-                            notificationHelper.recordingNotification(state.lineCount),
+                            notificationHelper.recordingNotification(state.lineCount, state.paused),
                         )
                     }
                 }

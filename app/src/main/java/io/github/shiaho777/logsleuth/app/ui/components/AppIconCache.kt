@@ -2,11 +2,13 @@ package io.github.shiaho777.logsleuth.app.ui.components
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
+import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +24,9 @@ import kotlinx.coroutines.withContext
 class AppIconCache(context: Context, private val scope: CoroutineScope) {
     private val pm = context.packageManager
     private val icons = mutableStateMapOf<Int, ImageBitmap?>()
+    private val labels = mutableStateMapOf<Int, String?>()
     private val pending = ConcurrentHashMap.newKeySet<Int>()
+    private val pendingLabels = ConcurrentHashMap.newKeySet<Int>()
     @Volatile private var launchable: Set<String>? = null
 
     /** Bitmap for [uid], or null while resolving / when the uid maps nowhere. */
@@ -37,15 +41,44 @@ class AppIconCache(context: Context, private val scope: CoroutineScope) {
         return icons[uid]
     }
 
+    /**
+     * Short name for [uid]. Well-known accounts (`system`, `shell`) return
+     * immediately. App uids resolve to a package label off the main thread
+     * and return null until that lookup lands.
+     */
+    fun labelFor(uid: Int?): String? {
+        if (uid == null) return null
+        UidNames.wellKnownName(uid)?.let { return it }
+        if (uid !in labels && pendingLabels.add(uid)) {
+            scope.launch {
+                val label = withContext(Dispatchers.IO) { resolveLabel(uid) }
+                labels[uid] = label
+            }
+        }
+        return labels[uid]
+    }
+
     private fun resolve(uid: Int): ImageBitmap? {
+        val pkg = pickPackage(uid) ?: return null
+        return runCatching {
+            pm.getApplicationIcon(pkg).toBitmap(48, 48).asImageBitmap()
+        }.getOrNull()
+    }
+
+    private fun resolveLabel(uid: Int): String? {
+        val pkg = pickPackage(uid) ?: return null
+        val label = runCatching {
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, PackageManager.GET_META_DATA)).toString()
+        }.getOrNull()
+        return label?.takeIf { it.isNotBlank() } ?: pkg
+    }
+
+    private fun pickPackage(uid: Int): String? {
         val pkgs = runCatching { pm.getPackagesForUid(uid)?.toList() }
             .getOrNull().orEmpty()
         if (pkgs.isEmpty()) return null
         val launchable = launchable ?: loadLaunchable().also { launchable = it }
-        val pkg = pkgs.firstOrNull { it in launchable } ?: pkgs.first()
-        return runCatching {
-            pm.getApplicationIcon(pkg).toBitmap(48, 48).asImageBitmap()
-        }.getOrNull()
+        return pkgs.firstOrNull { it in launchable } ?: pkgs.first()
     }
 
     private fun loadLaunchable(): Set<String> {

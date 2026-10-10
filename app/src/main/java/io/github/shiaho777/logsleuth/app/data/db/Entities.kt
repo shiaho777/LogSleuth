@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -29,6 +30,18 @@ data class FilterEntity(
     val useRegex: Boolean = false,
     val packageName: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    /** Joins the live stack while on. Existing rows stay off. */
+    @ColumnInfo(defaultValue = "0")
+    val enabled: Boolean = false,
+    /** False drops lines that suit the rule instead of keeping them. */
+    @ColumnInfo(defaultValue = "1")
+    val including: Boolean = true,
+    @ColumnInfo(defaultValue = "''")
+    val pid: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val tid: String = "",
+    @ColumnInfo(defaultValue = "''")
+    val uid: String = "",
 )
 
 @Entity(tableName = "crash_events")

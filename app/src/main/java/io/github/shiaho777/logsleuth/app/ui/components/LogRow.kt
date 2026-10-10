@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +64,19 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/** Which columns a log row draws, and how the timestamp is written. */
+data class LogRowPrefs(
+    val showTime: Boolean = true,
+    val showPid: Boolean = true,
+    val showTid: Boolean = true,
+    val showTag: Boolean = true,
+    val showPackage: Boolean = true,
+    /** "time" | "datetime" | "epoch" */
+    val timeFormat: String = "time",
+)
+
+val LocalLogRowPrefs = compositionLocalOf { LogRowPrefs() }
+
 fun levelColor(level: LogLevel): Color = when (level) {
     LogLevel.V -> LevelColors.V
     LogLevel.D -> LevelColors.D
@@ -81,6 +97,7 @@ fun LogRow(
     snackbar: SnackbarHostState? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onMakeFilter: ((LogcatEntry) -> Unit)? = null,
 ) {
     var showDetail by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -90,9 +107,12 @@ fun LogRow(
     val copiedMessage = stringResource(R.string.copied)
 
     val scale = LocalLogTextScale.current
-    val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
-    val timeText = remember(entry.timestampMillis) {
-        timeFormat.format(Date(entry.timestampMillis))
+    val prefs = LocalLogRowPrefs.current
+    val clockFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
+    val timeText = when (prefs.timeFormat) {
+        "datetime" -> entry.displayTime
+        "epoch" -> entry.timestampMillis.toString()
+        else -> clockFormat.format(Date(entry.timestampMillis))
     }
     val levelTint = levelColor(entry.level)
     val isError = entry.level.priority >= LogLevel.E.priority
@@ -144,7 +164,8 @@ fun LogRow(
 
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val icon = LocalAppIconCache.current?.iconFor(entry.uid)
+                val cache = LocalAppIconCache.current
+                val icon = cache?.iconFor(entry.uid)
                 if (icon != null) {
                     Image(
                         bitmap = icon,
@@ -155,17 +176,40 @@ fun LogRow(
                             .clip(RoundedCornerShape(3.dp)),
                     )
                 }
-                Text(
-                    text = timeText,
-                    style = logMetaStyle(scale),
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                Text(
-                    text = "  ${entry.pid}-${entry.tid}  ",
-                    style = logMetaStyle(scale),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
-                )
-                if (entry.tag.isNotEmpty()) {
+                if (prefs.showPackage) {
+                    cache?.labelFor(entry.uid)?.let { label ->
+                        Text(
+                            text = label,
+                            style = logMetaStyle(scale),
+                            color = MaterialTheme.colorScheme.outline,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .widthIn(max = 96.dp)
+                                .padding(end = 4.dp),
+                        )
+                    }
+                }
+                if (prefs.showTime) {
+                    Text(
+                        text = timeText,
+                        style = logMetaStyle(scale),
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+                if (prefs.showPid || prefs.showTid) {
+                    val ids = when {
+                        prefs.showPid && prefs.showTid -> "${entry.pid}-${entry.tid}"
+                        prefs.showPid -> entry.pid.toString()
+                        else -> entry.tid.toString()
+                    }
+                    Text(
+                        text = "  $ids  ",
+                        style = logMetaStyle(scale),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
+                    )
+                }
+                if (prefs.showTag && entry.tag.isNotEmpty()) {
                     Text(
                         text = tagText,
                         style = logMetaStyle(scale),
@@ -173,6 +217,7 @@ fun LogRow(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                 }
                 Icon(
@@ -201,7 +246,12 @@ fun LogRow(
     }
 
     if (showDetail) {
-        EntryDetailSheet(entry = entry, snackbar = snackbar, onDismiss = { showDetail = false })
+        EntryDetailSheet(
+            entry = entry,
+            snackbar = snackbar,
+            onMakeFilter = onMakeFilter,
+            onDismiss = { showDetail = false },
+        )
     }
 }
 
@@ -220,6 +270,7 @@ private fun notifyCopied(
 private fun EntryDetailSheet(
     entry: LogcatEntry,
     snackbar: SnackbarHostState?,
+    onMakeFilter: ((LogcatEntry) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -245,12 +296,23 @@ private fun EntryDetailSheet(
                             .clip(RoundedCornerShape(4.dp)),
                     )
                 }
+                LocalAppIconCache.current?.labelFor(entry.uid)?.let { label ->
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = entry.tag.ifEmpty { stringResource(R.string.entry_detail) },
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(8.dp))
@@ -296,6 +358,21 @@ private fun EntryDetailSheet(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.copy_raw))
+                }
+            }
+            if (onMakeFilter != null) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = {
+                    onMakeFilter(entry)
+                    onDismiss()
+                }) {
+                    Icon(
+                        Icons.Default.FilterAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.filter_from_line))
                 }
             }
         }

@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.core.filter
 
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 
 /** A user-facing filter preset. Mirrors the Room entity; keep it pure Kotlin. */
 data class LogFilter(
@@ -17,9 +18,41 @@ data class LogFilter(
     val useRegex: Boolean = false,
     /** Per-app filter, applied server-side via `logcat --uid` (Shizuku only). */
     val packageName: String? = null,
+    /**
+     * When true, this saved rule joins the stack. The quick filter on the
+     * stream is AND-ed with every enabled rule. Disabled rules are presets
+     * you can still apply by hand.
+     */
+    val enabled: Boolean = false,
+    /**
+     * Enabled including rules are OR-ed: a line stays if it suits any of them
+     * (and no excluding rule). An excluding rule drops lines that suit it.
+     */
+    val including: Boolean = true,
+    /** Exact pid, blank = any. */
+    val pid: String = "",
+    /** Exact tid, blank = any. */
+    val tid: String = "",
+    /**
+     * Exact uid: a decimal, `u0a123`, or a well-known name such as `system`.
+     * Blank = any.
+     */
+    val uid: String = "",
 ) {
     val isDefault: Boolean
         get() = this == DEFAULT
+
+    /** True when the rule would match every line. An enabled exclude of this
+     *  shape would blank the stream, so the stack skips it. */
+    val hasConstraint: Boolean
+        get() = minLevel != LogLevel.V ||
+            query.isNotBlank() ||
+            excludeQuery.isNotBlank() ||
+            tagQuery.isNotBlank() ||
+            !packageName.isNullOrBlank() ||
+            pid.isNotBlank() ||
+            tid.isNotBlank() ||
+            uid.isNotBlank()
 
     companion object {
         val DEFAULT = LogFilter(name = "Default")
@@ -51,6 +84,11 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
         ?.let { runCatching { Regex(it.tagQuery, RegexOption.IGNORE_CASE) }.getOrNull() }
     private val tagPlain = rule.takeIf { !it.useRegex }?.tagQuery?.trim().orEmpty()
 
+    private val pidExact = rule.pid.trim().takeIf { it.isNotEmpty() }
+    private val tidExact = rule.tid.trim().takeIf { it.isNotEmpty() }
+    private val uidExact: Int? = rule.uid.trim().takeIf { it.isNotEmpty() }?.let { UidNames.resolve(it) }
+    private val uidUnresolvable = rule.uid.isNotBlank() && uidExact == null
+
     /** True when [rule]'s regex strings are invalid (we fail open, matching everything). */
     val regexInvalid: Boolean =
         (rule.useRegex && rule.query.isNotBlank() && queryRegex == null) ||
@@ -63,6 +101,10 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
         if (requiredUid != null) {
             if (requiredUid == NO_UID || entry.uid != requiredUid) return false
         }
+        if (uidUnresolvable) return false
+        if (uidExact != null && entry.uid != uidExact) return false
+        if (pidExact != null && entry.pid.toString() != pidExact) return false
+        if (tidExact != null && entry.tid.toString() != tidExact) return false
 
         if (tagRegex != null) {
             if (!tagRegex.containsMatchIn(entry.tag)) return false

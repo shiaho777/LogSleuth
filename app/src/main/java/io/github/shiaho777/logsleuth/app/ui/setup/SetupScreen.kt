@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuStatus
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
@@ -143,6 +144,41 @@ fun SetupScreen(
                     }) { Text(stringResource(R.string.setup_grant_shizuku)) }
 
                     ShizukuStatus.READY -> {}
+                }
+            }
+        }
+
+        // --- Root path. Nothing execs `su` until the user taps the button. ---
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.setup_root_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatusText(
+                        label = when (state.rootStatus) {
+                            RootStatus.UNKNOWN -> stringResource(R.string.setup_root_unknown)
+                            RootStatus.CHECKING -> stringResource(R.string.setup_root_checking)
+                            RootStatus.READY -> stringResource(R.string.setup_root_ready)
+                            RootStatus.DENIED -> stringResource(R.string.setup_root_denied)
+                        },
+                        ready = state.rootStatus == RootStatus.READY,
+                    )
+                }
+                Text(
+                    stringResource(R.string.setup_root_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (state.rootStatus == RootStatus.UNKNOWN || state.rootStatus == RootStatus.DENIED) {
+                    Button(onClick = { viewModel.requestRoot() }) {
+                        Text(stringResource(R.string.setup_root_grant))
+                    }
                 }
             }
         }

@@ -15,33 +15,49 @@ sealed interface LogcatSource {
 
     /**
      * Command line for streaming with the uid column included. Per-app
-     * filtering is done client-side against this column, which works on both
-     * access paths (logd restricts the server-side `--uid` mask to shell).
+     * filtering is done client-side against this column. Shizuku and root both
+     * see it; logd restricts the server-side `--uid` mask to the shell user.
      *
      * `crash` and `events` buffers are merged in so native crash dumps
      * (`Fatal signal`, tag DEBUG) and `am_anr` events reach CrashDetector —
      * the default main buffer alone carries neither.
      */
-    fun buildCommand(): List<String> =
-        listOf("logcat", "-b", "main", "-b", "crash", "-b", "events", "-v", "threadtime", "-v", "uid")
+    /**
+     * @param since threadtime stamp (`MM-dd HH:mm:ss.SSS`). When set, logcat
+     *   is started with `-T` so a reconnect does not replay the whole ring
+     *   buffer. Null on the first connection, where the dump is the backlog
+     *   the user expects to see.
+     */
+    fun buildCommand(since: String? = null): List<String> = buildList {
+        add("logcat")
+        add("-b"); add("main")
+        add("-b"); add("crash")
+        add("-b"); add("events")
+        add("-v"); add("threadtime")
+        add("-v"); add("uid")
+        if (!since.isNullOrBlank()) {
+            add("-T")
+            add(since)
+        }
+    }
 
     /** Streams raw logcat lines until the flow collector is cancelled. */
-    fun stream(): Flow<String>
+    fun stream(since: String? = null): Flow<String>
 }
 
 /** Runs logcat in the app's own process — requires the READ_LOGS grant. */
 class LocalLogcatSource : LogcatSource {
 
-    override fun stream(): Flow<String> = streamProcess {
-        ProcessBuilder(buildCommand()).redirectErrorStream(true).start()
+    override fun stream(since: String?): Flow<String> = streamProcess {
+        ProcessBuilder(buildCommand(since)).redirectErrorStream(true).start()
     }
 }
 
 /** Runs logcat as the shell user through Shizuku. */
 class ShizukuLogcatSource(private val shizukuManager: ShizukuManager) : LogcatSource {
 
-    override fun stream(): Flow<String> = streamProcess {
-        shizukuManager.newProcess(buildCommand().toTypedArray())
+    override fun stream(since: String?): Flow<String> = streamProcess {
+        shizukuManager.newProcess(buildCommand(since).toTypedArray())
     }
 }
 

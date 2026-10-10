@@ -17,9 +17,11 @@ class NotificationHelper(private val context: Context) {
     companion object {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_CRASHES = "crashes"
+        const val CHANNEL_WATCH = "crash_watch"
         const val ID_RECORDING = 1001
         const val ID_RECORDING_LIMIT = 1002
         const val ID_RECORDING_TIMEOUT = 1003
+        const val ID_WATCH = 1004
         const val ID_CRASH_BASE = 2000
     }
 
@@ -40,9 +42,16 @@ class NotificationHelper(private val context: Context) {
                 NotificationManager.IMPORTANCE_HIGH,
             ),
         )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_WATCH,
+                context.getString(R.string.notif_channel_watch),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
     }
 
-    fun recordingNotification(lineCount: Long): Notification {
+    fun recordingNotification(lineCount: Long, paused: Boolean = false): Notification {
         val stopIntent = PendingIntent.getService(
             context,
             1,
@@ -55,19 +64,62 @@ class NotificationHelper(private val context: Context) {
             Intent(context, RecordService::class.java).setAction(RecordService.ACTION_BOOKMARK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val pauseIntent = PendingIntent.getService(
+            context,
+            7,
+            Intent(context, RecordService::class.java).setAction(
+                if (paused) RecordService.ACTION_RESUME else RecordService.ACTION_PAUSE,
+            ),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val openIntent = PendingIntent.getActivity(
             context,
             3,
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val title = if (paused) {
+            context.getString(R.string.notif_recording_paused)
+        } else {
+            context.getString(R.string.notif_recording_title)
+        }
+        val pauseLabel = if (paused) {
+            context.getString(R.string.notif_action_resume)
+        } else {
+            context.getString(R.string.notif_action_pause)
+        }
         return NotificationCompat.Builder(context, CHANNEL_RECORDING)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.notif_recording_title))
+            .setContentTitle(title)
             .setContentText(context.getString(R.string.notif_recording_text, lineCount))
             .setContentIntent(openIntent)
             .setOngoing(true)
+            .addAction(0, pauseLabel, pauseIntent)
             .addAction(0, context.getString(R.string.notif_action_bookmark), bookmarkIntent)
+            .addAction(0, context.getString(R.string.notif_action_stop), stopIntent)
+            .build()
+    }
+
+    /** Low-priority notice while the boot watch holds the logcat engine open. */
+    fun watchNotification(): Notification {
+        val stopIntent = PendingIntent.getService(
+            context,
+            8,
+            Intent(context, CrashWatchService::class.java).setAction(CrashWatchService.ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val openIntent = PendingIntent.getActivity(
+            context,
+            9,
+            MainActivity.crashesIntent(context),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(context, CHANNEL_WATCH)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_watch_title))
+            .setContentText(context.getString(R.string.notif_watch_text))
+            .setContentIntent(openIntent)
+            .setOngoing(true)
             .addAction(0, context.getString(R.string.notif_action_stop), stopIntent)
             .build()
     }

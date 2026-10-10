@@ -188,6 +188,7 @@ fun LogSleuthNavHost(
                             sessionId = entry.arguments?.getLong("sessionId") ?: -1L,
                             animatedVisibilityScope = this,
                             onBack = { navController.popBackStack() },
+                            onOpenFilters = { navController.navigate(Routes.FILTERS) },
                         )
                     }
                     composable(Routes.REPORT) {

@@ -69,6 +69,7 @@ fun FilterBar(
     onFilterChange: (LogFilter) -> Unit,
     onSavePreset: (String) -> Unit,
     onApplyPreset: (LogFilter) -> Unit,
+    onManageFilters: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -134,6 +135,18 @@ fun FilterBar(
                             },
                         )
                     }
+                }
+                if (onManageFilters != null) {
+                    FilterChip(
+                        selected = presets.any { it.enabled },
+                        onClick = onManageFilters,
+                        label = {
+                            Text(
+                                stringResource(R.string.filter_manage),
+                                maxLines = 1,
+                            )
+                        },
+                    )
                 }
                 IconButton(onClick = { expanded = !expanded }) {
                     val chevron by animateFloatAsState(

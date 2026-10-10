@@ -60,6 +60,7 @@ python3 scripts/check_string_parity.py   # bilingual string gate
 | Crash / ANR detector | `app/src/main/java/…/core/detect/` |
 | Export (txt/zip) & import | `app/src/main/java/…/core/export/`, `…/core/importer/` |
 | Shizuku integration | `app/src/main/java/…/core/shizuku/` |
+| Root (libsu, viewer only) | `app/src/main/java/…/core/root/` |
 | Recording (foreground service, manager, tile, bubble) | `app/src/main/java/…/service/` |
 | Compose UI (stream, report wizard, sessions, crashes, settings, setup) | `app/src/main/java/…/ui/` |
 | Room entities / DAOs / DataStore settings | `app/src/main/java/…/data/` |

@@ -1,1 +1,1 @@
-Root-free logcat viewer & logging SDK for Android
+Logcat viewer and logging SDK. Shizuku, root, or ADB.

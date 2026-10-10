@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // libsu 6 is published to JitPack, not Maven Central.
+        maven { url = uri("https://www.jitpack.io") }
     }
 }
 

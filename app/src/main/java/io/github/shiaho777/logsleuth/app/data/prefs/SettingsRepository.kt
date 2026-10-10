@@ -1,10 +1,12 @@
 package io.github.shiaho777.logsleuth.app.data.prefs
 
 import android.content.Context
+import io.github.shiaho777.logsleuth.app.core.logcat.AccessPolicy
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +36,23 @@ data class Settings(
     val recordingMaxMb: Int = 64,
     /** Recordings auto-stop after this many hours; 0 = unlimited. */
     val recordingMaxHours: Int = 0,
+    /** Package names whose crashes are dropped instead of stored or notified. */
+    val crashBlacklist: Set<String> = emptySet(),
+    /** Keep a foreground watch alive across reboot so crashes are not missed. */
+    val watchOnBoot: Boolean = false,
+    val showLogTime: Boolean = true,
+    val showLogPid: Boolean = true,
+    val showLogTid: Boolean = true,
+    val showLogTag: Boolean = true,
+    val showLogPackage: Boolean = true,
+    /** "time" | "datetime" | "epoch" */
+    val logTimeFormat: String = "time",
+    /**
+     * Opt-in for a root shell. Default off: an unrooted phone never execs `su`.
+     */
+    val rootEnabled: Boolean = false,
+    /** [AccessPolicy] value: auto, shizuku, root, or adb. */
+    val accessPreference: String = AccessPolicy.AUTO,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -53,6 +72,16 @@ class SettingsRepository(private val context: Context) {
         val LANGUAGE = stringPreferencesKey("language")
         val RECORDING_MAX_MB = intPreferencesKey("recording_max_mb")
         val RECORDING_MAX_HOURS = intPreferencesKey("recording_max_hours")
+        val CRASH_BLACKLIST = stringSetPreferencesKey("crash_blacklist")
+        val WATCH_ON_BOOT = booleanPreferencesKey("watch_on_boot")
+        val SHOW_LOG_TIME = booleanPreferencesKey("show_log_time")
+        val SHOW_LOG_PID = booleanPreferencesKey("show_log_pid")
+        val SHOW_LOG_TID = booleanPreferencesKey("show_log_tid")
+        val SHOW_LOG_TAG = booleanPreferencesKey("show_log_tag")
+        val SHOW_LOG_PACKAGE = booleanPreferencesKey("show_log_package")
+        val LOG_TIME_FORMAT = stringPreferencesKey("log_time_format")
+        val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
+        val ACCESS_PREFERENCE = stringPreferencesKey("access_preference")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -67,6 +96,16 @@ class SettingsRepository(private val context: Context) {
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
             recordingMaxMb = p[Keys.RECORDING_MAX_MB] ?: 64,
             recordingMaxHours = p[Keys.RECORDING_MAX_HOURS] ?: 0,
+            crashBlacklist = p[Keys.CRASH_BLACKLIST] ?: emptySet(),
+            watchOnBoot = p[Keys.WATCH_ON_BOOT] ?: false,
+            showLogTime = p[Keys.SHOW_LOG_TIME] ?: true,
+            showLogPid = p[Keys.SHOW_LOG_PID] ?: true,
+            showLogTid = p[Keys.SHOW_LOG_TID] ?: true,
+            showLogTag = p[Keys.SHOW_LOG_TAG] ?: true,
+            showLogPackage = p[Keys.SHOW_LOG_PACKAGE] ?: true,
+            logTimeFormat = p[Keys.LOG_TIME_FORMAT] ?: "time",
+            rootEnabled = p[Keys.ROOT_ENABLED] ?: false,
+            accessPreference = p[Keys.ACCESS_PREFERENCE] ?: AccessPolicy.AUTO,
         )
     }
 
@@ -108,6 +147,59 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRecordingMaxHours(value: Int) =
         context.dataStore.edit { it[Keys.RECORDING_MAX_HOURS] = value.coerceIn(0, 24) }
+
+    suspend fun setWatchOnBoot(value: Boolean) =
+        context.dataStore.edit { it[Keys.WATCH_ON_BOOT] = value }
+
+    suspend fun ignorePackage(packageName: String) {
+        if (packageName.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.CRASH_BLACKLIST] ?: emptySet()
+            prefs[Keys.CRASH_BLACKLIST] = current + packageName
+        }
+    }
+
+    suspend fun unignorePackage(packageName: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.CRASH_BLACKLIST] ?: emptySet()
+            prefs[Keys.CRASH_BLACKLIST] = current - packageName
+        }
+    }
+
+    suspend fun setShowLogTime(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_TIME] = value }
+
+    suspend fun setShowLogPid(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_PID] = value }
+
+    suspend fun setShowLogTid(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_TID] = value }
+
+    suspend fun setShowLogTag(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_TAG] = value }
+
+    suspend fun setShowLogPackage(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_PACKAGE] = value }
+
+    suspend fun setLogTimeFormat(value: String) {
+        val allowed = setOf("time", "datetime", "epoch")
+        context.dataStore.edit { it[Keys.LOG_TIME_FORMAT] = if (value in allowed) value else "time" }
+    }
+
+    suspend fun setRootEnabled(value: Boolean) =
+        context.dataStore.edit { it[Keys.ROOT_ENABLED] = value }
+
+    suspend fun setAccessPreference(value: String) {
+        val allowed = setOf(
+            AccessPolicy.AUTO,
+            AccessPolicy.SHIZUKU,
+            AccessPolicy.ROOT,
+            AccessPolicy.ADB,
+        )
+        context.dataStore.edit {
+            it[Keys.ACCESS_PREFERENCE] = if (value in allowed) value else AccessPolicy.AUTO
+        }
+    }
 
     /**
      * Mirrors the choice into DataStore (for UI state) and applies the

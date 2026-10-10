@@ -104,6 +104,8 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
 
+    implementation(libs.libsu.core)
+
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
 }

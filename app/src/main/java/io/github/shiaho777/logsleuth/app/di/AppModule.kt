@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessChecker
+import io.github.shiaho777.logsleuth.app.core.root.RootManager
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.db.AppDatabase
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
@@ -25,7 +26,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "logsleuth.db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "logsleuth.db")
+            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides fun provideSessionDao(db: AppDatabase): SessionDao = db.sessionDao()
     @Provides fun provideFilterDao(db: AppDatabase): FilterDao = db.filterDao()
@@ -41,6 +44,11 @@ object AppModule {
     @Singleton
     fun provideShizukuManager(@ApplicationContext context: Context): ShizukuManager =
         ShizukuManager(context)
+
+    @Provides
+    @Singleton
+    fun provideRootManager(@ApplicationContext context: Context): RootManager =
+        RootManager(context)
 
     @Provides
     @Singleton

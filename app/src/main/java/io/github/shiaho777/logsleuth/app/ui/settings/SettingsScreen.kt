@@ -36,11 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.BuildConfig
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessKind
+import io.github.shiaho777.logsleuth.app.core.logcat.AccessPolicy
+import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
@@ -56,6 +59,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val access by viewModel.access.collectAsState()
+    val rootStatus by viewModel.rootStatus.collectAsState()
     val context = LocalContext.current
     val s = settings ?: return
 
@@ -90,6 +94,7 @@ fun SettingsScreen(
                         )
                         val accessText = when (access.kind) {
                             AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
+                            AccessKind.ROOT -> stringResource(R.string.settings_access_root)
                             AccessKind.READ_LOGS -> stringResource(R.string.settings_access_adb)
                             AccessKind.NONE -> stringResource(R.string.no_access_title)
                         }
@@ -125,6 +130,59 @@ fun SettingsScreen(
                             Text(stringResource(R.string.settings_replay_guide))
                         }
                     }
+                }
+            }
+
+            Card {
+                Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.settings_access_mode),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Text(
+                        stringResource(R.string.settings_access_mode_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    SingleChoiceSegmentedButtonRow(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        listOf(
+                            AccessPolicy.AUTO to R.string.access_mode_auto,
+                            AccessPolicy.SHIZUKU to R.string.access_mode_shizuku,
+                            AccessPolicy.ROOT to R.string.access_mode_root,
+                            AccessPolicy.ADB to R.string.access_mode_adb,
+                        ).forEachIndexed { index, (value, labelRes) ->
+                            SegmentedButton(
+                                selected = s.accessPreference == value,
+                                onClick = { viewModel.setAccessPreference(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 4),
+                            ) {
+                                Text(
+                                    stringResource(labelRes),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    val rootDetail = when {
+                        !s.rootEnabled -> stringResource(R.string.settings_root_desc)
+                        rootStatus == RootStatus.READY -> stringResource(R.string.setup_root_ready)
+                        rootStatus == RootStatus.CHECKING -> stringResource(R.string.setup_root_checking)
+                        rootStatus == RootStatus.DENIED -> stringResource(R.string.setup_root_denied)
+                        else -> stringResource(R.string.settings_root_desc)
+                    }
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_root),
+                        subtitle = rootDetail,
+                        checked = s.rootEnabled,
+                        onCheckedChange = viewModel::setRootEnabled,
+                    )
                 }
             }
 
@@ -274,6 +332,107 @@ fun SettingsScreen(
                                 onClick = { viewModel.setTheme(value) },
                                 shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
                             ) { Text(stringResource(labelRes)) }
+                        }
+                    }
+                }
+            }
+
+            Card {
+                Column(Modifier.padding(top = 16.dp)) {
+                    Text(
+                        stringResource(R.string.settings_columns),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    Text(
+                        stringResource(R.string.settings_time_format),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    SingleChoiceSegmentedButtonRow(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        listOf(
+                            "time" to R.string.time_format_clock,
+                            "datetime" to R.string.time_format_datetime,
+                            "epoch" to R.string.time_format_epoch,
+                        ).forEachIndexed { index, (value, labelRes) ->
+                            SegmentedButton(
+                                selected = s.logTimeFormat == value,
+                                onClick = { viewModel.setLogTimeFormat(value) },
+                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
+                            ) { Text(stringResource(labelRes), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        }
+                    }
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_time),
+                        checked = s.showLogTime,
+                        onCheckedChange = viewModel::setShowLogTime,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_pid),
+                        checked = s.showLogPid,
+                        onCheckedChange = viewModel::setShowLogPid,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_tid),
+                        checked = s.showLogTid,
+                        onCheckedChange = viewModel::setShowLogTid,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_tag),
+                        checked = s.showLogTag,
+                        onCheckedChange = viewModel::setShowLogTag,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_package),
+                        checked = s.showLogPackage,
+                        onCheckedChange = viewModel::setShowLogPackage,
+                    )
+                }
+            }
+
+            Card {
+                Column {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_watch_boot),
+                        subtitle = stringResource(R.string.settings_watch_boot_desc),
+                        checked = s.watchOnBoot,
+                        onCheckedChange = viewModel::setWatchOnBoot,
+                    )
+                    if (s.crashBlacklist.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.settings_crash_blacklist),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                        Text(
+                            stringResource(R.string.settings_crash_blacklist_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        s.crashBlacklist.sorted().forEach { pkg ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    pkg,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = { viewModel.unignorePackage(pkg) }) {
+                                    Text(stringResource(R.string.delete))
+                                }
+                            }
                         }
                     }
                 }
