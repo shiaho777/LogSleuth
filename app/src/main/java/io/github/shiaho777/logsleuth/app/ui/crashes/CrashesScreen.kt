@@ -45,10 +45,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -60,6 +62,7 @@ import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +74,8 @@ fun CrashesScreen(
     val pendingDelete by viewModel.pendingDelete.collectAsState()
     val shown = crashes.filter { it.id != pendingDelete?.id }
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val deletedMessage = stringResource(R.string.crash_deleted)
     val undoLabel = stringResource(R.string.undo)
@@ -133,6 +138,16 @@ fun CrashesScreen(
                             crash = crash,
                             onDelete = { viewModel.requestDelete(crash) },
                             onShare = { viewModel.share(it) },
+                            onIgnore = crash.packageName?.let { pkg ->
+                                {
+                                    viewModel.ignore(pkg)
+                                    scope.launch {
+                                        snackbar.showSnackbar(
+                                            context.getString(R.string.crash_ignored, pkg),
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
                 }
@@ -148,6 +163,7 @@ fun CrashCard(
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onShare: ((CrashEventEntity) -> Unit)? = null,
+    onIgnore: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
@@ -223,6 +239,15 @@ fun CrashCard(
                 }
             },
             confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                if (onIgnore != null) {
+                    TextButton(onClick = {
+                        onIgnore()
+                        expanded = false
+                    }) {
+                        Text(stringResource(R.string.crash_ignore))
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (onShare != null) {
                         TextButton(onClick = {
@@ -250,6 +275,7 @@ fun CrashCard(
                         Spacer(Modifier.width(4.dp))
                         Text(stringResource(R.string.copy))
                     }
+                }
                 }
             },
             dismissButton = {

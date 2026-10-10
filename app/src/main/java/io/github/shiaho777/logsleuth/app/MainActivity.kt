@@ -31,6 +31,8 @@ import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.ui.components.AppIconCache
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
+import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
+import io.github.shiaho777.logsleuth.app.ui.components.LogRowPrefs
 import io.github.shiaho777.logsleuth.app.ui.navigation.LogSleuthNavHost
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
@@ -90,9 +92,18 @@ class MainActivity : ComponentActivity() {
                 val iconCache = remember {
                     AppIconCache(applicationContext, iconScope)
                 }
+                val rowPrefs = LogRowPrefs(
+                    showTime = settings?.showLogTime ?: true,
+                    showPid = settings?.showLogPid ?: true,
+                    showTid = settings?.showLogTid ?: true,
+                    showTag = settings?.showLogTag ?: true,
+                    showPackage = settings?.showLogPackage ?: true,
+                    timeFormat = settings?.logTimeFormat ?: "time",
+                )
                 CompositionLocalProvider(
                     LocalLogTextScale provides logScale,
                     LocalAppIconCache provides iconCache,
+                    LocalLogRowPrefs provides rowPrefs,
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         val start = when {

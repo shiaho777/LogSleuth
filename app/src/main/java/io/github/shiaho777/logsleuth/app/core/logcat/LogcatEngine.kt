@@ -3,6 +3,8 @@ package io.github.shiaho777.logsleuth.app.core.logcat
 import android.util.Log
 import io.github.shiaho777.logsleuth.app.core.detect.CrashDetector
 import io.github.shiaho777.logsleuth.app.core.detect.CrashSignal
+import io.github.shiaho777.logsleuth.app.core.root.RootManager
+import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkEntity
@@ -41,12 +43,13 @@ private const val CRASH_BACKLOG_GRACE_MS = 5_000L
  * attached. Entries fan out via [entries]; a ring [snapshot] gives late
  * consumers recent history.
  *
- * If the process dies (Shizuku restart, logd hiccup), the stream retries
- * with exponential backoff while consumers remain attached.
+ * If the process dies (Shizuku restart, root shell, logd hiccup), the stream
+ * retries with exponential backoff while consumers remain attached.
  */
 @Singleton
 class LogcatEngine @Inject constructor(
     private val shizukuManager: ShizukuManager,
+    private val rootManager: RootManager,
     private val accessChecker: AccessChecker,
     private val crashEventDao: CrashEventDao,
     private val bookmarkDao: BookmarkDao,
@@ -113,6 +116,35 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var acceptCrashesAfter = Long.MAX_VALUE
 
+    /**
+     * Threadtime stamp of the newest line we've dispatched. A reconnect
+     * passes it as `logcat -T` so logd does not dump the ring buffer again.
+     * Null until the first line of this process — a cold start still shows
+     * the backlog.
+     */
+    @Volatile
+    private var resumeSince: String? = null
+
+    /** Packages the user asked us to stop recording crashes for. */
+    @Volatile
+    private var crashBlacklist: Set<String> = emptySet()
+
+    /** User's preferred grant. `auto` tries Shizuku, then root, then READ_LOGS. */
+    @Volatile
+    private var accessPreference: String = AccessPolicy.AUTO
+
+    /** False until the user opts in. We never exec `su` before that. */
+    @Volatile
+    private var rootEnabled: Boolean = false
+
+    /**
+     * Bumped every time a stream is started or stopped. A dying stream may
+     * only clear [streamJob] when it still owns the current generation, so
+     * its `finally` cannot wipe out the replacement stream.
+     */
+    @Volatile
+    private var streamGeneration = 0
+
     private val crashWriteMutex = Mutex()
 
     init {
@@ -120,20 +152,44 @@ class LogcatEngine @Inject constructor(
             settingsRepository.settings.collect {
                 bufferCap = it.bufferSize
                 crashNotifications = it.crashNotifications
+                crashBlacklist = it.crashBlacklist
+                val prefChanged = accessPreference != it.accessPreference
+                val rootChanged = rootEnabled != it.rootEnabled
+                accessPreference = it.accessPreference
+                rootEnabled = it.rootEnabled
+                if (rootChanged) rootManager.refresh(it.rootEnabled)
+                if (prefChanged || rootChanged) refreshAccess()
             }
         }
-        // Shizuku status events funnel through refreshAccess, which restarts
-        // the stream on a false→true grant transition — regardless of whether
-        // the grant came from our dialog, the Shizuku app, or adb.
+        // Grant changes restart the stream when the *active* path changes.
+        // Root becoming ready while auto is still on Shizuku does not.
         scope.launch {
             shizukuManager.status.collect { refreshAccess() }
         }
+        scope.launch {
+            rootManager.status.collect { refreshAccess() }
+        }
     }
 
+    private fun currentAccess(): AccessState = accessChecker.currentState(
+        preference = accessPreference,
+        rootReady = rootManager.status.value == RootStatus.READY,
+    )
+
     fun refreshAccess() {
-        val wasGranted = _access.value.granted
-        _access.value = accessChecker.currentState()
-        if (!wasGranted && _access.value.granted) resetBackoffAndRestart()
+        val previous = _access.value
+        val next = currentAccess()
+        if (previous == next) return
+        _access.value = next
+        if (consumers == 0) return
+        val kindChanged = previous.kind != next.kind
+        val becameGranted = !previous.granted && next.granted
+        if (!kindChanged && !becameGranted) return
+        if (next.granted) {
+            resetBackoffAndRestart()
+        } else {
+            stopStream()
+        }
     }
 
     /** A consumer wants the stream. Starts logcat on first consumer. */
@@ -169,27 +225,35 @@ class LogcatEngine @Inject constructor(
         // Set _access directly: refreshAccess()'s restart-on-grant would
         // re-enter startStreamLocked while this monitor is already held and
         // leave a second stream's Job orphaned.
-        _access.value = accessChecker.currentState()
+        _access.value = currentAccess()
         _lastError.value = null
         if (!_access.value.granted) {
             _state.value = State.ERROR
+            streamGeneration++
+            streamJob = null
             return
         }
 
         val source: LogcatSource = when (_access.value.kind) {
             AccessKind.SHIZUKU -> ShizukuLogcatSource(shizukuManager)
-            else -> LocalLogcatSource()
+            AccessKind.ROOT -> RootLogcatSource()
+            AccessKind.READ_LOGS -> LocalLogcatSource()
+            AccessKind.NONE -> return
         }
 
+        val generation = ++streamGeneration
         _state.value = State.STARTING
         streamJob = scope.launch {
             val assembler = EntryAssembler()
             val crashDetector = CrashDetector()
-            // Set before the first line. `logcat` with no `-T` dumps every
-            // buffer it was given, including hours-old crash-buffer fatals.
+            val since = resumeSince
+            // Set before the first line. A cold start (`since == null`) dumps
+            // every buffer, including hours-old crash-buffer fatals. A
+            // reconnect with `-T` only replays the boundary line.
             acceptCrashesAfter = System.currentTimeMillis() - CRASH_BACKLOG_GRACE_MS
             try {
-                source.stream().collect { line ->
+                source.stream(since).collect { line ->
+                    if (generation != streamGeneration) return@collect
                     if (_state.compareAndSet(State.STARTING, State.RUNNING)) {
                         backoffMs = 1_000L
                     }
@@ -198,26 +262,30 @@ class LogcatEngine @Inject constructor(
                     }
                 }
                 // Clean EOF (shouldn't normally happen for logcat) — treat as
-                // a lost process and retry.
-                if (consumers > 0) scheduleReconnect()
+                // a lost process and retry. A stream we already replaced must
+                // not schedule that retry.
+                if (consumers > 0 && generation == streamGeneration) scheduleReconnect()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "logcat stream failed", e)
-                if (consumers > 0) {
+                // `su` fell back to `sh`. Mark root unusable and pick another
+                // path now, so reconnect does not raise the grant dialog again.
+                if (e is RootDeniedException) {
+                    rootManager.markDenied()
+                    if (generation == streamGeneration) refreshAccess()
+                } else if (consumers > 0 && generation == streamGeneration) {
                     _lastError.value = e.message ?: e.javaClass.simpleName
                     _state.value = State.ERROR
                     scheduleReconnect()
                 }
             } finally {
-                assembler.flush()?.let { dispatch(it, crashDetector) }
-                crashDetector.flush()?.let { onCrash(it) }
-                if (_state.value != State.ERROR) _state.value = State.STOPPED
-                // Free the slot so scheduleReconnect/acquireClient can
-                // actually restart — callers assign streamJob while holding
-                // this monitor, so this null-out always lands after the
-                // assignment (and only on a finished job).
-                synchronized(this@LogcatEngine) { streamJob = null }
+                if (generation == streamGeneration) {
+                    assembler.flush()?.let { dispatch(it, crashDetector) }
+                    crashDetector.flush()?.let { onCrash(it) }
+                    if (_state.value != State.ERROR) _state.value = State.STOPPED
+                    synchronized(this@LogcatEngine) { streamJob = null }
+                }
             }
         }
     }
@@ -237,18 +305,26 @@ class LogcatEngine @Inject constructor(
         }
     }
 
-    /** Access just became available — retry immediately, no backoff wait. */
+    /**
+     * Access changed while clients are attached. Cancel the live process and
+     * open the new source immediately. [streamGeneration] keeps the old
+     * job's `finally` from clearing the job we assign here.
+     */
     private fun resetBackoffAndRestart() {
         synchronized(this@LogcatEngine) {
             backoffMs = 1_000L
             reconnectJob?.cancel()
             reconnectJob = null
-            if (consumers > 0 && streamJob == null) startStreamLocked()
+            if (consumers > 0) {
+                streamJob?.cancel()
+                startStreamLocked()
+            }
         }
     }
 
     @Synchronized
     private fun stopStream() {
+        streamGeneration++
         streamJob?.cancel()
         streamJob = null
         reconnectJob?.cancel()
@@ -263,6 +339,7 @@ class LogcatEngine @Inject constructor(
             while (buffer.size > bufferCap) buffer.removeFirst()
             s
         }
+        resumeSince = UidNames.formatThreadTime(stamped.timestampMillis)
         _entries.emit(stamped)
         crashDetector.onEntry(stamped)?.let { onCrash(it) }
     }
@@ -271,6 +348,8 @@ class LogcatEngine @Inject constructor(
         val threshold = acceptCrashesAfter
         scope.launch {
             if (signal.timeMillis < threshold) return@launch
+            val pkg = signal.packageName
+            if (pkg != null && pkg in crashBlacklist) return@launch
             crashWriteMutex.withLock {
                 if (crashEventDao.findExisting(
                         time = signal.timeMillis,

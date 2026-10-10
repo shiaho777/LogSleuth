@@ -2,7 +2,10 @@ package io.github.shiaho777.logsleuth.app.service
 
 import android.content.Context
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.data.db.FilterDao
+import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
@@ -34,6 +37,8 @@ data class RecordingState(
     /** Lines backfilled from the engine buffer at start (context before live capture). */
     val backfillCount: Long = 0,
     val startedAt: Long = 0L,
+    /** Writer is open but new lines are skipped until [RecordingManager.resume]. */
+    val paused: Boolean = false,
 )
 
 /**
@@ -49,6 +54,7 @@ class RecordingManager @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val engine: LogcatEngine,
     private val sessionDao: SessionDao,
+    private val filterDao: FilterDao,
     private val settingsRepository: SettingsRepository,
     private val notificationHelper: NotificationHelper,
 ) {
@@ -62,6 +68,11 @@ class RecordingManager @Inject constructor(
     private var finalLines = 0L
 
     private var collectJob: Job? = null
+    private var filtersJob: Job? = null
+
+    /** Enabled saved rules, refreshed while a recording is open. */
+    @Volatile
+    private var activeStack = FilterStack.PASS
     private var writer: BufferedWriter? = null
     private val writeMutex = Mutex()
 
@@ -127,6 +138,13 @@ class RecordingManager @Inject constructor(
             )
 
             val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
+            val initialRules = filterDao.observeAll().first().map { it.toLogFilter() }
+            activeStack = FilterStack.compile(initialRules, ::resolveUid)
+            filtersJob = scope.launch {
+                filterDao.observeAll().collect { rows ->
+                    activeStack = FilterStack.compile(rows.map { it.toLogFilter() }, ::resolveUid)
+                }
+            }
             engine.activeSessionId = sessionId
 
             // isRecording is published synchronously so stop() and duplicate
@@ -149,7 +167,7 @@ class RecordingManager @Inject constructor(
                         val snap = engine.snapshot()
                         snapshotSeq = snap.maxSeq
                         // Include recent history as context before start.
-                        val matched = snap.entries.filter(compiled::matches)
+                        val matched = snap.entries.filter { compiled.matches(it) && activeStack.matches(it) }
                         writeMutex.withLock {
                             matched.forEach {
                                 w.appendLine(it.raw)
@@ -174,7 +192,8 @@ class RecordingManager @Inject constructor(
                     }
                     .collect { entry ->
                         if (entry.seq <= snapshotSeq) return@collect
-                        if (compiled.matches(entry)) {
+                        if (_state.value.paused) return@collect
+                        if (compiled.matches(entry) && activeStack.matches(entry)) {
                             writeMutex.withLock {
                                 w.appendLine(entry.raw)
                                 bytesWritten += entry.raw.toByteArray(Charsets.UTF_8).size + 1
@@ -204,6 +223,9 @@ class RecordingManager @Inject constructor(
         }.onFailure {
             collectJob?.cancel()
             collectJob = null
+            filtersJob?.cancel()
+            filtersJob = null
+            activeStack = FilterStack.PASS
             durationJob?.cancel()
             durationJob = null
             engine.activeSessionId = null
@@ -285,11 +307,27 @@ class RecordingManager @Inject constructor(
         }
     }
 
+    /** Stops writing without closing the session. Lines during the pause are dropped. */
+    fun pause() {
+        val s = _state.value
+        if (!s.isRecording || s.paused) return
+        _state.value = s.copy(paused = true)
+    }
+
+    fun resume() {
+        val s = _state.value
+        if (!s.isRecording || !s.paused) return
+        _state.value = s.copy(paused = false)
+    }
+
     suspend fun stop() {
         val s = _state.value
         if (!s.isRecording) return
         collectJob?.cancel()
         collectJob = null
+        filtersJob?.cancel()
+        filtersJob = null
+        activeStack = FilterStack.PASS
         durationJob?.cancel()
         durationJob = null
         engine.activeSessionId = null

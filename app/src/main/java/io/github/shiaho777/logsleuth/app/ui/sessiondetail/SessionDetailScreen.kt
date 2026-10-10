@@ -57,6 +57,7 @@ fun SessionDetailScreen(
     sessionId: Long,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
+    onOpenFilters: () -> Unit = {},
     viewModel: SessionDetailViewModel = hiltViewModel(),
 ) {
     val sharedScope = LocalSharedTransitionScope.current
@@ -127,6 +128,7 @@ fun SessionDetailScreen(
                             onFilterChange = viewModel::setFilter,
                             onSavePreset = viewModel::savePreset,
                             onApplyPreset = viewModel::applyPreset,
+                            onManageFilters = onOpenFilters,
                         )
                         when {
                             ui.loading -> Box(Modifier.fillMaxSize()) {

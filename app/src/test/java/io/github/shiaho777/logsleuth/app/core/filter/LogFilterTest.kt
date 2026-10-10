@@ -13,8 +13,10 @@ class LogFilterTest {
         tag: String = "MyTag",
         message: String = "hello",
         uid: Int? = 10123,
+        pid: Int = 1,
+        tid: Int = 1,
     ) = LogcatEntry(
-        timestampMillis = 0, pid = 1, tid = 1, uid = uid,
+        timestampMillis = 0, pid = pid, tid = tid, uid = uid,
         level = level, tag = tag, message = message, raw = "",
     )
 
@@ -81,5 +83,27 @@ class LogFilterTest {
     fun `unresolvable package matches nothing`() {
         val f = CompiledFilter(LogFilter(packageName = "com.missing"), resolvedUid = null)
         assertFalse(f.matches(entry(uid = 10123)))
+    }
+
+    @Test
+    fun `pid tid and uid tokens match exactly`() {
+        val byPid = CompiledFilter(LogFilter(pid = "42"))
+        assertTrue(byPid.matches(entry(pid = 42)))
+        assertFalse(byPid.matches(entry(pid = 7)))
+
+        val byTid = CompiledFilter(LogFilter(tid = "9"))
+        assertTrue(byTid.matches(entry(tid = 9)))
+        assertFalse(byTid.matches(entry(tid = 8)))
+
+        val byName = CompiledFilter(LogFilter(uid = "system"))
+        assertTrue(byName.matches(entry(uid = 1000)))
+        assertFalse(byName.matches(entry(uid = 10123)))
+
+        val byToken = CompiledFilter(LogFilter(uid = "u0a123"))
+        assertTrue(byToken.matches(entry(uid = 10123)))
+
+        val unknown = CompiledFilter(LogFilter(uid = "not-a-uid"))
+        assertFalse(unknown.matches(entry(uid = 10123)))
+        assertFalse(unknown.matches(entry(uid = null)))
     }
 }

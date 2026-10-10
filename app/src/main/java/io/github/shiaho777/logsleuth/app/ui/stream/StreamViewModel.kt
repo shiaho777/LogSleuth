@@ -11,12 +11,14 @@ import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.apps.groupEntriesByApp
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.data.db.toEntity
+import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.data.db.FilterDao
-import io.github.shiaho777.logsleuth.app.data.db.FilterEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.RecordService
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
@@ -65,6 +67,8 @@ data class StreamUiState(
     /** Last stream failure detail (e.g. "logcat exited 1: Permission
      *  denied"); null while healthy or when access is simply not granted. */
     val lastError: String? = null,
+    /** Bumped when a filter is created from a log line, so the screen can toast. */
+    val filterNotice: Int = 0,
 )
 
 @HiltViewModel
@@ -93,6 +97,10 @@ class StreamViewModel @Inject constructor(
     // running — a post-init declaration reads as null there (NPE crash).
     private val staged = ArrayList<LogcatEntry>(512)
     private val stagedMutex = Mutex()
+
+    /** Enabled saved rules. AND-ed with the quick filter on the bar. */
+    @Volatile
+    private var enabledStack = FilterStack.PASS
 
     init {
         engine.refreshAccess()
@@ -132,9 +140,12 @@ class StreamViewModel @Inject constructor(
                 wasRecording = r.isRecording
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             filterDao.observeAll().collect { list ->
-                _ui.update { it.copy(presets = list.map(::toModel)) }
+                val models = list.map { it.toLogFilter() }
+                enabledStack = FilterStack.compile(models, ::resolveUid)
+                _ui.update { it.copy(presets = models) }
+                refilter()
             }
         }
         viewModelScope.launch {
@@ -183,7 +194,7 @@ class StreamViewModel @Inject constructor(
             snapshot.forEach { e ->
                 val uiEntry = UiLogEntry(seq++, e)
                 all.add(uiEntry)
-                if (compiled.matches(e)) visible.add(uiEntry)
+                if (accepts(compiled, e)) visible.add(uiEntry)
             }
             trimLocked()
             publishLocked()
@@ -206,7 +217,7 @@ class StreamViewModel @Inject constructor(
                 }
                 val uiEntry = UiLogEntry(seq++, e)
                 all.add(uiEntry)
-                if (compiled.matches(e)) {
+                if (accepts(compiled, e)) {
                     visible.add(uiEntry)
                     addedVisible++
                 }
@@ -240,6 +251,9 @@ class StreamViewModel @Inject constructor(
     private fun currentCompiled(): CompiledFilter =
         CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
 
+    private fun accepts(quick: CompiledFilter, entry: LogcatEntry): Boolean =
+        quick.matches(entry) && enabledStack.matches(entry)
+
     // ---------------- user actions ----------------
 
     fun setFilter(filter: LogFilter) {
@@ -256,7 +270,7 @@ class StreamViewModel @Inject constructor(
                     for (e in pending) {
                         val uiEntry = UiLogEntry(seq++, e)
                         all.add(uiEntry)
-                        if (compiled.matches(e)) visible.add(uiEntry)
+                        if (accepts(compiled, e)) visible.add(uiEntry)
                     }
                     pending.clear()
                     trimLocked()
@@ -353,6 +367,47 @@ class StreamViewModel @Inject constructor(
         }
     }
 
+    fun toggleRecordingPause() {
+        viewModelScope.launch {
+            if (_ui.value.recording.paused) recordingManager.resume()
+            else recordingManager.pause()
+        }
+    }
+
+    fun saveSelection(entries: List<LogcatEntry>) {
+        if (entries.isEmpty()) return
+        viewModelScope.launch(Dispatchers.Default) {
+            recordingManager.snapshotToSession(entries).onSuccess { id ->
+                val session = sessionDao.getById(id) ?: return@onSuccess
+                _ui.update {
+                    it.copy(
+                        finishedSession = session,
+                        finishedBackfill = 0,
+                        finishedSnapshot = true,
+                    )
+                }
+            }
+        }
+    }
+
+    /** Saves an including rule for this line's tag and pid, and turns it on. */
+    fun saveFilterFromLine(entry: LogcatEntry) {
+        viewModelScope.launch {
+            val name = entry.tag.ifBlank { "pid ${entry.pid}" }.take(40)
+            filterDao.insert(
+                LogFilter(
+                    name = name,
+                    tagQuery = entry.tag,
+                    pid = entry.pid.toString(),
+                    uid = entry.uid?.toString().orEmpty(),
+                    enabled = true,
+                    including = true,
+                ).toEntity(),
+            )
+            _ui.update { it.copy(filterNotice = it.filterNotice + 1) }
+        }
+    }
+
     fun toggleRecording() {
         val recording = _ui.value.recording.isRecording
         val f = _ui.value.filter
@@ -399,14 +454,14 @@ class StreamViewModel @Inject constructor(
 
     fun savePreset(name: String) {
         viewModelScope.launch {
-            filterDao.insert(toEntity(_ui.value.filter.copy(name = name)))
+            filterDao.insert(_ui.value.filter.copy(name = name, id = 0).toEntity())
         }
     }
 
     fun applyPreset(preset: LogFilter) = setFilter(preset.copy(id = preset.id, name = preset.name))
 
     fun deletePreset(preset: LogFilter) {
-        viewModelScope.launch { filterDao.delete(toEntity(preset)) }
+        viewModelScope.launch { filterDao.delete(preset.toEntity()) }
     }
 
     // Search
@@ -459,11 +514,12 @@ class StreamViewModel @Inject constructor(
 
     private suspend fun refilter() {
         val compiled = CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
+        val stack = enabledStack
         listMutex.withLock {
-            visible = all.filterTo(ArrayList()) { compiled.matches(it.entry) }
+            visible = all.filterTo(ArrayList()) { accepts(compiled, it.entry) }
             publishLocked()
         }
-        _ui.update { it.copy(regexInvalid = compiled.regexInvalid) }
+        _ui.update { it.copy(regexInvalid = compiled.regexInvalid || stack.regexInvalid) }
     }
 
     private fun resolveUid(packageName: String?): Int? =
@@ -495,27 +551,6 @@ class StreamViewModel @Inject constructor(
         super.onCleared()
     }
 
-    private fun toEntity(f: LogFilter) = FilterEntity(
-        id = f.id,
-        name = f.name,
-        minLevel = f.minLevel.name,
-        query = f.query,
-        excludeQuery = f.excludeQuery,
-        tagQuery = f.tagQuery,
-        useRegex = f.useRegex,
-        packageName = f.packageName,
-    )
-
-    private fun toModel(e: FilterEntity) = LogFilter(
-        id = e.id,
-        name = e.name,
-        minLevel = io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.valueOf(e.minLevel),
-        query = e.query,
-        excludeQuery = e.excludeQuery,
-        tagQuery = e.tagQuery,
-        useRegex = e.useRegex,
-        packageName = e.packageName,
-    )
 }
 
 /**

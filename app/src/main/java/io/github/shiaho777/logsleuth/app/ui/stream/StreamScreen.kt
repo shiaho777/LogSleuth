@@ -196,6 +196,10 @@ fun StreamScreen(
     val selHi = maxOf(selAnchor, selEnd)
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
+    val filterSavedMsg = stringResource(R.string.filter_saved_from_line)
+    LaunchedEffect(ui.filterNotice) {
+        if (ui.filterNotice > 0) snackbar.showSnackbar(filterSavedMsg)
+    }
 
     // Clear / save scope picker — one shared dialog, two actions.
     var scopeDialog by remember { mutableStateOf<ScopeAction?>(null) }
@@ -448,6 +452,8 @@ fun StreamScreen(
             ) {
                 RecordingBanner(
                     lineCount = ui.recording.lineCount,
+                    paused = ui.recording.paused,
+                    onPause = viewModel::toggleRecordingPause,
                     onStop = viewModel::toggleRecording,
                 )
             }
@@ -475,6 +481,7 @@ fun StreamScreen(
                     onFilterChange = viewModel::setFilter,
                     onSavePreset = viewModel::savePreset,
                     onApplyPreset = viewModel::applyPreset,
+                    onManageFilters = { onNavigate(Routes.FILTERS) },
                 )
             }
 
@@ -505,6 +512,7 @@ fun StreamScreen(
                         selEnd = selEnd,
                         onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
                         onSelectExtend = { seq -> selEnd = seq },
+                        onMakeFilter = { viewModel.saveFilterFromLine(it) },
                         onUserTouch = { down ->
                             touching = down
                             if (!down) pullAccum = 0f
@@ -537,6 +545,14 @@ fun StreamScreen(
                 SelectionBar(
                     visible = selecting,
                     count = ui.entries.count { it.seq in selLo..selHi },
+                    onSave = {
+                        val selected = ui.entries
+                            .filter { it.seq in selLo..selHi }
+                            .map { it.entry }
+                        selAnchor = -1L
+                        selEnd = -1L
+                        if (selected.isNotEmpty()) viewModel.saveSelection(selected)
+                    },
                     onCopy = {
                         val text = ui.entries
                             .filter { it.seq in selLo..selHi }
@@ -650,10 +666,23 @@ private enum class ScopeAction { CLEAR, SAVE }
 
 /** Slim banner shown while a recording is active. */
 @Composable
-private fun RecordingBanner(lineCount: Long, onStop: () -> Unit) {
+private fun RecordingBanner(
+    lineCount: Long,
+    paused: Boolean,
+    onPause: () -> Unit,
+    onStop: () -> Unit,
+) {
     Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        color = if (paused) {
+            MaterialTheme.colorScheme.tertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.errorContainer
+        },
+        contentColor = if (paused) {
+            MaterialTheme.colorScheme.onTertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.onErrorContainer
+        },
     ) {
         Row(
             modifier = Modifier
@@ -661,18 +690,38 @@ private fun RecordingBanner(lineCount: Long, onStop: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.error),
-            )
+            if (paused) {
+                Icon(
+                    Icons.Default.Pause,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.error),
+                )
+            }
             Spacer(Modifier.size(10.dp))
             Text(
-                text = stringResource(R.string.recording_banner, lineCount),
+                text = stringResource(
+                    if (paused) R.string.recording_banner_paused else R.string.recording_banner,
+                    lineCount,
+                ),
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.weight(1f),
             )
+            TextButton(onClick = onPause) {
+                Icon(
+                    if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(stringResource(if (paused) R.string.resume else R.string.pause))
+            }
             TextButton(onClick = onStop) {
                 Icon(
                     Icons.Default.Stop,
@@ -847,6 +896,7 @@ private fun LogList(
     selEnd: Long,
     onSelectStart: (Long) -> Unit,
     onSelectExtend: (Long) -> Unit,
+    onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit = {},
     onUserTouch: (Boolean) -> Unit = {},
     onUserDrag: (Float) -> Unit = {},
 ) {
@@ -911,6 +961,7 @@ private fun LogList(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSelectStart(uiEntry.seq)
                 },
+                onMakeFilter = onMakeFilter,
             )
         }
     }
@@ -921,6 +972,7 @@ private fun LogList(
 private fun SelectionBar(
     visible: Boolean,
     count: Int,
+    onSave: () -> Unit,
     onCopy: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
@@ -945,6 +997,15 @@ private fun SelectionBar(
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Spacer(Modifier.size(8.dp))
+                TextButton(onClick = onSave) {
+                    Icon(
+                        Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(stringResource(R.string.selection_save))
+                }
                 TextButton(onClick = onCopy) {
                     Icon(
                         Icons.Default.ContentCopy,

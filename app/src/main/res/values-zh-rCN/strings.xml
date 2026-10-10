@@ -4,7 +4,7 @@
 
     <!-- 引导 -->
     <string name="setup_title">设置日志访问</string>
-    <string name="setup_explainer">从 Android 4.1 开始,应用无法读取其他 App 的日志,需要一次性授权。请从下面两条免 Root 路径中选一条。</string>
+    <string name="setup_explainer">从 Android 4.1 开始,应用无法读取其他 App 的日志,需要一次授权。Shizuku 和 ADB 命令不需要 Root。如果这台设备已经有 Root,也可以直接用。</string>
     <string name="setup_shizuku_title">Shizuku(推荐)</string>
     <string name="setup_shizuku_desc">免 Root,Android 11+ 可通过无线调试在手机上直接激活。支持按应用过滤,日志流最稳定。</string>
     <string name="setup_shizuku_not_installed">未安装 Shizuku</string>
@@ -14,6 +14,13 @@
     <string name="setup_get_shizuku">获取 Shizuku</string>
     <string name="setup_open_shizuku">打开 Shizuku</string>
     <string name="setup_grant_shizuku">授权</string>
+    <string name="setup_root_title">Root</string>
+    <string name="setup_root_desc">装了 Magisk、KernelSU 或 APatch 时,Root 和 Shizuku 一样能读到全部日志。你不点,就不会去要权限。</string>
+    <string name="setup_root_grant">使用 Root</string>
+    <string name="setup_root_ready">Root 已就绪</string>
+    <string name="setup_root_denied">Root 被拒绝</string>
+    <string name="setup_root_unknown">尚未请求</string>
+    <string name="setup_root_checking">正在等待 Root 管理器…</string>
     <string name="setup_adb_title">ADB 一次性授权</string>
     <string name="setup_adb_desc">有电脑时执行一次下面的命令即可,卸载前一直有效。</string>
     <string name="setup_copy_command">复制命令</string>
@@ -32,7 +39,7 @@
     <string name="scroll_top">回到顶部</string>
     <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
     <string name="no_access_title">还没有日志访问权限</string>
-    <string name="no_access_desc">LogSleuth 需要 Shizuku 或一次性 ADB 授权才能读取设备日志。</string>
+    <string name="no_access_desc">LogSleuth 需要 Shizuku、Root,或一次性 ADB 授权才能读取设备日志。</string>
     <string name="no_access_action">去设置</string>
 
     <!-- 过滤器 -->
@@ -79,6 +86,15 @@
     <string name="settings_access">日志访问权限</string>
     <string name="settings_access_shizuku">已通过 Shizuku 连接</string>
     <string name="settings_access_adb">已通过 ADB 授权(READ_LOGS)</string>
+    <string name="settings_access_root">已通过 Root 连接</string>
+    <string name="settings_access_mode">优先使用</string>
+    <string name="settings_access_mode_desc">自动顺序是 Shizuku,然后 Root,然后 ADB 授权。选中的路径没授权时,会落到下一条可用的。</string>
+    <string name="settings_root">使用 Root</string>
+    <string name="settings_root_desc">会向 Root 管理器请求授权。保持关闭时,没 Root 的手机不会弹出对话框。</string>
+    <string name="access_mode_auto">自动</string>
+    <string name="access_mode_shizuku">Shizuku</string>
+    <string name="access_mode_root">Root</string>
+    <string name="access_mode_adb">ADB</string>
     <string name="settings_access_open">打开设置向导</string>
     <string name="settings_buffer_size">缓冲区大小</string>
     <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
@@ -272,5 +288,51 @@
     <string name="update_status_done">已完成</string>
     <string name="update_status_failed">失败</string>
     <string name="update_history">历史版本</string>
+
+    <!-- Stackable filters -->
+    <string name="filter_manage">规则</string>
+    <string name="filter_stack_hint">打开开关后，这条规则加入叠加。包含规则：命中任意一条就留下。排除规则：命中就丢掉。上方过滤栏仍然同时生效。</string>
+    <string name="filter_including">包含</string>
+    <string name="filter_excluding">排除</string>
+    <string name="filter_enabled">启用</string>
+    <string name="filter_pid">PID</string>
+    <string name="filter_tid">TID</string>
+    <string name="filter_uid">UID</string>
+    <string name="filter_export">导出</string>
+    <string name="filter_import">导入</string>
+    <string name="filter_import_failed">无法读取这份过滤规则文件</string>
+    <string name="filter_import_ok">已导入 %1$d 条规则</string>
+    <string name="filter_saved_from_line">已为这一行保存一条包含规则</string>
+    <string name="filter_from_line">存为规则</string>
+    <string name="selection_save">保存</string>
+
+    <!-- Recording pause -->
+    <string name="recording_banner_paused">录制已暂停 · %1$d 行</string>
+    <string name="notif_recording_paused">录制已暂停</string>
+    <string name="notif_action_pause">暂停</string>
+    <string name="notif_action_resume">继续</string>
+
+    <!-- Crash blacklist and boot watch -->
+    <string name="crash_ignore">忽略此应用</string>
+    <string name="crash_ignored">将忽略 %1$s 的崩溃</string>
+    <string name="settings_crash_blacklist">已忽略的应用</string>
+    <string name="settings_crash_blacklist_desc">这些包名的崩溃和 ANR 会被丢掉。</string>
+    <string name="settings_watch_boot">开机后继续监听崩溃</string>
+    <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 没打开时也能抓到崩溃。</string>
+    <string name="notif_channel_watch">崩溃监听</string>
+    <string name="notif_watch_title">正在监听崩溃</string>
+    <string name="notif_watch_text">LogSleuth 在后台听着日志</string>
+
+    <!-- Log columns -->
+    <string name="settings_columns">日志列</string>
+    <string name="settings_col_time">时间</string>
+    <string name="settings_col_pid">PID</string>
+    <string name="settings_col_tid">TID</string>
+    <string name="settings_col_tag">Tag</string>
+    <string name="settings_col_package">应用</string>
+    <string name="settings_time_format">时间格式</string>
+    <string name="time_format_clock">时钟</string>
+    <string name="time_format_datetime">日期和时间</string>
+    <string name="time_format_epoch">时间戳</string>
 
 </resources>

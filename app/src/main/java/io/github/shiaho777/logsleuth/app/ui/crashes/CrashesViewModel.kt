@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
+import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 class CrashesViewModel @Inject constructor(
     private val crashEventDao: CrashEventDao,
     private val exporter: SessionExporter,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     val crashes: StateFlow<List<CrashEventEntity>> = crashEventDao.observeAll()
@@ -49,6 +51,10 @@ class CrashesViewModel @Inject constructor(
 
     private fun delete(id: Long) {
         viewModelScope.launch { crashEventDao.deleteById(id) }
+    }
+
+    fun ignore(packageName: String) {
+        viewModelScope.launch { settingsRepository.ignorePackage(packageName) }
     }
 
     fun share(crash: CrashEventEntity) {

@@ -8,6 +8,7 @@ import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.BubbleService
+import io.github.shiaho777.logsleuth.app.service.CrashWatchService
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,17 @@ class LogSleuthApp : Application() {
         // A previous process may have died mid-recording.
         recordingManager.reconcileInterruptedSessions()
         restoreBubble()
+        restoreWatch()
+    }
+
+    /** Brings the crash watch back after the process is recreated while the
+     *  user still wants it. Boot itself is handled by [BootReceiver]. */
+    private fun restoreWatch() {
+        scope.launch {
+            if (settingsRepository.settings.first().watchOnBoot) {
+                runCatching { CrashWatchService.start(this@LogSleuthApp) }
+            }
+        }
     }
 
     /** Restarts the floating controls after a process restart when the

@@ -1,6 +1,6 @@
 # LogSleuth
 
-**强大、免 Root 的安卓日志查看器 + 内嵌日志 SDK。**
+**强大的安卓日志查看器 + 内嵌日志 SDK。**
 目标是做安卓上操作最方便、体验最好的日志工具。
 
 [English](README.md)
@@ -28,8 +28,8 @@
 LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作:
 
 - **查看器 App**——面向全设备的 Logcat 风格实时日志查看器,Kotlin +
-  Jetpack Compose(Material 3)编写。免 Root:经 Shizuku 或 ADB 一次性授权
-  即可解锁全部功能。
+  Jetpack Compose(Material 3)编写。Shizuku、Root,或一次 ADB 授权都能
+  读到设备日志。手机没有 Root 时,仍然推荐 Shizuku。
 - **`logsleuth-sdk`**——嵌入你自己 App 的日志库,**零权限、零网络**地
   记录本应用的日志、崩溃与 ANR,打包成 zip 让用户一键发给你。查看器
   App 可以直接打开这些 zip 回放。
@@ -53,7 +53,7 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 | --- | --- |
 | 过滤器 | 级别阈值(V–A)、Tag、关键字、排除模式、正则开关——可组合 |
 | 过滤预设 | 一组条件存成预设随取随用,预设拥有独立管理页 |
-| 按应用过滤 | 流上方芯片,只看某个 App 的日志(包名解析需 Shizuku) |
+| 按应用过滤 | 流上方芯片,只看某个 App 的日志(包名来自 uid 列,需要 Shizuku 或 Root) |
 | 应用选择器 | 已安装应用列表,带图标与各应用行数统计 |
 
 ### 就地操作
@@ -99,7 +99,7 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 | 功能 | 说明 |
 | --- | --- |
 | 使用引导 | 17 步手把手引导,直接驱动真实 UI;随时可从 设置 → 关于 重播 |
-| 权限向导 | Shizuku 状态卡 + 可复制的 ADB 授权命令,就地复检 |
+| 权限向导 | Shizuku、可选的 Root 卡片,以及可复制的 ADB 授权命令,就地复检 |
 | 双语 | English / 简体中文,应用内语言可覆盖系统 |
 | 主题与字号 | 跟随系统 / 浅色 / 深色;日志字号紧凑 / 默认 / 舒适 |
 | 应用内更新 | GitHub Releases 检查、发行说明、APK 断点续传(暂停/继续/取消)、一键安装、版本历史 |
@@ -128,17 +128,21 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 ### 2. 授予日志权限
 
 从 Android 4.1 起,应用无法读取其他 App 的日志——这是平台限制,对所有
-日志类 App 一视同仁。二选一,一次性授权:
+日志类 App 一视同仁。下面任一授权都够用:
 
 1. **Shizuku(推荐)**——无需 Root,Android 11+ 可经"无线调试"在手机上
    直接激活,无需电脑。安装 [Shizuku](https://shizuku.rikka.app/),启动
    一次,授权 LogSleuth 即可;顺带解锁按应用过滤。
-2. **ADB 一次性授权**——有电脑的话执行一次即可(卸载前一直有效):
+2. **Root**——手机上已经有 Magisk、KernelSU 或 APatch 时,在权限向导里
+   打开 Root。LogSleuth 在你点下去之前不会执行 `su`,所以没 Root 的手机
+   不会弹出授权框。Root 和 Shizuku 一样能读全部日志,也包括按应用过滤。
+   自动模式在两者都可用时仍优先 Shizuku;可以在设置里把 Root 放到前面。
+3. **ADB 一次性授权**——有电脑的话执行一次即可(卸载前一直有效):
    ```bash
    adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
    ```
 
-首次启动的权限向导会带你走完任一路径;之后随时可从 设置 → 日志权限 →
+首次启动的权限向导会带你看这些路径;之后随时可从 设置 → 日志权限 →
 "打开设置向导"重进。
 
 ### 3. 跟着引导走一遍
@@ -152,7 +156,7 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 - **"用户反馈某 App 老崩溃"** → 报告页 → 选中该应用 → 开始录制 → 把手机
   交给对方 → 停止并分享。窗口期内的崩溃自动标记附带。
 - **"日志太吵"** → 展开过滤栏,级别拉到 ≥ Warn 加 Tag/关键字——或按
-  应用过滤(Shizuku)。常用组合可存成预设。
+  应用过滤(Shizuku 或 Root)。常用组合可存成预设。
 - **"我要标记出事那一刻"** → 开启悬浮控件(需悬浮窗权限)或用快捷开关
   瓷贴:不用离开被测应用就能录制 + 打书签。
 - **"收到一份日志 zip / txt"** → 直接用 LogSleuth 打开,或在会话页点
@@ -210,7 +214,7 @@ zip 包含 `device.txt`(厂商/机型/Android 版本)、`meta.txt` 和日志文�
 ## 架构
 
 ```text
-LogcatSource(本机 READ_LOGS / Shizuku shell)
+LogcatSource(本机 READ_LOGS / Shizuku shell / Root shell)
   → LogcatEngine(唯一的 logcat 进程持有者,断线自动重连)
       ├→ 实时日志流 UI(级别着色、过滤、搜索、暂停缓冲)
       ├→ RecordingManager(前台服务 → 会话文件 + Room)
@@ -228,7 +232,7 @@ App 声明的每个权限及用途:
 
 | 权限 | 用途 |
 | --- | --- |
-| `READ_LOGS` | 读取设备日志(经 Shizuku 或 ADB 命令授予——本应用的核心) |
+| `READ_LOGS` | 走 ADB 授权时读取设备日志。Shizuku 和 Root 则通过 shell 读日志 |
 | `moe.shizuku…API_V23` | 与 Shizuku 服务通信 |
 | `FOREGROUND_SERVICE` + `…_DATA_SYNC` | 保持后台录制存活 |
 | `POST_NOTIFICATIONS` | 录制状态、崩溃/ANR 提醒、自动停止通知 |

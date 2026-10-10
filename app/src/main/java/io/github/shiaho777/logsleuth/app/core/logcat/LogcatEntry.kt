@@ -40,14 +40,6 @@ data class LogcatEntry(
 ) {
     val displayTime: String
         get() {
-            val cal = java.util.Calendar.getInstance().apply { timeInMillis = timestampMillis }
-            return "%02d-%02d %02d:%02d:%02d.%03d".format(
-                cal.get(java.util.Calendar.MONTH) + 1,
-                cal.get(java.util.Calendar.DAY_OF_MONTH),
-                cal.get(java.util.Calendar.HOUR_OF_DAY),
-                cal.get(java.util.Calendar.MINUTE),
-                cal.get(java.util.Calendar.SECOND),
-                cal.get(java.util.Calendar.MILLISECOND),
-            )
+            return UidNames.formatThreadTime(timestampMillis)
         }
 }

@@ -1,1 +1,1 @@
-免 Root 的安卓日志查看器与内嵌日志 SDK
+安卓日志查看器与内嵌日志 SDK,支持 Shizuku、Root 或 ADB

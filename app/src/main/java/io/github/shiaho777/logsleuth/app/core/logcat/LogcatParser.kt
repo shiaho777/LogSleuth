@@ -16,33 +16,49 @@ sealed interface ParsedLine {
  *
  *   `MM-DD HH:MM:SS.mmm [UID] PID TID LEVEL TAG      : message`
  *
+ * The uid column may be a decimal, a multi-user token (`u0a123`), or a
+ * well-known name (`system`). See [UidNames].
+ *
  * threadtime has no year; it is inferred as the current year and corrected
  * around New Year (a "future" date is moved one year back).
  */
 object LogcatParser {
 
     private val THREADTIME =
-        Regex("""^(\d{2}-\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+((?:\d+\s+)+)([VDIWEFA])\s+(.*?)\s*:\s(.*)$""")
+        Regex("""^(\d{2}-\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+(.*)$""")
+
+    /**
+     * Optional uid token, then pid, tid, level, tag, message.
+     * The uid alternative backtracks when the line has no uid column:
+     * `4567 4589 D Tag: msg` fails the three-field shape and retries as two.
+     */
+    private val FIELDS =
+        Regex("""^(?:(\S+)\s+)?(\d+)\s+(\d+)\s+([VDIWEFA])\s+(.*?)\s*:\s(.*)$""")
 
     fun parse(line: String, nowMillis: Long = System.currentTimeMillis()): ParsedLine {
         // Readers that split on '\n' alone leave a stray '\r' on CRLF files.
         val clean = line.removeSuffix("\r")
-        val m = THREADTIME.matchEntire(clean) ?: return ParsedLine.Continuation(clean)
+        val head = THREADTIME.matchEntire(clean) ?: return ParsedLine.Continuation(clean)
+        val fields = FIELDS.matchEntire(head.groupValues[6]) ?: return ParsedLine.Continuation(clean)
 
-        val nums = m.groupValues[6].trim().split(Regex("""\s+""")).mapNotNull { it.toIntOrNull() }
-        val (uid, pid, tid) = when (nums.size) {
-            2 -> Triple(null, nums[0], nums[1])
-            3 -> Triple(nums[0], nums[1], nums[2])
-            else -> return ParsedLine.Continuation(clean)
-        }
+        val uidToken = fields.groupValues[1].takeIf { it.isNotEmpty() }
+        val uid = uidToken?.let { UidNames.resolve(it) }
+        // A uid-looking token that resolves to nothing is still a real column
+        // (OEM name we don't know). Dropping the line would hide the log;
+        // keeping it with a null uid just loses per-app grouping.
+        val pid = fields.groupValues[2].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val tid = fields.groupValues[3].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val levelLetter = fields.groupValues[4]
+        val tag = fields.groupValues[5].trim()
+        val message = fields.groupValues[6]
 
-        val monthDay = m.groupValues[1]
+        val monthDay = head.groupValues[1]
         val month = monthDay.substring(0, 2).toIntOrNull() ?: return ParsedLine.Continuation(clean)
         val day = monthDay.substring(3, 5).toIntOrNull() ?: return ParsedLine.Continuation(clean)
-        val hour = m.groupValues[2].toIntOrNull() ?: return ParsedLine.Continuation(clean)
-        val minute = m.groupValues[3].toIntOrNull() ?: return ParsedLine.Continuation(clean)
-        val second = m.groupValues[4].toIntOrNull() ?: return ParsedLine.Continuation(clean)
-        val milli = m.groupValues[5].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val hour = head.groupValues[2].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val minute = head.groupValues[3].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val second = head.groupValues[4].toIntOrNull() ?: return ParsedLine.Continuation(clean)
+        val milli = head.groupValues[5].toIntOrNull() ?: return ParsedLine.Continuation(clean)
 
         val cal = Calendar.getInstance().apply {
             timeInMillis = nowMillis
@@ -63,9 +79,9 @@ object LogcatParser {
             pid = pid,
             tid = tid,
             uid = uid,
-            level = LogLevel.from(m.groupValues[7].first()),
-            tag = m.groupValues[8].trim(),
-            message = m.groupValues[9],
+            level = LogLevel.from(levelLetter.first()),
+            tag = tag,
+            message = message,
             raw = clean,
         )
         return ParsedLine.Entry(entry)

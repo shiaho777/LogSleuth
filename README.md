@@ -1,6 +1,6 @@
 # LogSleuth
 
-**A powerful, root-free logcat viewer & embedded logging SDK for Android.**
+**A powerful logcat viewer and embedded logging SDK for Android.**
 On a mission to be the easiest and most delightful logging tool on Android.
 
 [简体中文](README.zh-CN.md)
@@ -29,8 +29,9 @@ LogSleuth is an open-source (Apache-2.0) Android logging toolkit with two
 halves that work together:
 
 - **The viewer app** — a polished, Logcat-style live reader for the whole
-  device, written in Kotlin + Jetpack Compose (Material 3). No root: one
-  grant via Shizuku or ADB unlocks everything.
+  device, written in Kotlin + Jetpack Compose (Material 3). Shizuku, root,
+  or one ADB grant unlocks the device log. Shizuku stays the recommended
+  path when the phone is not rooted.
 - **`logsleuth-sdk`** — a drop-in library for your own app that records its
   logs, crashes and ANRs **with zero permissions and zero network**, then
   packages them into a zip your users can send you. LogSleuth the viewer
@@ -55,7 +56,7 @@ halves that work together:
 | --- | --- |
 | Filters | Level threshold (V–A), tag, keyword, exclude-pattern, regex toggle — combinable |
 | Filter presets | Save a filter combo, reapply it later; presets manage their own screen |
-| Per-app filter | Chip over the stream filters to one app (needs Shizuku for package resolution) |
+| Per-app filter | Chip over the stream filters to one app (package names need the uid column, so Shizuku or root) |
 | App picker | Installed-app list with icons and per-app line stats |
 
 ### Act on what you see
@@ -101,7 +102,7 @@ halves that work together:
 | Feature | Details |
 | --- | --- |
 | Guided tour | A 17-step hands-on tour that drives the real UI — replay it anytime from Settings → About |
-| Setup wizard | Shizuku status card + copyable ADB grant command, re-checkable in place |
+| Setup wizard | Shizuku, an opt-in root card, and a copyable ADB grant, re-checkable in place |
 | Bilingual | English & 简体中文, plus an in-app language override |
 | Themes & text | System / Light / Dark themes; Compact / Default / Comfortable log text sizes |
 | In-app updates | GitHub Releases check, release notes, resumable APK download (pause/resume/cancel), one-tap install, version history |
@@ -129,18 +130,23 @@ Grab the APK from [Releases](https://github.com/shiaho777/LogSleuth/releases) an
 ### 2. Grant log access
 
 Since Android 4.1, apps cannot read other apps' logs — a platform rule that
-applies to every logcat app. One of these two one-time grants is required:
+applies to every logcat app. Any one of these grants is enough:
 
 1. **Shizuku (recommended)** — no root, no PC needed on Android 11+ via
    Wireless Debugging. Install [Shizuku](https://shizuku.rikka.app/), start it
    once, and authorize LogSleuth. This also unlocks per-app filtering.
-2. **ADB one-time grant** — with a PC, run once (persists until uninstall):
+2. **Root** — if the phone already runs Magisk, KernelSU, or APatch, turn
+   root on in the setup wizard. LogSleuth does not exec `su` until you ask,
+   so an unrooted phone never sees a grant dialog. Root reads the same full
+   log as Shizuku, including per-app filtering. Auto mode still prefers
+   Shizuku when both are available; Settings can put root first.
+3. **ADB one-time grant** — with a PC, run once (persists until uninstall):
    ```bash
    adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
    ```
 
-The setup wizard walks you through either path on first launch and can be
-reopened any time from Settings → Log access → "Open setup guide".
+The setup wizard walks you through these on first launch and can be reopened
+any time from Settings → Log access → "Open setup guide".
 
 ### 3. Take the tour
 
@@ -155,7 +161,7 @@ guided tour".
   start recording → hand them the phone → Stop & share. Crashes inside the
   window are flagged and attached automatically.
 - **"It's too noisy"** → unfold the filter bar, set level ≥ Warn and a tag or
-  keyword — or filter by app (Shizuku). Save the combo as a preset.
+  keyword — or filter by app (Shizuku or root). Save the combo as a preset.
 - **"I need to mark when it happened"** → enable Floating controls (needs the
   overlay permission) or use the Quick Settings tile: record + bookmark
   without leaving the app under test.
@@ -216,7 +222,7 @@ so your support flow is "send me the zip" → they open it → you replay it.
 ## Architecture
 
 ```text
-LogcatSource (local READ_LOGS / Shizuku shell)
+LogcatSource (local READ_LOGS / Shizuku shell / root shell)
   → LogcatEngine (single owner of the logcat process, auto-reconnect)
       ├→ Stream UI (level colors, filters, search, pause/buffering)
       ├→ RecordingManager (foreground service → session files + Room)
@@ -234,7 +240,7 @@ Everything the app asks for, and why:
 
 | Permission | Used for |
 | --- | --- |
-| `READ_LOGS` | Reading the device log (granted via Shizuku or the ADB command — the whole point) |
+| `READ_LOGS` | Device log when you use the ADB grant. Shizuku and root read logs through a shell instead |
 | `moe.shizuku…API_V23` | Talking to the Shizuku service |
 | `FOREGROUND_SERVICE` + `…_DATA_SYNC` | Keeping background recording alive |
 | `POST_NOTIFICATIONS` | Recording status, crash/ANR alerts, auto-stop notices |

@@ -26,7 +26,7 @@ Instructions for coding agents working in this repository.
 ## How the main pieces connect
 
 ```text
-LogcatSource (local / Shizuku)
+LogcatSource (local / Shizuku / root)
   → LogcatEngine (singleton, owns THE logcat process)
       SharedFlow<LogcatEntry> ─┬→ StreamViewModel (120ms batches) → UI list
                                 ├→ RecordingManager → session file + Room row
@@ -43,8 +43,10 @@ Mental model:
 
 - **The engine is the single logcat owner.** UI and services consume its
   SharedFlow. Never spawn `logcat` anywhere else.
-- The engine reconnects with backoff when the process dies; Shizuku grant
-  changes restart it immediately.
+- The engine reconnects with backoff when the process dies. A Shizuku or
+  root grant change restarts it when that change switches the active path.
+  Auto mode tries Shizuku, then root, then the ADB grant, so an existing
+  Shizuku setup does not open a root shell.
 - Recordings honor the *full* active filter (level/query/tag/exclude/regex +
   package) so what gets recorded matches what the user sees.
 - The SDK runs in a different process entirely — it may only read its host
@@ -63,12 +65,14 @@ Mental model:
 
 ## Platform constraints (do not "fix" these)
 
-- Reading other apps' logs requires Shizuku or
-  `adb shell pm grant <pkg> android.permission.READ_LOGS`. There is no third
-  way. The SDK mode reads only the host app's own logs.
-- PID→package mapping beyond the logcat `uid` column is only possible via
-  shell (Shizuku).
-- SDK stays permission-free and network-free by design.
+- Reading other apps' logs takes one of three grants: Shizuku, root
+  (libsu, **viewer app only**, opt-in — do not exec `su` until the user
+  turns it on), or `adb shell pm grant <pkg> android.permission.READ_LOGS`.
+  The SDK reads only the host app's own logs and must not depend on libsu.
+- PID→package mapping beyond the logcat `uid` column needs a shell
+  (Shizuku or root). The uid column itself is available on those two paths.
+- SDK stays permission-free and network-free by design. Root support lives
+  in the viewer only.
 
 ## Workflow
 

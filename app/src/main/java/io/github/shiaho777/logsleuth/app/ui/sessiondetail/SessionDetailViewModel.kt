@@ -8,15 +8,16 @@ import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.data.db.toEntity
+import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
-import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkEntity
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.db.FilterDao
-import io.github.shiaho777.logsleuth.app.data.db.FilterEntity
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.stream.UiLogEntry
@@ -61,6 +62,9 @@ class SessionDetailViewModel @Inject constructor(
 
     private var all = emptyList<UiLogEntry>()
 
+    @Volatile
+    private var enabledStack = FilterStack.PASS
+
     init {
         viewModelScope.launch {
             val session = sessionDao.getById(sessionId)
@@ -82,7 +86,12 @@ class SessionDetailViewModel @Inject constructor(
         }
         viewModelScope.launch { _ui.update { it.copy(apps = installedApps.load()) } }
         viewModelScope.launch {
-            filterDao.observeAll().collect { list -> _ui.update { it.copy(presets = list.map(::toModel)) } }
+            filterDao.observeAll().collect { list ->
+                val models = list.map { it.toLogFilter() }
+                enabledStack = FilterStack.compile(models, ::resolveUid)
+                _ui.update { it.copy(presets = models) }
+                if (all.isNotEmpty()) applyFilter(_ui.value.filter)
+            }
         }
     }
 
@@ -95,16 +104,19 @@ class SessionDetailViewModel @Inject constructor(
 
     fun savePreset(name: String) {
         viewModelScope.launch {
-            filterDao.insert(toEntity(_ui.value.filter.copy(name = name)))
+            filterDao.insert(_ui.value.filter.copy(name = name, id = 0).toEntity())
         }
     }
 
     private suspend fun applyFilter(filter: LogFilter) {
         val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
+        val stack = enabledStack
         val filtered = withContext(Dispatchers.Default) {
-            all.filter { compiled.matches(it.entry) }
+            all.filter { compiled.matches(it.entry) && stack.matches(it.entry) }
         }
-        _ui.update { it.copy(entries = filtered, regexInvalid = compiled.regexInvalid) }
+        _ui.update {
+            it.copy(entries = filtered, regexInvalid = compiled.regexInvalid || stack.regexInvalid)
+        }
     }
 
     private suspend fun parseFile(session: SessionEntity): List<UiLogEntry> =
@@ -128,28 +140,6 @@ class SessionDetailViewModel @Inject constructor(
     // only meaningful for sessions captured on this device (imported SDK
     // bundles carry no uid column and match nothing either way).
     private fun resolveUid(packageName: String?): Int? = installedApps.resolveUid(packageName)
-
-    private fun toEntity(f: LogFilter) = FilterEntity(
-        id = f.id,
-        name = f.name,
-        minLevel = f.minLevel.name,
-        query = f.query,
-        excludeQuery = f.excludeQuery,
-        tagQuery = f.tagQuery,
-        useRegex = f.useRegex,
-        packageName = f.packageName,
-    )
-
-    private fun toModel(e: FilterEntity) = LogFilter(
-        id = e.id,
-        name = e.name,
-        minLevel = LogLevel.valueOf(e.minLevel),
-        query = e.query,
-        excludeQuery = e.excludeQuery,
-        tagQuery = e.tagQuery,
-        useRegex = e.useRegex,
-        packageName = e.packageName,
-    )
 
     fun share(format: SessionExporter.Format) {
         viewModelScope.launch {

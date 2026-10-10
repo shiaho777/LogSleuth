@@ -9,11 +9,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
+import io.github.shiaho777.logsleuth.app.core.root.RootManager
+import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.core.update.ReleaseInfo
 import io.github.shiaho777.logsleuth.app.core.update.UpdateManager
 import io.github.shiaho777.logsleuth.app.data.prefs.Settings
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.BubbleService
+import io.github.shiaho777.logsleuth.app.service.CrashWatchService
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,14 +28,17 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
     private val settingsRepository: SettingsRepository,
     private val engine: LogcatEngine,
+    private val rootManager: RootManager,
     private val updateManager: UpdateManager,
 ) : ViewModel() {
 
     val settings: StateFlow<Settings?> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Live log-access state — Shizuku grant changes push through the engine. */
+    /** Live log-access state — grant changes push through the engine. */
     val access: StateFlow<AccessState> = engine.access
+
+    val rootStatus: StateFlow<RootStatus> = rootManager.status
 
     /** Called when the screen opens: an ADB grant has no event bus, so the
      *  access state only refreshes when someone asks. */
@@ -64,6 +70,51 @@ class SettingsViewModel @Inject constructor(
 
     fun setRecordingMaxHours(value: Int) = viewModelScope.launch {
         settingsRepository.setRecordingMaxHours(value)
+    }
+
+    fun setWatchOnBoot(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setWatchOnBoot(value)
+        if (value) {
+            runCatching { CrashWatchService.start(context) }
+        } else {
+            context.stopService(Intent(context, CrashWatchService::class.java))
+        }
+    }
+
+    fun unignorePackage(packageName: String) = viewModelScope.launch {
+        settingsRepository.unignorePackage(packageName)
+    }
+
+    fun setShowLogTime(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogTime(value)
+    }
+
+    fun setShowLogPid(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogPid(value)
+    }
+
+    fun setShowLogTid(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogTid(value)
+    }
+
+    fun setShowLogTag(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogTag(value)
+    }
+
+    fun setShowLogPackage(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogPackage(value)
+    }
+
+    fun setLogTimeFormat(value: String) = viewModelScope.launch {
+        settingsRepository.setLogTimeFormat(value)
+    }
+
+    fun setRootEnabled(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setRootEnabled(value)
+    }
+
+    fun setAccessPreference(value: String) = viewModelScope.launch {
+        settingsRepository.setAccessPreference(value)
     }
 
     /** Toggles the floating bubble; returns false when the overlay permission

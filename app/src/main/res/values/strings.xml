@@ -4,7 +4,7 @@
 
     <!-- Setup -->
     <string name="setup_title">Set up log access</string>
-    <string name="setup_explainer">Since Android 4.1, apps cannot read other apps\' logs without a one-time grant. Pick one of the two root-free paths below.</string>
+    <string name="setup_explainer">Since Android 4.1, apps cannot read other apps\' logs without a grant. Shizuku and the ADB command need no root. Root also works, if this device already has it.</string>
     <string name="setup_shizuku_title">Shizuku (recommended)</string>
     <string name="setup_shizuku_desc">No root, no PC on Android 11+ via Wireless Debugging. Enables per-app filtering and the most reliable stream.</string>
     <string name="setup_shizuku_not_installed">Shizuku is not installed</string>
@@ -14,6 +14,13 @@
     <string name="setup_get_shizuku">Get Shizuku</string>
     <string name="setup_open_shizuku">Open Shizuku</string>
     <string name="setup_grant_shizuku">Grant permission</string>
+    <string name="setup_root_title">Root</string>
+    <string name="setup_root_desc">With Magisk, KernelSU, or APatch, root reads the full log the same way Shizuku does. Nothing runs until you ask.</string>
+    <string name="setup_root_grant">Use root</string>
+    <string name="setup_root_ready">Root is ready</string>
+    <string name="setup_root_denied">Root was denied</string>
+    <string name="setup_root_unknown">Not requested</string>
+    <string name="setup_root_checking">Waiting for the root manager…</string>
     <string name="setup_adb_title">ADB one-time grant</string>
     <string name="setup_adb_desc">With a computer, run this command once. It stays valid until the app is uninstalled.</string>
     <string name="setup_copy_command">Copy command</string>
@@ -32,7 +39,7 @@
     <string name="scroll_top">Scroll to top</string>
     <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
     <string name="no_access_title">No log access yet</string>
-    <string name="no_access_desc">LogSleuth needs either Shizuku or a one-time ADB grant to read device logs.</string>
+    <string name="no_access_desc">LogSleuth needs Shizuku, root, or a one-time ADB grant to read device logs.</string>
     <string name="no_access_action">Open setup</string>
 
     <!-- Filters -->
@@ -79,6 +86,15 @@
     <string name="settings_access">Log access</string>
     <string name="settings_access_shizuku">Connected via Shizuku</string>
     <string name="settings_access_adb">Granted via ADB (READ_LOGS)</string>
+    <string name="settings_access_root">Connected via root</string>
+    <string name="settings_access_mode">Preferred access</string>
+    <string name="settings_access_mode_desc">Auto tries Shizuku, then root, then the ADB grant. A path that is not granted falls through to the next one.</string>
+    <string name="settings_root">Use root</string>
+    <string name="settings_root_desc">Asks your root manager. Leave this off and an unrooted phone never sees a dialog.</string>
+    <string name="access_mode_auto">Auto</string>
+    <string name="access_mode_shizuku">Shizuku</string>
+    <string name="access_mode_root">Root</string>
+    <string name="access_mode_adb">ADB</string>
     <string name="settings_access_open">Open setup guide</string>
     <string name="settings_buffer_size">Buffer size</string>
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
@@ -272,5 +288,51 @@
     <string name="update_status_done">done</string>
     <string name="update_status_failed">failed</string>
     <string name="update_history">Version history</string>
+
+    <!-- Stackable filters -->
+    <string name="filter_manage">Rules</string>
+    <string name="filter_stack_hint">Turn a rule on to add it to the stack. Including rules keep a line when any of them match. Excluding rules drop a line when they match. The filter bar above still applies on top.</string>
+    <string name="filter_including">Including</string>
+    <string name="filter_excluding">Excluding</string>
+    <string name="filter_enabled">On</string>
+    <string name="filter_pid">PID</string>
+    <string name="filter_tid">TID</string>
+    <string name="filter_uid">UID</string>
+    <string name="filter_export">Export</string>
+    <string name="filter_import">Import</string>
+    <string name="filter_import_failed">Couldn\'t read that filter file</string>
+    <string name="filter_import_ok">Imported %1$d rules</string>
+    <string name="filter_saved_from_line">Saved an including rule for this line</string>
+    <string name="filter_from_line">Save as rule</string>
+    <string name="selection_save">Save</string>
+
+    <!-- Recording pause -->
+    <string name="recording_banner_paused">Recording paused · %1$d lines</string>
+    <string name="notif_recording_paused">Recording paused</string>
+    <string name="notif_action_pause">Pause</string>
+    <string name="notif_action_resume">Resume</string>
+
+    <!-- Crash blacklist and boot watch -->
+    <string name="crash_ignore">Ignore this app</string>
+    <string name="crash_ignored">Crashes from %1$s will be ignored</string>
+    <string name="settings_crash_blacklist">Ignored apps</string>
+    <string name="settings_crash_blacklist_desc">Crashes and ANRs from these packages are dropped.</string>
+    <string name="settings_watch_boot">Watch for crashes after reboot</string>
+    <string name="settings_watch_boot_desc">Keeps a quiet notification so a crash is caught even when LogSleuth isn\'t open.</string>
+    <string name="notif_channel_watch">Crash watch</string>
+    <string name="notif_watch_title">Watching for crashes</string>
+    <string name="notif_watch_text">LogSleuth is listening in the background</string>
+
+    <!-- Log columns -->
+    <string name="settings_columns">Log columns</string>
+    <string name="settings_col_time">Time</string>
+    <string name="settings_col_pid">PID</string>
+    <string name="settings_col_tid">TID</string>
+    <string name="settings_col_tag">Tag</string>
+    <string name="settings_col_package">App</string>
+    <string name="settings_time_format">Time format</string>
+    <string name="time_format_clock">Clock</string>
+    <string name="time_format_datetime">Date and time</string>
+    <string name="time_format_epoch">Epoch</string>
 
 </resources>
