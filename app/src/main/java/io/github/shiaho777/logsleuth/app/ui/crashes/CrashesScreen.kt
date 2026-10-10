@@ -50,7 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -75,7 +75,7 @@ fun CrashesScreen(
     val shown = crashes.filter { it.id != pendingDelete?.id }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     val deletedMessage = stringResource(R.string.crash_deleted)
     val undoLabel = stringResource(R.string.undo)
@@ -143,7 +143,7 @@ fun CrashesScreen(
                                     viewModel.ignore(pkg)
                                     scope.launch {
                                         snackbar.showSnackbar(
-                                            context.getString(R.string.crash_ignored, pkg),
+                                            resources.getString(R.string.crash_ignored, pkg),
                                         )
                                     }
                                 }
