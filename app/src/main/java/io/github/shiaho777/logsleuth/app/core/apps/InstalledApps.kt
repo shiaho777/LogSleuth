@@ -72,4 +72,22 @@ class InstalledApps @Inject constructor(
             context.packageManager.getApplicationInfo(packageName, 0).uid
         }.getOrNull()
     }
+
+    /**
+     * Launchable package for [uid] when several share it; otherwise the
+     * first package Android lists. Null when the uid maps nowhere.
+     */
+    fun packageForUid(uid: Int?): String? {
+        if (uid == null) return null
+        val pkgs = runCatching {
+            context.packageManager.getPackagesForUid(uid)?.toList()
+        }.getOrNull().orEmpty()
+        if (pkgs.isEmpty()) return null
+        val launchable = cached?.mapTo(HashSet()) { it.packageName }
+        return if (launchable != null) {
+            pkgs.firstOrNull { it in launchable } ?: pkgs.first()
+        } else {
+            pkgs.first()
+        }
+    }
 }

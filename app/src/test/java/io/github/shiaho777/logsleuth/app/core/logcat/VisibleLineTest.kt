@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearch
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchSection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -170,5 +171,19 @@ class VisibleLineTest {
             "Process died",
             context.substring(contextOnly.contextRanges[0].first, contextOnly.contextRanges[0].last + 1),
         )
+    }
+
+    @Test
+    fun `crash search hits walk snippet then surrounding context`() {
+        val snippet = "alpha FATAL one"
+        val context = "beta FATAL two FATAL three"
+        val hits = CrashSearch.search(snippet, context, "FATAL", ignoreCase = false)
+        assertEquals(3, hits.hits.size)
+        assertEquals(CrashSearchSection.SNIPPET, hits.hits[0].section)
+        assertEquals(CrashSearchSection.CONTEXT, hits.hits[1].section)
+        assertEquals(CrashSearchSection.CONTEXT, hits.hits[2].section)
+        assertEquals("FATAL", snippet.substring(hits.hits[0].range.first, hits.hits[0].range.last + 1))
+        assertEquals("FATAL", context.substring(hits.hits[1].range.first, hits.hits[1].range.last + 1))
+        assertEquals("FATAL", context.substring(hits.hits[2].range.first, hits.hits[2].range.last + 1))
     }
 }

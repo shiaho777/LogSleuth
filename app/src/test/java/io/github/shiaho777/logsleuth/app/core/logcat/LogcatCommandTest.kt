@@ -15,7 +15,7 @@ class LogcatCommandTest {
         assertEquals(
             listOf(
                 "logcat",
-                "-b", "main", "-b", "crash", "-b", "events",
+                "-b", "main", "-b", "system", "-b", "crash", "-b", "events",
                 "-v", "threadtime", "-v", "uid",
             ),
             cmd,
