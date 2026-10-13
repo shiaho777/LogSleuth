@@ -4,17 +4,41 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 
+/** Levels at [min] and every higher priority. Empty is never returned. */
+fun LogLevel.andAbove(): Set<LogLevel> =
+    LogLevel.entries.filter { it.priority >= priority }.toSet()
+
+/** Encode a level set as `W,E` for Room / exchange. Empty means “use minLevel”. */
+fun Set<LogLevel>.encodeLevels(): String =
+    sortedBy { it.ordinal }.joinToString(",") { it.name }
+
+fun decodeLevels(raw: String?): Set<LogLevel> {
+    if (raw.isNullOrBlank()) return emptySet()
+    return raw.split(',')
+        .mapNotNull { token ->
+            runCatching { LogLevel.valueOf(token.trim()) }.getOrNull()
+        }
+        .toSet()
+}
+
 /** A user-facing filter preset. Mirrors the Room entity; keep it pure Kotlin. */
 data class LogFilter(
     val id: Long = 0,
     val name: String = "",
     val minLevel: LogLevel = LogLevel.V,
+    /**
+     * When non-empty, only these levels pass. Empty means [minLevel] and
+     * above, so a legacy `minLevel=W` rule never becomes an empty set.
+     */
+    val allowedLevels: Set<LogLevel> = emptySet(),
     /** Include matcher: checked against tag and message. */
     val query: String = "",
     /** Exclusion matcher: any match drops the entry. */
     val excludeQuery: String = "",
     /** Tag-only matcher. */
     val tagQuery: String = "",
+    /** Tag must equal [tagQuery] (ignore-case) instead of containing it. */
+    val tagExact: Boolean = false,
     val useRegex: Boolean = false,
     /** Per-app filter, applied server-side via `logcat --uid` (Shizuku only). */
     val packageName: String? = null,
@@ -42,10 +66,18 @@ data class LogFilter(
     val isDefault: Boolean
         get() = this == DEFAULT
 
+    /** Levels this rule actually admits. Never empty. */
+    val effectiveLevels: Set<LogLevel>
+        get() = allowedLevels.ifEmpty { minLevel.andAbove() }
+
+    /** True when [effectiveLevels] is every log level. */
+    val admitsAllLevels: Boolean
+        get() = effectiveLevels.size == LogLevel.entries.size
+
     /** True when the rule would match every line. An enabled exclude of this
      *  shape would blank the stream, so the stack skips it. */
     val hasConstraint: Boolean
-        get() = minLevel != LogLevel.V ||
+        get() = !admitsAllLevels ||
             query.isNotBlank() ||
             excludeQuery.isNotBlank() ||
             tagQuery.isNotBlank() ||
@@ -53,6 +85,22 @@ data class LogFilter(
             pid.isNotBlank() ||
             tid.isNotBlank() ||
             uid.isNotBlank()
+
+    /** Toggle [level] in the allowed set. Clearing the last level admits every level. */
+    fun withToggledLevel(level: LogLevel): LogFilter {
+        val current = effectiveLevels
+        val next = if (level in current) current - level else current + level
+        if (next.isEmpty() || next.size == LogLevel.entries.size) {
+            return copy(allowedLevels = emptySet(), minLevel = LogLevel.V)
+        }
+        val min = next.minBy { it.priority }
+        val asMin = min.andAbove()
+        return if (next == asMin) {
+            copy(allowedLevels = emptySet(), minLevel = min)
+        } else {
+            copy(allowedLevels = next, minLevel = min)
+        }
+    }
 
     companion object {
         val DEFAULT = LogFilter(name = "Default")
@@ -62,7 +110,8 @@ data class LogFilter(
 /** Pre-compiled, reusable matcher for a [LogFilter]. */
 class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
 
-    private val minPriority = rule.minLevel.priority
+    private val levels: Set<LogLevel> = rule.effectiveLevels
+    private val tagExact = rule.tagExact && !rule.useRegex
 
     // Per-app filter: compare the entry's uid column against the resolved uid.
     // null = no app filter; NO_UID = filter set but uid unresolvable (match nothing).
@@ -96,7 +145,7 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
             (rule.useRegex && rule.tagQuery.isNotBlank() && tagRegex == null)
 
     fun matches(entry: LogcatEntry): Boolean {
-        if (entry.level.priority < minPriority) return false
+        if (entry.level !in levels) return false
 
         if (requiredUid != null) {
             if (requiredUid == NO_UID || entry.uid != requiredUid) return false
@@ -109,7 +158,12 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
         if (tagRegex != null) {
             if (!tagRegex.containsMatchIn(entry.tag)) return false
         } else if (tagPlain.isNotEmpty()) {
-            if (!entry.tag.contains(tagPlain, ignoreCase = true)) return false
+            val tagHit = if (tagExact) {
+                entry.tag.equals(tagPlain, ignoreCase = true)
+            } else {
+                entry.tag.contains(tagPlain, ignoreCase = true)
+            }
+            if (!tagHit) return false
         }
 
         if (queryRegex != null) {

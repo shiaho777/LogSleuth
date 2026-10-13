@@ -38,6 +38,8 @@
     <string name="scroll_bottom">Scroll to bottom</string>
     <string name="scroll_top">Scroll to top</string>
     <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
+    <string name="empty_logs_waiting">Waiting for logs.</string>
+    <string name="empty_logs_filtered">The active filters hide every line. Relax the filter to see the stream.</string>
     <string name="no_access_title">No log access yet</string>
     <string name="no_access_desc">LogSleuth needs Shizuku, root, or a one-time ADB grant to read device logs.</string>
     <string name="no_access_action">Open setup</string>
@@ -49,6 +51,10 @@
     <string name="filter_edit">Edit preset</string>
     <string name="filter_query">Include (tag or message)</string>
     <string name="filter_tag">Tag</string>
+    <string name="filter_tag_exact">Exact tag match</string>
+    <string name="filter_expand">More filter fields</string>
+    <string name="filter_levels_all">All levels</string>
+    <string name="filter_level_on">Selected</string>
     <string name="filter_exclude">Exclude</string>
     <string name="filter_regex">Regular expressions</string>
     <string name="filter_save_preset">Save as preset</string>
@@ -144,6 +150,7 @@
     <string name="notif_anr_title">ANR: %1$s</string>
     <string name="tile_record">Record logs</string>
     <string name="tile_recording">Recording · %1$d</string>
+    <string name="bookmark">Bookmark</string>
     <string name="bookmark_added">Bookmark added</string>
     <string name="not_recording">Not recording — tap the record button first</string>
     <string name="recording_start_failed">Couldn\'t start recording — check log access</string>
@@ -317,15 +324,17 @@
     <string name="crash_ignored">Crashes from %1$s will be ignored</string>
     <string name="settings_crash_blacklist">Ignored apps</string>
     <string name="settings_crash_blacklist_desc">Crashes and ANRs from these packages are dropped.</string>
-    <string name="settings_watch_boot">Watch for crashes after reboot</string>
-    <string name="settings_watch_boot_desc">Keeps a quiet notification so a crash is caught when LogSleuth isn\'t open. With only the ADB grant on Android 13 and later, watching waits until LogSleuth is on screen. Shizuku and root keep watching after reboot.</string>
+    <string name="settings_watch_boot">Watch for crashes in the background</string>
+    <string name="settings_watch_boot_desc">Keeps a quiet notification so crashes are caught while LogSleuth is in the background, including after reboot. With only the ADB grant on Android 13 and later, watching waits until LogSleuth is on screen. Shizuku and root keep watching off-screen.</string>
     <string name="notif_channel_watch">Crash watch</string>
     <string name="notif_watch_title">Watching for crashes</string>
     <string name="notif_watch_text">LogSleuth is listening in the background</string>
 
     <!-- Log columns -->
     <string name="settings_columns">Log columns</string>
+    <string name="settings_col_date">Date</string>
     <string name="settings_col_time">Time</string>
+    <string name="settings_col_uid">UID</string>
     <string name="settings_col_pid">PID</string>
     <string name="settings_col_tid">TID</string>
     <string name="settings_col_tag">Tag</string>
@@ -368,5 +377,21 @@
     <string name="crash_version_name">Version %1$s</string>
     <string name="session_rename">Rename</string>
     <string name="session_rename_hint">Session name</string>
+    <string name="crash_details_title">Crash</string>
+    <string name="crash_wrap">Wrap lines</string>
+    <string name="crash_open_app">App info</string>
+    <string name="crash_app_icon">App icon</string>
+    <string name="select_all">Select all</string>
+    <string name="extended_copy">Extended copy</string>
+    <string name="save_to">Save to file</string>
+    <string name="settings_date_pattern">Date pattern</string>
+    <string name="settings_time_pattern">Time pattern</string>
+    <string name="settings_open_crashes_startup">Open crashes on startup</string>
+    <string name="settings_include_device_zip">Include device info in zip exports</string>
+    <string name="settings_include_app_zip">Include app info in crash zips</string>
+    <string name="search_case_sensitive">Match case</string>
+    <string name="search_prev">Previous match</string>
+    <string name="search_next">Next match</string>
+    <string name="navigate_back">Back</string>
 
 </resources>

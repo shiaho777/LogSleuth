@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.core.filter.andAbove
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
@@ -99,12 +100,12 @@ fun FilterBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 LevelDropdown(
-                    current = filter.minLevel,
-                    onSelect = { onFilterChange(filter.copy(minLevel = it)) },
+                    filter = filter,
+                    onChange = onFilterChange,
                 )
                 AssistChip(
                     onClick = { showAppPicker = true },
-                    leadingIcon = { Icon(Icons.Default.Apps, null) },
+                    leadingIcon = { Icon(Icons.Default.Apps, contentDescription = stringResource(R.string.app_filter_title)) },
                     label = {
                         Text(
                             filter.packageName
@@ -155,7 +156,7 @@ fun FilterBar(
                     )
                     Icon(
                         Icons.Default.ExpandMore,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.filter_expand),
                         modifier = Modifier.rotate(chevron),
                     )
                 }
@@ -181,6 +182,17 @@ fun FilterBar(
                         onValueChange = { onFilterChange(filter.copy(tagQuery = it)) },
                         label = stringResource(R.string.filter_tag),
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = filter.tagExact,
+                            onCheckedChange = { onFilterChange(filter.copy(tagExact = it)) },
+                        )
+                        Text(
+                            stringResource(R.string.filter_tag_exact),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
                     FilterTextField(
                         value = filter.excludeQuery,
                         onValueChange = { onFilterChange(filter.copy(excludeQuery = it)) },
@@ -198,7 +210,10 @@ fun FilterBar(
                         )
                         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
                         TextButton(onClick = { showSaveDialog = true }) {
-                            Icon(Icons.Default.Save, contentDescription = null)
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = stringResource(R.string.filter_save_preset),
+                            )
                             Text(stringResource(R.string.filter_save_preset))
                         }
                     }
@@ -231,14 +246,16 @@ fun FilterBar(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LevelDropdown(current: LogLevel, onSelect: (LogLevel) -> Unit) {
+private fun LevelDropdown(filter: LogFilter, onChange: (LogFilter) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val selected = filter.effectiveLevels
+    val label = levelSetLabel(selected)
     ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
         FilterChip(
-            selected = current != LogLevel.V,
+            selected = !filter.admitsAllLevels,
             onClick = { open = true },
-            leadingIcon = { LevelBadge(current) },
-            label = { Text("≥ ${levelName(current)}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            leadingIcon = { LevelBadge(selected.minBy { it.priority }) },
+            label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(
@@ -248,27 +265,33 @@ private fun LevelDropdown(current: LogLevel, onSelect: (LogLevel) -> Unit) {
             modifier = Modifier.widthIn(min = 200.dp),
         ) {
             LogLevel.entries.forEach { level ->
+                val on = level in selected
                 DropdownMenuItem(
                     text = { Text(levelName(level), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { LevelBadge(level) },
                     trailingIcon = {
-                        if (level == current) {
+                        if (on) {
                             Icon(
                                 Icons.Default.Check,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.filter_level_on),
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     },
-                    onClick = {
-                        onSelect(level)
-                        open = false
-                    },
+                    onClick = { onChange(filter.withToggledLevel(level)) },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun levelSetLabel(selected: Set<LogLevel>): String {
+    if (selected.size == LogLevel.entries.size) return stringResource(R.string.filter_levels_all)
+    val min = selected.minBy { it.priority }
+    if (selected == min.andAbove()) return "≥ ${levelName(min)}"
+    return selected.sortedBy { it.ordinal }.joinToString("+") { it.letter.toString() }
 }
 
 @Composable
@@ -369,7 +392,7 @@ private fun AppPickerDialog(
                                 if (current == null) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(R.string.filter_level_on),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
                                 }
@@ -406,7 +429,7 @@ private fun AppPickerDialog(
                                 if (selected) {
                                     Icon(
                                         Icons.Default.Check,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(R.string.filter_level_on),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
                                 }

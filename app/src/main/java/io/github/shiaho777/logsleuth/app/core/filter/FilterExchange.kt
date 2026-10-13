@@ -13,9 +13,11 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
  * including=true
  * enabled=true
  * minLevel=V
+ * levels=
  * query=
  * exclude=
  * tag=OkHttp
+ * tagExact=false
  * regex=false
  * package=
  * pid=
@@ -35,9 +37,11 @@ object FilterExchange {
             field("including", f.including.toString())
             field("enabled", f.enabled.toString())
             field("minLevel", f.minLevel.name)
+            field("levels", f.allowedLevels.encodeLevels())
             field("query", f.query)
             field("exclude", f.excludeQuery)
             field("tag", f.tagQuery)
+            field("tagExact", f.tagExact.toString())
             field("regex", f.useRegex.toString())
             field("package", f.packageName.orEmpty())
             field("pid", f.pid)
@@ -84,9 +88,11 @@ object FilterExchange {
         return LogFilter(
             name = fields["name"].orEmpty().ifBlank { "Imported" },
             minLevel = level,
+            allowedLevels = decodeLevels(fields["levels"]),
             query = fields["query"].orEmpty(),
             excludeQuery = fields["exclude"].orEmpty(),
             tagQuery = fields["tag"].orEmpty(),
+            tagExact = fields["tagExact"] == "true",
             useRegex = fields["regex"] == "true",
             packageName = pkg,
             enabled = fields["enabled"] == "true",

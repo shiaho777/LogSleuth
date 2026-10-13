@@ -27,6 +27,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -47,7 +50,10 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -92,9 +98,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.logcat.formatVisible
+import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
+import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
@@ -147,7 +158,10 @@ fun StreamScreen(
     // Range selection (long-press + drag): seq bounds of the selected span.
     var selAnchor by remember { mutableStateOf(-1L) }
     var selEnd by remember { mutableStateOf(-1L) }
+    var extendedCopyText by remember { mutableStateOf<String?>(null) }
     val selecting = selAnchor >= 0L
+    val rowPrefs = LocalLogRowPrefs.current
+    val iconCache = LocalAppIconCache.current
     val selectingNow by rememberUpdatedState(selecting)
     val entriesNow by rememberUpdatedState(ui.entries)
 
@@ -367,7 +381,9 @@ fun StreamScreen(
                         query = ui.searchQuery,
                         hits = ui.searchHits.size,
                         hitIndex = ui.searchHitIndex,
+                        caseSensitive = ui.searchCaseSensitive,
                         onQueryChange = viewModel::setSearchQuery,
+                        onCaseSensitiveChange = viewModel::setSearchCaseSensitive,
                         onPrev = { viewModel.nextSearchHit(-1) },
                         onNext = { viewModel.nextSearchHit(1) },
                         onClose = { viewModel.setSearching(false) },
@@ -492,13 +508,13 @@ fun StreamScreen(
                     )
 
                     ui.entries.isEmpty() -> EmptyState(
-                        // A failed stream shows its real cause here —
-                        // "logcat exited 1: Permission denied" tells the
-                        // user something a bare badge never could.
                         text = when {
                             ui.adbHeld -> stringResource(R.string.stream_adb_needs_foreground)
                             ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null ->
                                 stringResource(R.string.stream_error_detail, ui.lastError!!)
+                            ui.engineState == LogcatEngine.State.STARTING ->
+                                stringResource(R.string.empty_logs_waiting)
+                            ui.filteredOut -> stringResource(R.string.empty_logs_filtered)
                             else -> stringResource(R.string.empty_logs)
                         },
                     )
@@ -547,6 +563,25 @@ fun StreamScreen(
                 SelectionBar(
                     visible = selecting,
                     count = ui.entries.count { it.seq in selLo..selHi },
+                    onSelectAll = {
+                        val first = ui.entries.firstOrNull()?.seq ?: return@SelectionBar
+                        val last = ui.entries.lastOrNull()?.seq ?: return@SelectionBar
+                        selAnchor = first
+                        selEnd = last
+                    },
+                    onExtendedCopy = {
+                        val prefs = rowPrefs
+                        val cache = iconCache
+                        extendedCopyText = ui.entries
+                            .filter { it.seq in selLo..selHi }
+                            .joinToString("\n") {
+                                formatVisible(
+                                    it.entry,
+                                    prefs.visibleColumns(),
+                                    appLabel = cache?.labelFor(it.entry.uid),
+                                )
+                            }
+                    },
                     onSave = {
                         val selected = ui.entries
                             .filter { it.seq in selLo..selHi }
@@ -556,9 +591,17 @@ fun StreamScreen(
                         if (selected.isNotEmpty()) viewModel.saveSelection(selected)
                     },
                     onCopy = {
+                        val prefs = rowPrefs
+                        val cache = iconCache
                         val text = ui.entries
                             .filter { it.seq in selLo..selHi }
-                            .joinToString("\n") { it.entry.raw }
+                            .joinToString("\n") {
+                                formatVisible(
+                                    it.entry,
+                                    prefs.visibleColumns(),
+                                    appLabel = cache?.labelFor(it.entry.uid),
+                                )
+                            }
                         selAnchor = -1L
                         selEnd = -1L
                         if (text.isNotEmpty()) {
@@ -659,6 +702,31 @@ fun StreamScreen(
             isSnapshot = ui.finishedSnapshot,
             onShare = { viewModel.shareFinishedSession(it) },
             onDismiss = viewModel::dismissFinishedSession,
+        )
+    }
+
+    extendedCopyText?.let { text ->
+        AlertDialog(
+            onDismissRequest = { extendedCopyText = null },
+            title = { Text(stringResource(R.string.extended_copy)) },
+            text = {
+                SelectionContainer {
+                    Text(
+                        text,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp)
+                            .verticalScroll(rememberScrollState()),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { extendedCopyText = null }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
         )
     }
 }
@@ -856,7 +924,9 @@ private fun SearchTopBar(
     query: String,
     hits: Int,
     hitIndex: Int,
+    caseSensitive: Boolean,
     onQueryChange: (String) -> Unit,
+    onCaseSensitiveChange: (Boolean) -> Unit,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onClose: () -> Unit,
@@ -879,14 +949,31 @@ private fun SearchTopBar(
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
+            IconButton(onClick = { onCaseSensitiveChange(!caseSensitive) }) {
+                Icon(
+                    Icons.Default.TextFields,
+                    contentDescription = stringResource(R.string.search_case_sensitive),
+                    tint = if (caseSensitive) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
             IconButton(onClick = onPrev, enabled = hits > 0) {
-                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                Icon(
+                    Icons.Default.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.search_prev),
+                )
             }
             IconButton(onClick = onNext, enabled = hits > 0) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.search_next),
+                )
             }
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = null)
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
             }
         },
     )
@@ -979,6 +1066,8 @@ private fun LogList(
 private fun SelectionBar(
     visible: Boolean,
     count: Int,
+    onSelectAll: () -> Unit,
+    onExtendedCopy: () -> Unit,
     onSave: () -> Unit,
     onCopy: () -> Unit,
     onClear: () -> Unit,
@@ -1004,10 +1093,22 @@ private fun SelectionBar(
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Spacer(Modifier.size(8.dp))
+                IconButton(onClick = onSelectAll) {
+                    Icon(
+                        Icons.Default.SelectAll,
+                        contentDescription = stringResource(R.string.select_all),
+                    )
+                }
+                IconButton(onClick = onExtendedCopy) {
+                    Icon(
+                        Icons.Default.TextFields,
+                        contentDescription = stringResource(R.string.extended_copy),
+                    )
+                }
                 TextButton(onClick = onSave) {
                     Icon(
                         Icons.Default.Save,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.selection_save),
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.size(6.dp))
@@ -1016,7 +1117,7 @@ private fun SelectionBar(
                 TextButton(onClick = onCopy) {
                     Icon(
                         Icons.Default.ContentCopy,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.copy),
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.size(6.dp))

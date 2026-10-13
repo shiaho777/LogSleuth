@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppCrashesScreen(
     onBack: () -> Unit,
+    onOpenCrash: (Long) -> Unit,
     viewModel: AppCrashesViewModel = hiltViewModel(),
 ) {
     val crashes by viewModel.crashes.collectAsState()
@@ -74,7 +75,7 @@ fun AppCrashesScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.close),
+                            contentDescription = stringResource(R.string.navigate_back),
                         )
                     }
                 },
@@ -106,20 +107,7 @@ fun AppCrashesScreen(
                     CrashCard(
                         crash = crash,
                         onDelete = { viewModel.requestDelete(crash) },
-                        onShare = viewModel::share,
-                        onIgnore = crash.packageName?.let { pkg ->
-                            {
-                                viewModel.ignore(pkg)
-                                scope.launch {
-                                    snackbar.showSnackbar(
-                                        resources.getString(R.string.crash_ignored, pkg),
-                                    )
-                                }
-                            }
-                        },
-                        onOpenChannel = { viewModel.openChannel(crash.type) },
-                        onReadContext = viewModel::readContext,
-                        initiallyExpanded = crash.id == viewModel.highlightEventId,
+                        onOpen = { onOpenCrash(crash.id) },
                         modifier = Modifier.animateItem(),
                     )
                 }

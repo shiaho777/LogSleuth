@@ -1,6 +1,5 @@
 package io.github.shiaho777.logsleuth.app.ui.sessiondetail
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,15 +10,18 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryTabRow
@@ -36,7 +38,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -60,6 +61,7 @@ fun SessionDetailScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     onOpenFilters: () -> Unit = {},
+    onOpenCrash: (Long) -> Unit = {},
     viewModel: SessionDetailViewModel = hiltViewModel(),
 ) {
     val sharedScope = LocalSharedTransitionScope.current
@@ -78,10 +80,37 @@ fun SessionDetailScreen(
                 title = { Text(ui.session?.name ?: stringResource(R.string.sessions_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.navigate_back),
+                        )
                     }
                 },
                 actions = {
+                    if (ui.searching) {
+                        TextField(
+                            value = ui.searchQuery,
+                            onValueChange = viewModel::setSearchQuery,
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text(stringResource(R.string.search_hint)) },
+                        )
+                        IconButton(onClick = { viewModel.setSearchCaseSensitive(!ui.searchCaseSensitive) }) {
+                            Icon(
+                                Icons.Default.TextFields,
+                                contentDescription = stringResource(R.string.search_case_sensitive),
+                            )
+                        }
+                        IconButton(onClick = { viewModel.setSearching(false) }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close),
+                            )
+                        }
+                    } else {
+                    IconButton(onClick = { viewModel.setSearching(true) }) {
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
+                    }
                     IconButton(onClick = {
                         renameText = ui.session?.name.orEmpty()
                         showRename = true
@@ -90,6 +119,7 @@ fun SessionDetailScreen(
                     }
                     IconButton(onClick = { showShare = true }) {
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_logs))
+                    }
                     }
                 },
             )
@@ -141,11 +171,14 @@ fun SessionDetailScreen(
                             onManageFilters = onOpenFilters,
                         )
                         when {
-                            ui.loading -> Box(Modifier.fillMaxSize()) {
-                                LoadingIndicator(Modifier.align(Alignment.Center))
-                            }
+                            ui.loading -> EmptyState(stringResource(R.string.empty_logs_waiting))
                             ui.missingFile -> EmptyState(stringResource(R.string.session_file_missing))
-                            ui.entries.isEmpty() -> EmptyState(stringResource(R.string.empty_logs))
+                            ui.entries.isEmpty() -> EmptyState(
+                                stringResource(
+                                    if (ui.filteredOut) R.string.empty_logs_filtered
+                                    else R.string.empty_logs,
+                                ),
+                            )
                             else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                                 items(
                                     count = ui.entries.size,
@@ -155,6 +188,8 @@ fun SessionDetailScreen(
                                         entry = ui.entries[index].entry,
                                         modifier = Modifier.animateItem(),
                                         snackbar = snackbar,
+                                        highlight = ui.searchQuery.takeIf { it.isNotBlank() },
+                                        isCurrentHit = ui.searchHits.getOrNull(ui.searchHitIndex) == index,
                                     )
                                 }
                             }
@@ -166,8 +201,7 @@ fun SessionDetailScreen(
                             CrashCard(
                                 ui.crashes[i],
                                 onDelete = null,
-                                onShare = viewModel::shareCrash,
-                                onReadContext = viewModel::readContext,
+                                onOpen = { onOpenCrash(ui.crashes[i].id) },
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -190,7 +224,7 @@ fun SessionDetailScreen(
                                 leadingContent = {
                                     Icon(
                                         Icons.Default.Bookmark,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(R.string.bookmark),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
                                 },
@@ -232,16 +266,28 @@ fun SessionDetailScreen(
         )
     }
 
+    val saveZipLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) viewModel.saveToUri(SessionExporter.Format.ZIP, uri)
+        showShare = false
+    }
+
     if (showShare) {
         AlertDialog(
             onDismissRequest = { showShare = false },
             title = { Text(stringResource(R.string.share_logs)) },
             text = { Text(stringResource(R.string.export_format_prompt)) },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.share(SessionExporter.Format.ZIP)
-                    showShare = false
-                }) { Text("ZIP") }
+                Column {
+                    TextButton(onClick = {
+                        viewModel.share(SessionExporter.Format.ZIP)
+                        showShare = false
+                    }) { Text("ZIP") }
+                    TextButton(onClick = {
+                        saveZipLauncher.launch("${ui.session?.name ?: "session"}.zip")
+                    }) { Text(stringResource(R.string.save_to)) }
+                }
             },
             dismissButton = {
                 TextButton(onClick = {

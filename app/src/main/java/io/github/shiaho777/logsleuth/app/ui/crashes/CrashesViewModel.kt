@@ -8,6 +8,7 @@ import io.github.shiaho777.logsleuth.app.core.crashes.CrashSort
 import io.github.shiaho777.logsleuth.app.core.crashes.groupCrashes
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
+import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,12 +30,25 @@ data class CrashBrowserState(
 class CrashesViewModel @Inject constructor(
     private val crashEventDao: CrashEventDao,
     private val deleter: CrashDeleter,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val crashes = crashEventDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val browser = MutableStateFlow(CrashBrowserState())
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { s ->
+                val sort = runCatching { CrashSort.valueOf(s.crashSort) }.getOrDefault(CrashSort.NEWEST)
+                val current = browser.value
+                if (current.sort != sort || current.reversed != s.crashSortReversed) {
+                    browser.value = current.copy(sort = sort, reversed = s.crashSortReversed)
+                }
+            }
+        }
+    }
 
     /** Ids hidden during the undo window. Committed when it expires. */
     private val _pendingIds = MutableStateFlow<Set<Long>>(emptySet())
@@ -61,10 +75,13 @@ class CrashesViewModel @Inject constructor(
 
     fun setSort(sort: CrashSort) {
         browser.value = browser.value.copy(sort = sort)
+        viewModelScope.launch { settingsRepository.setCrashSort(sort.name) }
     }
 
     fun toggleReversed() {
-        browser.value = browser.value.copy(reversed = !browser.value.reversed)
+        val next = !browser.value.reversed
+        browser.value = browser.value.copy(reversed = next)
+        viewModelScope.launch { settingsRepository.setCrashSortReversed(next) }
     }
 
     fun requestDeletePackage(packageName: String?) {

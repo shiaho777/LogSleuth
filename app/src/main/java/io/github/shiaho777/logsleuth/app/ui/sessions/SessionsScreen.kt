@@ -217,16 +217,29 @@ fun SessionsScreen(
         )
     }
 
+    val saveZipLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        val session = shareTarget ?: return@rememberLauncherForActivityResult
+        if (uri != null) viewModel.saveToUri(session, SessionExporter.Format.ZIP, uri)
+        shareTarget = null
+    }
+
     shareTarget?.let { session ->
         AlertDialog(
             onDismissRequest = { shareTarget = null },
             title = { Text(stringResource(R.string.share_logs)) },
             text = { Text(stringResource(R.string.export_format_prompt)) },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.share(session, SessionExporter.Format.ZIP)
-                    shareTarget = null
-                }) { Text("ZIP") }
+                Column {
+                    TextButton(onClick = {
+                        viewModel.share(session, SessionExporter.Format.ZIP)
+                        shareTarget = null
+                    }) { Text("ZIP") }
+                    TextButton(onClick = {
+                        saveZipLauncher.launch("${session.name}.zip")
+                    }) { Text(stringResource(R.string.save_to)) }
+                }
             },
             dismissButton = {
                 TextButton(onClick = {

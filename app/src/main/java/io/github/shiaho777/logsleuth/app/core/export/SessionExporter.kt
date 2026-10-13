@@ -2,11 +2,14 @@ package io.github.shiaho777.logsleuth.app.core.export
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.core.content.FileProvider
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
+import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.io.FileInputStream
 import java.util.zip.ZipEntry
@@ -25,6 +28,7 @@ import kotlinx.coroutines.withContext
 class SessionExporter @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val sessionDao: SessionDao,
+    private val settingsRepository: SettingsRepository,
 ) {
     companion object {
         const val AUTHORITY_SUFFIX = ".fileprovider"
@@ -35,7 +39,11 @@ class SessionExporter @Inject constructor(
 
     enum class Format { TXT, ZIP }
 
-    suspend fun export(sessionId: Long, format: Format): Result<File> = withContext(Dispatchers.IO) {
+    suspend fun export(
+        sessionId: Long,
+        format: Format,
+        includeDevice: Boolean? = null,
+    ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             pruneExports()
             val session = sessionDao.getById(sessionId) ?: error("Session $sessionId not found")
@@ -51,18 +59,16 @@ class SessionExporter @Inject constructor(
 
                 Format.ZIP -> {
                     val out = exportFile(session, "zip")
+                    val withDevice = includeDevice
+                        ?: settingsRepository.settings.first().includeDeviceInfoInZip
                     ZipOutputStream(out.outputStream().buffered()).use { zip ->
                         zip.putNextEntry(ZipEntry("logs/session.log"))
                         FileInputStream(source).use { it.copyTo(zip) }
                         zip.closeEntry()
-
-                        zip.putNextEntry(ZipEntry("device.txt"))
-                        zip.write(deviceInfo().toByteArray())
-                        zip.closeEntry()
-
-                        zip.putNextEntry(ZipEntry("meta.txt"))
-                        zip.write(sessionMeta(session).toByteArray())
-                        zip.closeEntry()
+                        if (withDevice) {
+                            zip.putText("device.txt", deviceInfo())
+                        }
+                        zip.putText("meta.txt", sessionMeta(session))
                     }
                     out
                 }
@@ -74,15 +80,34 @@ class SessionExporter @Inject constructor(
      * Zip of one crash: the crashed app's version, this device, the stack,
      * and the surrounding lines when they were saved.
      */
-    suspend fun shareCrash(crash: CrashEventEntity): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun shareCrash(
+        crash: CrashEventEntity,
+        includeApp: Boolean? = null,
+        includeDevice: Boolean? = null,
+    ): Result<Unit> = crashZip(crash, includeApp, includeDevice).fold(
+        onSuccess = { file ->
+            share(file, "application/zip")
+            Result.success(Unit)
+        },
+        onFailure = { Result.failure(it) },
+    )
+
+    suspend fun crashZip(
+        crash: CrashEventEntity,
+        includeApp: Boolean? = null,
+        includeDevice: Boolean? = null,
+    ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             pruneExports()
+            val flags = settingsRepository.settings.first()
+            val withApp = includeApp ?: flags.includeAppInfoInZip
+            val withDevice = includeDevice ?: flags.includeDeviceInfoInZip
             val dir = File(context.cacheDir, "exports").apply { mkdirs() }
             val safe = (crash.packageName ?: "unknown").replace(Regex("""[^\w.-]+"""), "_")
             val out = File(dir, "crash_${safe}_${crash.id}.zip")
             ZipOutputStream(out.outputStream().buffered()).use { zip ->
-                zip.putText("app.txt", appInfo(crash))
-                zip.putText("device.txt", deviceInfo())
+                if (withApp) zip.putText("app.txt", appInfo(crash))
+                if (withDevice) zip.putText("device.txt", deviceInfo())
                 zip.putText("crash.txt", crashBody(crash))
                 val contextFile = crash.contextPath?.let { File(it) }?.takeIf { it.isFile }
                 if (contextFile != null) {
@@ -91,7 +116,16 @@ class SessionExporter @Inject constructor(
                     zip.closeEntry()
                 }
             }
-            share(out, "application/zip")
+            out
+        }
+    }
+
+    suspend fun saveToUri(file: File, uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                file.inputStream().use { it.copyTo(out) }
+            } ?: error("Could not open $uri")
+            Unit
         }
     }
 

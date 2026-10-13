@@ -83,22 +83,22 @@ class MainActivity : ComponentActivity() {
             }
 
             LogSleuthTheme(themeSetting = settings?.theme ?: "system") {
-                val logScale = when (settings?.logTextScale ?: 1) {
-                    0 -> 0.85f
-                    2 -> 1.15f
-                    else -> 1f
-                }
+                val logScale = settings?.logTextScale ?: 1f
                 val iconScope = rememberCoroutineScope()
                 val iconCache = remember {
                     AppIconCache(applicationContext, iconScope)
                 }
                 val rowPrefs = LogRowPrefs(
                     showTime = settings?.showLogTime ?: true,
+                    showDate = settings?.showLogDate ?: false,
+                    showUid = settings?.showLogUid ?: false,
                     showPid = settings?.showLogPid ?: true,
                     showTid = settings?.showLogTid ?: true,
                     showTag = settings?.showLogTag ?: true,
                     showPackage = settings?.showLogPackage ?: true,
                     timeFormat = settings?.logTimeFormat ?: "time",
+                    datePattern = settings?.datePattern ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.DATE_PRESET,
+                    timePattern = settings?.timePattern ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.TIME_PRESET,
                     logsExpanded = settings?.logsExpanded ?: false,
                     searchCaseSensitive = settings?.searchCaseSensitive ?: false,
                 )
@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
                         val start = when {
                             settings?.setupCompleted != true -> Routes.SETUP
                             intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
+                            settings?.openCrashesOnStartup == true -> Routes.CRASHES
                             else -> Routes.STREAM
                         }
                         LogSleuthNavHost(
@@ -157,10 +158,7 @@ class MainActivity : ComponentActivity() {
         if (sessionId > 0) pendingRoute = Routes.sessionDetail(sessionId)
         val crashId = intent.getLongExtra(EXTRA_OPEN_CRASH, -1L)
         if (crashId > 0) {
-            pendingRoute = Routes.appCrashes(
-                intent.getStringExtra(EXTRA_OPEN_CRASH_PKG),
-                crashId,
-            )
+            pendingRoute = Routes.crashDetail(crashId)
         } else if (fromNewIntent && intent.getBooleanExtra(EXTRA_OPEN_CRASHES, false)) {
             pendingRoute = Routes.CRASHES
         }

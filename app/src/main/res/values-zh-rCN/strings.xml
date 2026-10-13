@@ -38,6 +38,8 @@
     <string name="scroll_bottom">回到底部</string>
     <string name="scroll_top">回到顶部</string>
     <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
+    <string name="empty_logs_waiting">正在等待日志。</string>
+    <string name="empty_logs_filtered">当前过滤器把所有行都挡掉了。放宽过滤才能看到日志。</string>
     <string name="no_access_title">还没有日志访问权限</string>
     <string name="no_access_desc">LogSleuth 需要 Shizuku、Root,或一次性 ADB 授权才能读取设备日志。</string>
     <string name="no_access_action">去设置</string>
@@ -49,6 +51,10 @@
     <string name="filter_edit">编辑预设</string>
     <string name="filter_query">包含(Tag 或消息)</string>
     <string name="filter_tag">Tag</string>
+    <string name="filter_tag_exact">精确匹配 Tag</string>
+    <string name="filter_expand">更多过滤条件</string>
+    <string name="filter_levels_all">全部级别</string>
+    <string name="filter_level_on">已选</string>
     <string name="filter_exclude">排除</string>
     <string name="filter_regex">使用正则表达式</string>
     <string name="filter_save_preset">保存为预设</string>
@@ -144,6 +150,7 @@
     <string name="notif_anr_title">ANR:%1$s</string>
     <string name="tile_record">录制日志</string>
     <string name="tile_recording">录制中 · %1$d</string>
+    <string name="bookmark">书签</string>
     <string name="bookmark_added">已添加书签</string>
     <string name="not_recording">未在录制,请先点录制按钮</string>
     <string name="recording_start_failed">无法开始录制——请检查日志读取权限</string>
@@ -317,15 +324,17 @@
     <string name="crash_ignored">将忽略 %1$s 的崩溃</string>
     <string name="settings_crash_blacklist">已忽略的应用</string>
     <string name="settings_crash_blacklist_desc">这些包名的崩溃和 ANR 会被丢掉。</string>
-    <string name="settings_watch_boot">开机后继续监听崩溃</string>
-    <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 没打开时也能抓到崩溃。Android 13 及以后，如果只有 ADB 授权，要等应用回到前台才会开始读；Shizuku 和 Root 可以在开机后继续听。</string>
+    <string name="settings_watch_boot">后台监听崩溃</string>
+    <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 在后台时也能抓到崩溃，开机后同样有效。Android 13 及以后，如果只有 ADB 授权，要等应用回到前台才会开始读；Shizuku 和 Root 可以在离开屏幕后继续听。</string>
     <string name="notif_channel_watch">崩溃监听</string>
     <string name="notif_watch_title">正在监听崩溃</string>
     <string name="notif_watch_text">LogSleuth 在后台听着日志</string>
 
     <!-- Log columns -->
     <string name="settings_columns">日志列</string>
+    <string name="settings_col_date">日期</string>
     <string name="settings_col_time">时间</string>
+    <string name="settings_col_uid">UID</string>
     <string name="settings_col_pid">PID</string>
     <string name="settings_col_tid">TID</string>
     <string name="settings_col_tag">Tag</string>
@@ -368,5 +377,21 @@
     <string name="crash_version_name">版本 %1$s</string>
     <string name="session_rename">重命名</string>
     <string name="session_rename_hint">会话名称</string>
+    <string name="crash_details_title">崩溃</string>
+    <string name="crash_wrap">自动换行</string>
+    <string name="crash_open_app">应用信息</string>
+    <string name="crash_app_icon">应用图标</string>
+    <string name="select_all">全选</string>
+    <string name="extended_copy">扩展复制</string>
+    <string name="save_to">保存到文件</string>
+    <string name="settings_date_pattern">日期格式</string>
+    <string name="settings_time_pattern">时间格式</string>
+    <string name="settings_open_crashes_startup">启动时打开崩溃页</string>
+    <string name="settings_include_device_zip">zip 导出包含设备信息</string>
+    <string name="settings_include_app_zip">崩溃 zip 包含应用信息</string>
+    <string name="search_case_sensitive">区分大小写</string>
+    <string name="search_prev">上一个匹配</string>
+    <string name="search_next">下一个匹配</string>
+    <string name="navigate_back">返回</string>
 
 </resources>

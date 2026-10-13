@@ -60,6 +60,9 @@ interface CrashEventDao {
     @Query("SELECT * FROM crash_events WHERE sessionId = :sessionId ORDER BY time ASC")
     fun observeForSession(sessionId: Long): Flow<List<CrashEventEntity>>
 
+    @Query("SELECT * FROM crash_events WHERE id = :id")
+    fun observeById(id: Long): Flow<CrashEventEntity?>
+
     @Insert
     suspend fun insert(entity: CrashEventEntity): Long
 

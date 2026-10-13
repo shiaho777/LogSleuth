@@ -54,30 +54,48 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
+import io.github.shiaho777.logsleuth.app.core.logcat.VisibleColumns
+import io.github.shiaho777.logsleuth.app.core.logcat.formatLogTime
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /** Which columns a log row draws, and how the timestamp is written. */
 data class LogRowPrefs(
     val showTime: Boolean = true,
+    val showDate: Boolean = false,
+    val showUid: Boolean = false,
     val showPid: Boolean = true,
     val showTid: Boolean = true,
     val showTag: Boolean = true,
     val showPackage: Boolean = true,
     /** "time" | "datetime" | "epoch" */
     val timeFormat: String = "time",
+    val datePattern: String = DateTimePatterns.DATE_PRESET,
+    val timePattern: String = DateTimePatterns.TIME_PRESET,
     /** Draw the whole message instead of clamping the row to 8 lines. */
     val logsExpanded: Boolean = false,
     /** Search highlight matches case. Off keeps the previous ignore-case hit. */
     val searchCaseSensitive: Boolean = false,
-)
+) {
+    fun visibleColumns(): VisibleColumns = VisibleColumns(
+        showDate = showDate,
+        showTime = showTime,
+        showUid = showUid,
+        showPid = showPid,
+        showTid = showTid,
+        showPackage = showPackage,
+        showTag = showTag,
+        datePattern = datePattern,
+        timePattern = timePattern,
+        timeFormat = timeFormat,
+    )
+}
 
 val LocalLogRowPrefs = compositionLocalOf { LogRowPrefs() }
 
@@ -112,12 +130,12 @@ fun LogRow(
 
     val scale = LocalLogTextScale.current
     val prefs = LocalLogRowPrefs.current
-    val clockFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.US) }
-    val timeText = when (prefs.timeFormat) {
-        "datetime" -> entry.displayTime
-        "epoch" -> entry.timestampMillis.toString()
-        else -> clockFormat.format(Date(entry.timestampMillis))
-    }
+    val dateText = DateTimePatterns.format(
+        entry.timestampMillis,
+        prefs.datePattern,
+        DateTimePatterns.DATE_PRESET,
+    )
+    val timeText = formatLogTime(entry, prefs.timeFormat, prefs.timePattern)
     val levelTint = levelColor(entry.level)
     val isError = entry.level.priority >= LogLevel.E.priority
 
@@ -195,11 +213,27 @@ fun LogRow(
                         )
                     }
                 }
+                if (prefs.showDate) {
+                    Text(
+                        text = dateText,
+                        style = logMetaStyle(scale),
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(end = 4.dp),
+                    )
+                }
                 if (prefs.showTime) {
                     Text(
                         text = timeText,
                         style = logMetaStyle(scale),
                         color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+                if (prefs.showUid) {
+                    val uidLabel = entry.uid?.let { UidNames.wellKnownName(it) ?: it.toString() } ?: "-"
+                    Text(
+                        text = "  $uidLabel",
+                        style = logMetaStyle(scale),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f),
                     )
                 }
                 if (prefs.showPid || prefs.showTid) {

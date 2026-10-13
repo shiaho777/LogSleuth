@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -410,9 +411,19 @@ fun SettingsScreen(
                         }
                     }
                     SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_date),
+                        checked = s.showLogDate,
+                        onCheckedChange = viewModel::setShowLogDate,
+                    )
+                    SettingsSwitchRow(
                         title = stringResource(R.string.settings_col_time),
                         checked = s.showLogTime,
                         onCheckedChange = viewModel::setShowLogTime,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_col_uid),
+                        checked = s.showLogUid,
+                        onCheckedChange = viewModel::setShowLogUid,
                     )
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_col_pid),
@@ -444,6 +455,24 @@ fun SettingsScreen(
                         checked = s.searchCaseSensitive,
                         onCheckedChange = viewModel::setSearchCaseSensitive,
                     )
+                    OutlinedTextField(
+                        value = s.datePattern,
+                        onValueChange = viewModel::setDatePattern,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.settings_date_pattern)) },
+                    )
+                    OutlinedTextField(
+                        value = s.timePattern,
+                        onValueChange = viewModel::setTimePattern,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.settings_time_pattern)) },
+                    )
                 }
             }
 
@@ -454,6 +483,21 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_watch_boot_desc),
                         checked = s.watchOnBoot,
                         onCheckedChange = viewModel::setWatchOnBoot,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_open_crashes_startup),
+                        checked = s.openCrashesOnStartup,
+                        onCheckedChange = viewModel::setOpenCrashesOnStartup,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_include_device_zip),
+                        checked = s.includeDeviceInfoInZip,
+                        onCheckedChange = viewModel::setIncludeDeviceInfoInZip,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_include_app_zip),
+                        checked = s.includeAppInfoInZip,
+                        onCheckedChange = viewModel::setIncludeAppInfoInZip,
                     )
                     if (s.crashBlacklist.isNotEmpty()) {
                         Text(
@@ -496,19 +540,19 @@ fun SettingsScreen(
                         stringResource(R.string.settings_log_text_size),
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf(
-                            0 to R.string.text_size_compact,
-                            1 to R.string.text_size_default,
-                            2 to R.string.text_size_comfortable,
-                        ).forEachIndexed { index, (value, labelRes) ->
-                            SegmentedButton(
-                                selected = s.logTextScale == value,
-                                onClick = { viewModel.setLogTextScale(value) },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
-                            ) { Text(stringResource(labelRes)) }
-                        }
-                    }
+                    var scaleValue by remember(s.logTextScale) { mutableStateOf(s.logTextScale) }
+                    Text(
+                        stringResource(R.string.settings_log_text_size) +
+                            " · ${(scaleValue * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Slider(
+                        value = scaleValue,
+                        onValueChange = { scaleValue = it },
+                        onValueChangeFinished = { viewModel.setLogTextScale(scaleValue) },
+                        valueRange = 0.75f..1.50f,
+                    )
                 }
             }
 

@@ -108,7 +108,7 @@ halves that work together:
 | Themes & text | System / Light / Dark themes; Compact / Default / Comfortable log text sizes |
 | In-app updates | GitHub Releases check, release notes, resumable APK download (pause/resume/cancel), one-tap install, version history |
 | Tunable buffer | On-screen ring buffer from 1,000 to 200,000 entries (default 20,000). Optional cold start that follows only new lines; a reconnect still continues from the last line |
-| Log rows | Optional full lines instead of an 8-line clamp, and optional case-sensitive search |
+| Log rows | Optional full lines instead of an 8-line clamp. Search has a match-case toggle on the search bar |
 | Sessions | Rename any session from the list or its detail screen |
 
 ### Embedded SDK (`logsleuth-sdk`)
@@ -168,8 +168,9 @@ guided tour".
 - **"The app keeps crashing for a user"** → Report tab → pick the app →
   start recording → hand them the phone → Stop & share. Crashes inside the
   window are flagged and attached automatically.
-- **"It's too noisy"** → unfold the filter bar, set level ≥ Warn and a tag or
-  keyword — or filter by app (Shizuku or root). Save the combo as a preset.
+- **"It's too noisy"** → unfold the filter bar, pick only Warn and Error (or
+  any level set) and a tag or keyword — or filter by app (Shizuku or root).
+  Save the combo as a preset.
 - **"I need to mark when it happened"** → enable Floating controls (needs the
   overlay permission) or use the Quick Settings tile: record + bookmark
   without leaving the app under test.

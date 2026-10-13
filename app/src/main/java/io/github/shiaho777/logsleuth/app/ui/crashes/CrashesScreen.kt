@@ -17,17 +17,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -43,7 +39,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,13 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashGroup
@@ -139,7 +130,7 @@ fun CrashesScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.crash_search)) },
                 label = { Text(stringResource(R.string.crash_search)) },
             )
             if (groups.isEmpty()) {
@@ -209,7 +200,7 @@ private fun CrashGroupCard(
             if (icon != null) {
                 Image(
                     bitmap = icon,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.crash_app_icon),
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp)),
@@ -222,7 +213,7 @@ private fun CrashGroupCard(
                 ) {
                     Icon(
                         Icons.Default.BugReport,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.crash_app_icon),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(10.dp),
                     )
@@ -277,15 +268,8 @@ fun CrashCard(
     crash: CrashEventEntity,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    onShare: ((CrashEventEntity) -> Unit)? = null,
-    onIgnore: (() -> Unit)? = null,
-    onOpenChannel: (() -> Unit)? = null,
-    onReadContext: (suspend (CrashEventEntity) -> String?)? = null,
-    initiallyExpanded: Boolean = false,
+    onOpen: () -> Unit,
 ) {
-    var expanded by remember(crash.id) { mutableStateOf(initiallyExpanded) }
-    var contextText by remember(crash.id) { mutableStateOf<String?>(null) }
-    val clipboard = LocalClipboardManager.current
     val isAnr = crash.type == "ANR"
     val typeLabel = when (crash.type) {
         "NATIVE" -> stringResource(R.string.crash_type_native)
@@ -295,16 +279,9 @@ fun CrashCard(
     val title = crash.appName?.takeIf { it.isNotBlank() }
         ?: crash.packageName
         ?: stringResource(R.string.unknown_app)
-    val version = crashVersion(crash)
-
-    LaunchedEffect(expanded, crash.id) {
-        if (expanded && contextText == null && onReadContext != null) {
-            contextText = onReadContext(crash)
-        }
-    }
 
     Card(
-        onClick = { expanded = true },
+        onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
@@ -361,102 +338,5 @@ fun CrashCard(
                 }
             }
         }
-    }
-
-    if (expanded) {
-        AlertDialog(
-            onDismissRequest = { expanded = false },
-            title = { Text(title) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    crash.packageName?.let {
-                        Text(it, style = MaterialTheme.typography.labelMedium)
-                    }
-                    version?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    SelectionContainer {
-                        Text(crash.snippet, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-                    }
-                    if (!contextText.isNullOrBlank()) {
-                        Text(
-                            stringResource(R.string.crash_context_heading),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        SelectionContainer {
-                            Text(
-                                contextText.orEmpty(),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 11.sp,
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (onIgnore != null) {
-                        TextButton(onClick = {
-                            onIgnore()
-                            expanded = false
-                        }) {
-                            Text(stringResource(R.string.crash_ignore))
-                        }
-                    }
-                    if (onOpenChannel != null) {
-                        TextButton(onClick = onOpenChannel) {
-                            Text(stringResource(R.string.crash_open_channel))
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (onShare != null) {
-                            TextButton(onClick = {
-                                onShare(crash)
-                                expanded = false
-                            }) {
-                                Icon(
-                                    Icons.Default.Share,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(stringResource(R.string.crash_share))
-                            }
-                        }
-                        TextButton(onClick = {
-                            clipboard.setText(AnnotatedString(crash.snippet))
-                            expanded = false
-                        }) {
-                            Icon(
-                                Icons.Default.ContentCopy,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.copy))
-                        }
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.close)) }
-            },
-        )
-    }
-}
-
-@Composable
-private fun crashVersion(crash: CrashEventEntity): String? {
-    val name = crash.versionName?.takeIf { it.isNotBlank() }
-    val code = crash.versionCode
-    return when {
-        name != null && code != null -> stringResource(R.string.crash_version, name, code)
-        name != null -> stringResource(R.string.crash_version_name, name)
-        code != null -> code.toString()
-        else -> null
     }
 }

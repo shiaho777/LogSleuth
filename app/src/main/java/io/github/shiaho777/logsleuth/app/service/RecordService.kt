@@ -38,6 +38,8 @@ class RecordService : Service() {
         const val EXTRA_FILTER_TAG = "extra_filter_tag"
         const val EXTRA_FILTER_EXCLUDE = "extra_filter_exclude"
         const val EXTRA_FILTER_REGEX = "extra_filter_regex"
+        const val EXTRA_FILTER_LEVELS = "extra_filter_levels"
+        const val EXTRA_FILTER_TAG_EXACT = "extra_filter_tag_exact"
     }
 
     @Inject lateinit var recordingManager: RecordingManager
@@ -66,8 +68,12 @@ class RecordService : Service() {
                     minLevel = intent.getStringExtra(EXTRA_FILTER_LEVEL)
                         ?.let { runCatching { io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.valueOf(it) }.getOrNull() }
                         ?: io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.V,
+                    allowedLevels = io.github.shiaho777.logsleuth.app.core.filter.decodeLevels(
+                        intent.getStringExtra(EXTRA_FILTER_LEVELS),
+                    ),
                     query = intent.getStringExtra(EXTRA_FILTER_QUERY).orEmpty(),
                     tagQuery = intent.getStringExtra(EXTRA_FILTER_TAG).orEmpty(),
+                    tagExact = intent.getBooleanExtra(EXTRA_FILTER_TAG_EXACT, false),
                     excludeQuery = intent.getStringExtra(EXTRA_FILTER_EXCLUDE).orEmpty(),
                     useRegex = intent.getBooleanExtra(EXTRA_FILTER_REGEX, false),
                 )

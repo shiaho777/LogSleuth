@@ -33,6 +33,35 @@ class LogFilterTest {
         assertFalse(f.matches(entry(level = LogLevel.I)))
         assertTrue(f.matches(entry(level = LogLevel.W)))
         assertTrue(f.matches(entry(level = LogLevel.E)))
+        assertTrue(f.matches(entry(level = LogLevel.F)))
+    }
+
+    @Test
+    fun `error-only keeps E and drops W and F`() {
+        val f = CompiledFilter(LogFilter(allowedLevels = setOf(LogLevel.E)))
+        assertFalse(f.matches(entry(level = LogLevel.W)))
+        assertTrue(f.matches(entry(level = LogLevel.E)))
+        assertFalse(f.matches(entry(level = LogLevel.F)))
+    }
+
+    @Test
+    fun `warn plus error without fatal keeps W and E and drops F`() {
+        val f = CompiledFilter(LogFilter(allowedLevels = setOf(LogLevel.W, LogLevel.E)))
+        assertTrue(f.matches(entry(level = LogLevel.W)))
+        assertTrue(f.matches(entry(level = LogLevel.E)))
+        assertFalse(f.matches(entry(level = LogLevel.F)))
+        assertFalse(f.matches(entry(level = LogLevel.I)))
+    }
+
+    @Test
+    fun `legacy minLevel W still admits W and above`() {
+        val rule = LogFilter(minLevel = LogLevel.W, allowedLevels = emptySet())
+        assertTrue(rule.effectiveLevels.isNotEmpty())
+        val f = CompiledFilter(rule)
+        assertFalse(f.matches(entry(level = LogLevel.I)))
+        assertTrue(f.matches(entry(level = LogLevel.W)))
+        assertTrue(f.matches(entry(level = LogLevel.E)))
+        assertTrue(f.matches(entry(level = LogLevel.F)))
     }
 
     @Test
@@ -55,6 +84,24 @@ class LogFilterTest {
         val f = CompiledFilter(LogFilter(tagQuery = "Activity"))
         assertTrue(f.matches(entry(tag = "ActivityManager", message = "nothing")))
         assertFalse(f.matches(entry(tag = "Other", message = "Activity happened")))
+    }
+
+    @Test
+    fun `exact tag keeps AndroidRuntime and drops a superstring`() {
+        val f = CompiledFilter(
+            LogFilter(tagQuery = "AndroidRuntime", tagExact = true),
+        )
+        assertTrue(f.matches(entry(tag = "AndroidRuntime")))
+        assertTrue(f.matches(entry(tag = "androidruntime")))
+        assertFalse(f.matches(entry(tag = "AndroidRuntimeSomething")))
+    }
+
+    @Test
+    fun `contains tag still matches a superstring`() {
+        val f = CompiledFilter(
+            LogFilter(tagQuery = "AndroidRuntime", tagExact = false),
+        )
+        assertTrue(f.matches(entry(tag = "AndroidRuntimeSomething")))
     }
 
     @Test

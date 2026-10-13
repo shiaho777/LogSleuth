@@ -107,6 +107,14 @@ class SessionsViewModel @Inject constructor(
         }
     }
 
+    fun saveToUri(session: SessionEntity, format: SessionExporter.Format, uri: android.net.Uri) {
+        viewModelScope.launch {
+            exporter.export(session.id, format).onSuccess { file ->
+                exporter.saveToUri(file, uri)
+            }
+        }
+    }
+
     /** Imports an externally shared log file or SDK export zip. */
     fun import(uri: Uri, onResult: (Result<Long>) -> Unit) {
         viewModelScope.launch {

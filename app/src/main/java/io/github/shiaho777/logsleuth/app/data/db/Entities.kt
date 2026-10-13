@@ -42,6 +42,11 @@ data class FilterEntity(
     val tid: String = "",
     @ColumnInfo(defaultValue = "''")
     val uid: String = "",
+    /** Comma-separated LogLevel names. Empty means use [minLevel] and above. */
+    @ColumnInfo(defaultValue = "''")
+    val allowedLevels: String = "",
+    @ColumnInfo(defaultValue = "0")
+    val tagExact: Boolean = false,
 )
 
 @Entity(tableName = "crash_events")

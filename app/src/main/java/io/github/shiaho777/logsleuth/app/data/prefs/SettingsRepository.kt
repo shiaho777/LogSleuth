@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessPolicy
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -24,8 +25,8 @@ data class Settings(
     val bubbleEnabled: Boolean = false,
     /** "system" | "light" | "dark" */
     val theme: String = "system",
-    /** Log row text scale preset: 0 compact, 1 default, 2 comfortable. */
-    val logTextScale: Int = 1,
+    /** Log row text scale, 0.75–1.50. Older installs mapped 0/1/2 presets. */
+    val logTextScale: Float = 1f,
     /** Show the setup wizard until the user has granted some access once. */
     val setupCompleted: Boolean = false,
     /** Feature tour overlay has been seen once (skip and finish both count). */
@@ -41,12 +42,16 @@ data class Settings(
     /** Keep a foreground watch alive across reboot so crashes are not missed. */
     val watchOnBoot: Boolean = false,
     val showLogTime: Boolean = true,
+    val showLogDate: Boolean = false,
+    val showLogUid: Boolean = false,
     val showLogPid: Boolean = true,
     val showLogTid: Boolean = true,
     val showLogTag: Boolean = true,
     val showLogPackage: Boolean = true,
     /** "time" | "datetime" | "epoch" */
     val logTimeFormat: String = "time",
+    val datePattern: String = io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.DATE_PRESET,
+    val timePattern: String = io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.TIME_PRESET,
     /**
      * Opt-in for a root shell. Default off: an unrooted phone never execs `su`.
      */
@@ -67,6 +72,12 @@ data class Settings(
     val logsExpanded: Boolean = false,
     /** Search matches case. Default off, which is the previous behavior. */
     val searchCaseSensitive: Boolean = false,
+    val crashSort: String = "NEWEST",
+    val crashSortReversed: Boolean = false,
+    val wrapCrashLogLines: Boolean = true,
+    val openCrashesOnStartup: Boolean = false,
+    val includeDeviceInfoInZip: Boolean = true,
+    val includeAppInfoInZip: Boolean = true,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -81,6 +92,7 @@ class SettingsRepository(private val context: Context) {
         val BUBBLE_ENABLED = booleanPreferencesKey("bubble_enabled")
         val THEME = stringPreferencesKey("theme")
         val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
+        val LOG_TEXT_SCALE_F = floatPreferencesKey("log_text_scale_f")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
         val GUIDE_COMPLETED = booleanPreferencesKey("guide_completed")
         val LANGUAGE = stringPreferencesKey("language")
@@ -89,11 +101,21 @@ class SettingsRepository(private val context: Context) {
         val CRASH_BLACKLIST = stringSetPreferencesKey("crash_blacklist")
         val WATCH_ON_BOOT = booleanPreferencesKey("watch_on_boot")
         val SHOW_LOG_TIME = booleanPreferencesKey("show_log_time")
+        val SHOW_LOG_DATE = booleanPreferencesKey("show_log_date")
+        val SHOW_LOG_UID = booleanPreferencesKey("show_log_uid")
         val SHOW_LOG_PID = booleanPreferencesKey("show_log_pid")
         val SHOW_LOG_TID = booleanPreferencesKey("show_log_tid")
         val SHOW_LOG_TAG = booleanPreferencesKey("show_log_tag")
         val SHOW_LOG_PACKAGE = booleanPreferencesKey("show_log_package")
         val LOG_TIME_FORMAT = stringPreferencesKey("log_time_format")
+        val DATE_PATTERN = stringPreferencesKey("date_pattern")
+        val TIME_PATTERN = stringPreferencesKey("time_pattern")
+        val CRASH_SORT = stringPreferencesKey("crash_sort")
+        val CRASH_SORT_REVERSED = booleanPreferencesKey("crash_sort_reversed")
+        val WRAP_CRASH_LOG = booleanPreferencesKey("wrap_crash_log")
+        val OPEN_CRASHES_ON_STARTUP = booleanPreferencesKey("open_crashes_on_startup")
+        val INCLUDE_DEVICE_ZIP = booleanPreferencesKey("include_device_zip")
+        val INCLUDE_APP_ZIP = booleanPreferencesKey("include_app_zip")
         val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
         val ACCESS_PREFERENCE = stringPreferencesKey("access_preference")
         val LIVE_ONLY_ON_START = booleanPreferencesKey("live_only_on_start")
@@ -114,7 +136,11 @@ class SettingsRepository(private val context: Context) {
             crashNotifications = p[Keys.CRASH_NOTIFICATIONS] ?: true,
             bubbleEnabled = p[Keys.BUBBLE_ENABLED] ?: false,
             theme = p[Keys.THEME] ?: "system",
-            logTextScale = p[Keys.LOG_TEXT_SCALE] ?: 1,
+            logTextScale = p[Keys.LOG_TEXT_SCALE_F] ?: when (p[Keys.LOG_TEXT_SCALE]) {
+                0 -> 0.85f
+                2 -> 1.15f
+                else -> 1f
+            },
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
             guideCompleted = p[Keys.GUIDE_COMPLETED] ?: false,
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
@@ -123,11 +149,17 @@ class SettingsRepository(private val context: Context) {
             crashBlacklist = p[Keys.CRASH_BLACKLIST] ?: emptySet(),
             watchOnBoot = p[Keys.WATCH_ON_BOOT] ?: false,
             showLogTime = p[Keys.SHOW_LOG_TIME] ?: true,
+            showLogDate = p[Keys.SHOW_LOG_DATE] ?: false,
+            showLogUid = p[Keys.SHOW_LOG_UID] ?: false,
             showLogPid = p[Keys.SHOW_LOG_PID] ?: true,
             showLogTid = p[Keys.SHOW_LOG_TID] ?: true,
             showLogTag = p[Keys.SHOW_LOG_TAG] ?: true,
             showLogPackage = p[Keys.SHOW_LOG_PACKAGE] ?: true,
             logTimeFormat = p[Keys.LOG_TIME_FORMAT] ?: "time",
+            datePattern = p[Keys.DATE_PATTERN]
+                ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.DATE_PRESET,
+            timePattern = p[Keys.TIME_PATTERN]
+                ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.TIME_PRESET,
             rootEnabled = p[Keys.ROOT_ENABLED] ?: false,
             accessPreference = p[Keys.ACCESS_PREFERENCE] ?: AccessPolicy.AUTO,
             liveOnlyOnStart = p[Keys.LIVE_ONLY_ON_START] ?: false,
@@ -140,6 +172,12 @@ class SettingsRepository(private val context: Context) {
             separateCrashChannels = p[Keys.SEPARATE_CRASH_CHANNELS] ?: true,
             logsExpanded = p[Keys.LOGS_EXPANDED] ?: false,
             searchCaseSensitive = p[Keys.SEARCH_CASE_SENSITIVE] ?: false,
+            crashSort = p[Keys.CRASH_SORT] ?: "NEWEST",
+            crashSortReversed = p[Keys.CRASH_SORT_REVERSED] ?: false,
+            wrapCrashLogLines = p[Keys.WRAP_CRASH_LOG] ?: true,
+            openCrashesOnStartup = p[Keys.OPEN_CRASHES_ON_STARTUP] ?: false,
+            includeDeviceInfoInZip = p[Keys.INCLUDE_DEVICE_ZIP] ?: true,
+            includeAppInfoInZip = p[Keys.INCLUDE_APP_ZIP] ?: true,
         )
     }
 
@@ -155,8 +193,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTheme(value: String) =
         context.dataStore.edit { it[Keys.THEME] = value }
 
-    suspend fun setLogTextScale(value: Int) =
-        context.dataStore.edit { it[Keys.LOG_TEXT_SCALE] = value.coerceIn(0, 2) }
+    suspend fun setLogTextScale(value: Float) =
+        context.dataStore.edit { it[Keys.LOG_TEXT_SCALE_F] = value.coerceIn(0.75f, 1.50f) }
 
     suspend fun setSetupCompleted(value: Boolean) =
         context.dataStore.edit { it[Keys.SETUP_COMPLETED] = value }
@@ -202,6 +240,12 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setShowLogTime(value: Boolean) =
         context.dataStore.edit { it[Keys.SHOW_LOG_TIME] = value }
+
+    suspend fun setShowLogDate(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_DATE] = value }
+
+    suspend fun setShowLogUid(value: Boolean) =
+        context.dataStore.edit { it[Keys.SHOW_LOG_UID] = value }
 
     suspend fun setShowLogPid(value: Boolean) =
         context.dataStore.edit { it[Keys.SHOW_LOG_PID] = value }
@@ -252,6 +296,30 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setSearchCaseSensitive(value: Boolean) =
         context.dataStore.edit { it[Keys.SEARCH_CASE_SENSITIVE] = value }
+
+    suspend fun setDatePattern(value: String) =
+        context.dataStore.edit { it[Keys.DATE_PATTERN] = value }
+
+    suspend fun setTimePattern(value: String) =
+        context.dataStore.edit { it[Keys.TIME_PATTERN] = value }
+
+    suspend fun setCrashSort(value: String) =
+        context.dataStore.edit { it[Keys.CRASH_SORT] = value }
+
+    suspend fun setCrashSortReversed(value: Boolean) =
+        context.dataStore.edit { it[Keys.CRASH_SORT_REVERSED] = value }
+
+    suspend fun setWrapCrashLogLines(value: Boolean) =
+        context.dataStore.edit { it[Keys.WRAP_CRASH_LOG] = value }
+
+    suspend fun setOpenCrashesOnStartup(value: Boolean) =
+        context.dataStore.edit { it[Keys.OPEN_CRASHES_ON_STARTUP] = value }
+
+    suspend fun setIncludeDeviceInfoInZip(value: Boolean) =
+        context.dataStore.edit { it[Keys.INCLUDE_DEVICE_ZIP] = value }
+
+    suspend fun setIncludeAppInfoInZip(value: Boolean) =
+        context.dataStore.edit { it[Keys.INCLUDE_APP_ZIP] = value }
 
     suspend fun setAccessPreference(value: String) {
         val allowed = setOf(

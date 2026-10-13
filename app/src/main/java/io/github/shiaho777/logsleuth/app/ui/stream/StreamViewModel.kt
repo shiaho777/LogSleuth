@@ -13,6 +13,7 @@ import io.github.shiaho777.logsleuth.app.core.apps.groupEntriesByApp
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.core.filter.encodeLevels
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
 import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
@@ -74,6 +75,9 @@ data class StreamUiState(
     val adbHeld: Boolean = false,
     /** Bumped when a filter is created from a log line, so the screen can toast. */
     val filterNotice: Int = 0,
+    val searchCaseSensitive: Boolean = false,
+    /** Buffer has lines but the active filter hides every one. */
+    val filteredOut: Boolean = false,
 )
 
 @HiltViewModel
@@ -121,7 +125,12 @@ class StreamViewModel @Inject constructor(
                 val ignore = !s.searchCaseSensitive
                 val caseChanged = ignore != searchIgnoreCase
                 searchIgnoreCase = ignore
-                _ui.update { it.copy(bubbleEnabled = s.bubbleEnabled) }
+                _ui.update {
+                    it.copy(
+                        bubbleEnabled = s.bubbleEnabled,
+                        searchCaseSensitive = s.searchCaseSensitive,
+                    )
+                }
                 if (caseChanged) {
                     val query = _ui.value.searchQuery
                     if (query.isNotBlank()) recomputeHits(query, resetIndex = true)
@@ -266,7 +275,8 @@ class StreamViewModel @Inject constructor(
     /** Call with [listMutex] held. */
     private fun publishLocked() {
         val snapshot = ArrayList(visible)
-        _ui.update { it.copy(entries = snapshot) }
+        val filteredOut = all.isNotEmpty() && snapshot.isEmpty()
+        _ui.update { it.copy(entries = snapshot, filteredOut = filteredOut) }
     }
 
     private fun currentCompiled(): CompiledFilter =
@@ -419,6 +429,7 @@ class StreamViewModel @Inject constructor(
                 LogFilter(
                     name = name,
                     tagQuery = entry.tag,
+                    tagExact = true,
                     pid = entry.pid.toString(),
                     uid = entry.uid?.toString().orEmpty(),
                     enabled = true,
@@ -438,8 +449,10 @@ class StreamViewModel @Inject constructor(
                 // Record what the user currently sees, filters included.
                 putExtra(RecordService.EXTRA_FILTER_PACKAGE, f.packageName)
                 putExtra(RecordService.EXTRA_FILTER_LEVEL, f.minLevel.name)
+                putExtra(RecordService.EXTRA_FILTER_LEVELS, f.allowedLevels.encodeLevels())
                 putExtra(RecordService.EXTRA_FILTER_QUERY, f.query)
                 putExtra(RecordService.EXTRA_FILTER_TAG, f.tagQuery)
+                putExtra(RecordService.EXTRA_FILTER_TAG_EXACT, f.tagExact)
                 putExtra(RecordService.EXTRA_FILTER_EXCLUDE, f.excludeQuery)
                 putExtra(RecordService.EXTRA_FILTER_REGEX, f.useRegex)
             }
@@ -499,6 +512,10 @@ class StreamViewModel @Inject constructor(
             delay(250)
             recomputeHits(query, resetIndex = true)
         }
+    }
+
+    fun setSearchCaseSensitive(value: Boolean) {
+        viewModelScope.launch { settingsRepository.setSearchCaseSensitive(value) }
     }
 
     private suspend fun recomputeHits(query: String, resetIndex: Boolean = false) {

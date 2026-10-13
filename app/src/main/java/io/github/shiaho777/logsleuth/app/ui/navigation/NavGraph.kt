@@ -43,6 +43,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.ui.crashes.AppCrashesScreen
+import io.github.shiaho777.logsleuth.app.ui.crashes.CrashDetailsScreen
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
@@ -64,6 +65,7 @@ object Routes {
     const val REPORT = "report"
     const val CRASHES = "crashes"
     const val APP_CRASHES = "crashes/pkg/{packageName}?event={eventId}"
+    const val CRASH_DETAIL = "crash/{eventId}"
     const val FILTERS = "filters"
     const val SETTINGS = "settings"
 
@@ -76,6 +78,8 @@ object Routes {
         val key = Uri.encode(packageName?.takeIf { it.isNotBlank() } ?: UNKNOWN_PACKAGE)
         return "crashes/pkg/$key?event=$eventId"
     }
+
+    fun crashDetail(eventId: Long) = "crash/$eventId"
 
     fun packageFromKey(key: String?): String? {
         val decoded = Uri.decode(key ?: return null)
@@ -205,6 +209,7 @@ fun LogSleuthNavHost(
                             animatedVisibilityScope = this,
                             onBack = { navController.popBackStack() },
                             onOpenFilters = { navController.navigate(Routes.FILTERS) },
+                            onOpenCrash = { id -> navController.navigate(Routes.crashDetail(id)) },
                         )
                     }
                     composable(Routes.REPORT) {
@@ -231,7 +236,16 @@ fun LogSleuthNavHost(
                             },
                         ),
                     ) {
-                        AppCrashesScreen(onBack = { navController.popBackStack() })
+                        AppCrashesScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenCrash = { id -> navController.navigate(Routes.crashDetail(id)) },
+                        )
+                    }
+                    composable(
+                        Routes.CRASH_DETAIL,
+                        arguments = listOf(navArgument("eventId") { type = NavType.LongType }),
+                    ) {
+                        CrashDetailsScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Routes.FILTERS) {
                         FiltersScreen(onBack = { navController.popBackStack() })

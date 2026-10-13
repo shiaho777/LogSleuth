@@ -92,6 +92,26 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setSearchCaseSensitive(value)
     }
 
+    fun setDatePattern(value: String) = viewModelScope.launch {
+        settingsRepository.setDatePattern(value)
+    }
+
+    fun setTimePattern(value: String) = viewModelScope.launch {
+        settingsRepository.setTimePattern(value)
+    }
+
+    fun setOpenCrashesOnStartup(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setOpenCrashesOnStartup(value)
+    }
+
+    fun setIncludeDeviceInfoInZip(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setIncludeDeviceInfoInZip(value)
+    }
+
+    fun setIncludeAppInfoInZip(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setIncludeAppInfoInZip(value)
+    }
+
     fun setTheme(value: String) = viewModelScope.launch {
         settingsRepository.setTheme(value)
     }
@@ -100,7 +120,7 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setLanguage(value)
     }
 
-    fun setLogTextScale(value: Int) = viewModelScope.launch {
+    fun setLogTextScale(value: Float) = viewModelScope.launch {
         settingsRepository.setLogTextScale(value)
     }
 
@@ -127,6 +147,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowLogTime(value: Boolean) = viewModelScope.launch {
         settingsRepository.setShowLogTime(value)
+    }
+
+    fun setShowLogDate(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogDate(value)
+    }
+
+    fun setShowLogUid(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setShowLogUid(value)
     }
 
     fun setShowLogPid(value: Boolean) = viewModelScope.launch {

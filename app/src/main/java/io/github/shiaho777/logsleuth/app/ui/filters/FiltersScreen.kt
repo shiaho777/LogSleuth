@@ -210,7 +210,7 @@ private fun presetSummary(f: LogFilter): String {
     val kind = stringResource(if (f.including) R.string.filter_including else R.string.filter_excluding)
     return buildString {
         append(kind)
-        append(" · ≥ ${f.minLevel.letter}")
+        append(" · ${f.effectiveLevels.sortedBy { it.ordinal }.joinToString("+") { it.letter.toString() }}")
         if (f.query.isNotBlank()) append(" · q:\"${f.query}\"")
         if (f.tagQuery.isNotBlank()) append(" · tag:\"${f.tagQuery}\"")
         if (f.excludeQuery.isNotBlank()) append(" · -\"${f.excludeQuery}\"")
@@ -236,6 +236,7 @@ private fun FilterEditorDialog(
     var tid by remember { mutableStateOf(initial?.tid ?: "") }
     var uid by remember { mutableStateOf(initial?.uid ?: "") }
     var useRegex by remember { mutableStateOf(initial?.useRegex ?: false) }
+    var tagExact by remember { mutableStateOf(initial?.tagExact ?: false) }
     var including by remember { mutableStateOf(initial?.including ?: true) }
     var enabled by remember { mutableStateOf(initial?.enabled ?: false) }
 
@@ -290,6 +291,10 @@ private fun FilterEditorDialog(
                     Text(stringResource(R.string.filter_enabled), modifier = Modifier.padding(start = 8.dp))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = tagExact, onCheckedChange = { tagExact = it })
+                    Text(stringResource(R.string.filter_tag_exact), modifier = Modifier.padding(start = 8.dp))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = useRegex, onCheckedChange = { useRegex = it })
                     Text(stringResource(R.string.filter_regex), modifier = Modifier.padding(start = 8.dp))
                 }
@@ -308,6 +313,7 @@ private fun FilterEditorDialog(
                             pid = pid.trim(),
                             tid = tid.trim(),
                             uid = uid.trim(),
+                            tagExact = tagExact,
                             useRegex = useRegex,
                             including = including,
                             enabled = enabled,

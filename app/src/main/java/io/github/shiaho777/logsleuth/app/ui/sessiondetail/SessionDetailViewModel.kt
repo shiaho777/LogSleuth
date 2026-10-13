@@ -43,6 +43,12 @@ data class SessionDetailUiState(
     val presets: List<LogFilter> = emptyList(),
     val loading: Boolean = true,
     val missingFile: Boolean = false,
+    val searching: Boolean = false,
+    val searchQuery: String = "",
+    val searchHits: List<Int> = emptyList(),
+    val searchHitIndex: Int = -1,
+    val searchCaseSensitive: Boolean = false,
+    val filteredOut: Boolean = false,
 )
 
 @HiltViewModel
@@ -55,6 +61,7 @@ class SessionDetailViewModel @Inject constructor(
     private val contextStore: CrashContextStore,
     private val installedApps: InstalledApps,
     private val filterDao: FilterDao,
+    private val settingsRepository: io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository,
 ) : ViewModel() {
 
     private val sessionId: Long = checkNotNull(savedStateHandle["sessionId"])
@@ -87,6 +94,11 @@ class SessionDetailViewModel @Inject constructor(
             bookmarkDao.observeForSession(sessionId).collect { b -> _ui.update { it.copy(bookmarks = b) } }
         }
         viewModelScope.launch { _ui.update { it.copy(apps = installedApps.load()) } }
+        viewModelScope.launch {
+            settingsRepository.settings.collect { s ->
+                _ui.update { it.copy(searchCaseSensitive = s.searchCaseSensitive) }
+            }
+        }
         viewModelScope.launch {
             filterDao.observeAll().collect { list ->
                 val models = list.map { it.toLogFilter() }
@@ -133,7 +145,58 @@ class SessionDetailViewModel @Inject constructor(
             all.filter { compiled.matches(it.entry) && stack.matches(it.entry) }
         }
         _ui.update {
-            it.copy(entries = filtered, regexInvalid = compiled.regexInvalid || stack.regexInvalid)
+            it.copy(
+                entries = filtered,
+                regexInvalid = compiled.regexInvalid || stack.regexInvalid,
+                filteredOut = all.isNotEmpty() && filtered.isEmpty(),
+            )
+        }
+        recomputeHits(_ui.value.searchQuery)
+    }
+
+    fun setSearching(searching: Boolean) {
+        _ui.update {
+            it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1)
+        }
+    }
+
+    fun setSearchQuery(query: String) {
+        _ui.update { it.copy(searchQuery = query) }
+        recomputeHits(query, resetIndex = true)
+    }
+
+    fun setSearchCaseSensitive(value: Boolean) {
+        viewModelScope.launch { settingsRepository.setSearchCaseSensitive(value) }
+    }
+
+    fun nextSearchHit(direction: Int) {
+        _ui.update { state ->
+            if (state.searchHits.isEmpty()) state
+            else state.copy(
+                searchHitIndex = (state.searchHitIndex + direction).mod(state.searchHits.size),
+            )
+        }
+    }
+
+    private fun recomputeHits(query: String, resetIndex: Boolean = false) {
+        val ignore = !_ui.value.searchCaseSensitive
+        val hits = if (query.isBlank()) {
+            emptyList()
+        } else {
+            _ui.value.entries.mapIndexedNotNull { index, uiEntry ->
+                val e = uiEntry.entry
+                if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
+            }
+        }
+        _ui.update {
+            it.copy(
+                searchHits = hits,
+                searchHitIndex = when {
+                    hits.isEmpty() -> -1
+                    resetIndex -> 0
+                    else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
+                },
+            )
         }
     }
 
@@ -163,6 +226,14 @@ class SessionDetailViewModel @Inject constructor(
         viewModelScope.launch {
             exporter.export(sessionId, format).onSuccess { file ->
                 exporter.share(file, if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain")
+            }
+        }
+    }
+
+    fun saveToUri(format: SessionExporter.Format, uri: android.net.Uri) {
+        viewModelScope.launch {
+            exporter.export(sessionId, format).onSuccess { file ->
+                exporter.saveToUri(file, uri)
             }
         }
     }

@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CrashEventEntity::class,
         BookmarkEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +42,17 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE crash_events ADD COLUMN versionName TEXT")
                 db.execSQL("ALTER TABLE crash_events ADD COLUMN versionCode INTEGER")
                 db.execSQL("ALTER TABLE crash_events ADD COLUMN contextPath TEXT")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE filters ADD COLUMN allowedLevels TEXT NOT NULL DEFAULT ''",
+                )
+                db.execSQL(
+                    "ALTER TABLE filters ADD COLUMN tagExact INTEGER NOT NULL DEFAULT 0",
+                )
             }
         }
     }
