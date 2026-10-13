@@ -52,6 +52,46 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setCrashNotifications(value)
     }
 
+    fun setLiveOnlyOnStart(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setLiveOnlyOnStart(value)
+    }
+
+    fun setCollectJava(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setCollectJava(value)
+    }
+
+    fun setCollectNative(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setCollectNative(value)
+    }
+
+    fun setCollectAnr(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setCollectAnr(value)
+    }
+
+    fun setNotifyJava(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setNotifyJava(value)
+    }
+
+    fun setNotifyNative(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setNotifyNative(value)
+    }
+
+    fun setNotifyAnr(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setNotifyAnr(value)
+    }
+
+    fun setSeparateCrashChannels(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setSeparateCrashChannels(value)
+    }
+
+    fun setLogsExpanded(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setLogsExpanded(value)
+    }
+
+    fun setSearchCaseSensitive(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setSearchCaseSensitive(value)
+    }
+
     fun setTheme(value: String) = viewModelScope.launch {
         settingsRepository.setTheme(value)
     }

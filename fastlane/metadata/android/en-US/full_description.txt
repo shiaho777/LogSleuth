@@ -14,7 +14,9 @@ Reading other apps' logs needs a grant. Shizuku needs no root (on Android 11+
 it can be activated on-device via Wireless Debugging). Root works too, if the
 device has Magisk, KernelSU, or APatch — it stays off until you turn it on.
 Or grant once over ADB: adb shell pm grant io.github.shiaho777.logsleuth.app
-android.permission.READ_LOGS. The embedded SDK mode needs no grant at all.
+android.permission.READ_LOGS. On Android 13 and later that grant only starts
+logcat while LogSleuth is on screen; Shizuku and root keep working in the
+background. The embedded SDK mode needs no grant at all.
 
 Open source (Apache-2.0). No ads, no tracking. Network is used only to check
 GitHub for updates.

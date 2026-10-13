@@ -11,8 +11,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +69,8 @@ fun SessionDetailScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var showShare by remember { mutableStateOf(false) }
+    var showRename by remember { mutableStateOf(false) }
+    var renameText by remember(ui.session?.name) { mutableStateOf(ui.session?.name.orEmpty()) }
 
     Scaffold(
         topBar = {
@@ -78,6 +82,12 @@ fun SessionDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        renameText = ui.session?.name.orEmpty()
+                        showRename = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.session_rename))
+                    }
                     IconButton(onClick = { showShare = true }) {
                         Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_logs))
                     }
@@ -156,6 +166,8 @@ fun SessionDetailScreen(
                             CrashCard(
                                 ui.crashes[i],
                                 onDelete = null,
+                                onShare = viewModel::shareCrash,
+                                onReadContext = viewModel::readContext,
                                 modifier = Modifier.animateItem(),
                             )
                         }
@@ -192,6 +204,32 @@ fun SessionDetailScreen(
                 }
             }
         }
+    }
+
+    if (showRename) {
+        AlertDialog(
+            onDismissRequest = { showRename = false },
+            title = { Text(stringResource(R.string.session_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.session_rename_hint)) },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.rename(renameText)
+                    showRename = false
+                }) { Text(stringResource(R.string.session_rename)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRename = false }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
     }
 
     if (showShare) {

@@ -86,8 +86,9 @@ halves that work together:
 | Feature | Details |
 | --- | --- |
 | Live detection | `FATAL EXCEPTION`, native `Fatal signal` and ANR signatures flagged while streaming or recording |
-| In-app event list | Crash cards expand to the full stack trace; share or delete with Undo |
-| Notifications | Optional heads-up when a crash lands (off by a toggle in Settings) |
+| In-app event list | Crashes grouped by app (icon, name, count). Search, sort, and open one app's stack, version, and the surrounding lines. Delete one app's crashes with Undo |
+| Notifications | Save and notify are separate for Java crashes, native crashes, and ANRs. Each app can have its own channel, so muting one in system settings keeps the record. The alert shows the stack, copies it, and opens that crash |
+| Surrounding logs | Up to 200 lines from the moment of the crash are stored beside it and included in the share zip |
 
 ### Reports, export & import
 
@@ -106,7 +107,9 @@ halves that work together:
 | Bilingual | English & 简体中文, plus an in-app language override |
 | Themes & text | System / Light / Dark themes; Compact / Default / Comfortable log text sizes |
 | In-app updates | GitHub Releases check, release notes, resumable APK download (pause/resume/cancel), one-tap install, version history |
-| Tunable buffer | On-screen ring buffer from 1,000 to 200,000 entries (default 20,000) |
+| Tunable buffer | On-screen ring buffer from 1,000 to 200,000 entries (default 20,000). Optional cold start that follows only new lines; a reconnect still continues from the last line |
+| Log rows | Optional full lines instead of an 8-line clamp, and optional case-sensitive search |
+| Sessions | Rename any session from the list or its detail screen |
 
 ### Embedded SDK (`logsleuth-sdk`)
 
@@ -140,10 +143,15 @@ applies to every logcat app. Any one of these grants is enough:
    so an unrooted phone never sees a grant dialog. Root reads the same full
    log as Shizuku, including per-app filtering. Auto mode still prefers
    Shizuku when both are available; Settings can put root first.
-3. **ADB one-time grant** — with a PC, run once (persists until uninstall):
+3. **ADB grant** — with a PC, run once. The permission stays until you uninstall:
    ```bash
    adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
    ```
+   On Android 13 and later this grant is not a background log source. Android
+   only shows the approval dialog while LogSleuth is on screen, and a start
+   from the background is refused and remembered for about a minute. An
+   already-approved stream keeps running after you leave. Shizuku and root
+   are not affected, including the boot crash watch.
 
 The setup wizard walks you through these on first launch and can be reopened
 any time from Settings → Log access → "Open setup guide".
@@ -240,7 +248,7 @@ Everything the app asks for, and why:
 
 | Permission | Used for |
 | --- | --- |
-| `READ_LOGS` | Device log when you use the ADB grant. Shizuku and root read logs through a shell instead |
+| `READ_LOGS` | Device log when you use the ADB grant. On Android 13+ a new logcat starts only while LogSleuth is on screen. Shizuku and root read logs through a shell instead |
 | `moe.shizuku…API_V23` | Talking to the Shizuku service |
 | `FOREGROUND_SERVICE` + `…_DATA_SYNC` | Keeping background recording alive |
 | `POST_NOTIFICATIONS` | Recording status, crash/ANR alerts, auto-stop notices |

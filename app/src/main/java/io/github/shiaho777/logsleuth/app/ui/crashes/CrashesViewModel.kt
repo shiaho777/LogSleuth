@@ -3,67 +3,97 @@ package io.github.shiaho777.logsleuth.app.ui.crashes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashGroup
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashSort
+import io.github.shiaho777.logsleuth.app.core.crashes.groupCrashes
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
-import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
-import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class CrashBrowserState(
+    val query: String = "",
+    val sort: CrashSort = CrashSort.NEWEST,
+    val reversed: Boolean = false,
+)
 
 @HiltViewModel
 class CrashesViewModel @Inject constructor(
     private val crashEventDao: CrashEventDao,
-    private val exporter: SessionExporter,
-    private val settingsRepository: SettingsRepository,
+    private val deleter: CrashDeleter,
 ) : ViewModel() {
 
-    val crashes: StateFlow<List<CrashEventEntity>> = crashEventDao.observeAll()
+    private val crashes = crashEventDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Crash event hidden pending the undo window; deleted for real on expiry. */
-    private val _pendingDelete = MutableStateFlow<CrashEventEntity?>(null)
-    val pendingDelete: StateFlow<CrashEventEntity?> = _pendingDelete.asStateFlow()
+    private val browser = MutableStateFlow(CrashBrowserState())
+
+    /** Ids hidden during the undo window. Committed when it expires. */
+    private val _pendingIds = MutableStateFlow<Set<Long>>(emptySet())
+    val pendingDelete: StateFlow<Boolean> = _pendingIds
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val groups: StateFlow<List<CrashGroup>> = combine(crashes, browser, _pendingIds) { rows, state, hidden ->
+        groupCrashes(
+            rows.filter { it.id !in hidden },
+            query = state.query,
+            sort = state.sort,
+            reversed = state.reversed,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val browserState: StateFlow<CrashBrowserState> = browser
 
     private var deleteJob: Job? = null
 
-    fun requestDelete(crash: CrashEventEntity) {
-        _pendingDelete.value?.let { delete(it.id) }
-        _pendingDelete.value = crash
-        deleteJob?.cancel()
+    fun setQuery(query: String) {
+        browser.value = browser.value.copy(query = query)
+    }
+
+    fun setSort(sort: CrashSort) {
+        browser.value = browser.value.copy(sort = sort)
+    }
+
+    fun toggleReversed() {
+        browser.value = browser.value.copy(reversed = !browser.value.reversed)
+    }
+
+    fun requestDeletePackage(packageName: String?) {
+        commitPending()
+        val ids = crashes.value
+            .filter { it.packageName == packageName }
+            .map { it.id }
+            .toSet()
+        if (ids.isEmpty()) return
+        _pendingIds.value = ids
         deleteJob = viewModelScope.launch {
             delay(4_000)
-            _pendingDelete.value = null
-            delete(crash.id)
+            val pending = _pendingIds.value
+            _pendingIds.value = emptySet()
+            deleter.deleteIds(pending)
         }
     }
 
     fun undoDelete() {
         deleteJob?.cancel()
-        _pendingDelete.value = null
+        _pendingIds.value = emptySet()
     }
 
-    private fun delete(id: Long) {
-        viewModelScope.launch { crashEventDao.deleteById(id) }
-    }
-
-    fun ignore(packageName: String) {
-        viewModelScope.launch { settingsRepository.ignorePackage(packageName) }
-    }
-
-    fun share(crash: CrashEventEntity) {
-        viewModelScope.launch {
-            val name = "crash_${crash.packageName ?: "unknown"}_${crash.id}.txt"
-            exporter.shareSnippet(
-                name,
-                "${crash.type} in ${crash.packageName ?: "unknown app"}\n\n${crash.snippet}",
-            )
+    private fun commitPending() {
+        val pending = _pendingIds.value
+        deleteJob?.cancel()
+        _pendingIds.value = emptySet()
+        if (pending.isNotEmpty()) {
+            viewModelScope.launch { deleter.deleteIds(pending) }
         }
     }
 }

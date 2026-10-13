@@ -73,6 +73,10 @@ data class LogRowPrefs(
     val showPackage: Boolean = true,
     /** "time" | "datetime" | "epoch" */
     val timeFormat: String = "time",
+    /** Draw the whole message instead of clamping the row to 8 lines. */
+    val logsExpanded: Boolean = false,
+    /** Search highlight matches case. Off keeps the previous ignore-case hit. */
+    val searchCaseSensitive: Boolean = false,
 )
 
 val LocalLogRowPrefs = compositionLocalOf { LogRowPrefs() }
@@ -118,11 +122,12 @@ fun LogRow(
     val isError = entry.level.priority >= LogLevel.E.priority
 
     val highlightStyle = highlightStyle(isError)
-    val tagText = remember(entry.tag, highlight, highlightStyle) {
-        highlighted(entry.tag, highlight, highlightStyle)
+    val ignoreCase = !prefs.searchCaseSensitive
+    val tagText = remember(entry.tag, highlight, highlightStyle, ignoreCase) {
+        highlighted(entry.tag, highlight, highlightStyle, ignoreCase)
     }
-    val messageText = remember(entry.message, highlight, highlightStyle) {
-        highlighted(entry.message, highlight, highlightStyle)
+    val messageText = remember(entry.message, highlight, highlightStyle, ignoreCase) {
+        highlighted(entry.message, highlight, highlightStyle, ignoreCase)
     }
 
     val rowBg = when {
@@ -239,7 +244,7 @@ fun LogRow(
                 },
                 // Multi-line entries (e.g. glued fatal blocks) are capped in
                 // the list; the detail sheet always shows the full message.
-                maxLines = 8,
+                maxLines = if (prefs.logsExpanded) Int.MAX_VALUE else 8,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -421,12 +426,17 @@ private fun highlightStyle(isError: Boolean) = SpanStyle(
     ),
 )
 
-private fun highlighted(text: String, query: String?, style: SpanStyle): AnnotatedString {
+private fun highlighted(
+    text: String,
+    query: String?,
+    style: SpanStyle,
+    ignoreCase: Boolean,
+): AnnotatedString {
     if (query.isNullOrBlank()) return AnnotatedString(text)
     return buildAnnotatedString {
         var start = 0
-        val lower = text.lowercase()
-        val q = query.lowercase()
+        val lower = if (ignoreCase) text.lowercase() else text
+        val q = if (ignoreCase) query.lowercase() else query
         while (true) {
             val idx = lower.indexOf(q, start)
             if (idx < 0) {

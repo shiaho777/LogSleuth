@@ -45,6 +45,24 @@ sealed interface LogcatSource {
     fun stream(since: String? = null): Flow<String>
 }
 
+/**
+ * Stamp passed to `logcat -T`. A reconnect keeps [resumeSince]. A cold
+ * start dumps the ring unless [liveOnly] is set, in which case logcat
+ * follows from [nowMillis] and the old buffer stays out of the stream.
+ */
+fun streamSince(resumeSince: String?, liveOnly: Boolean, nowMillis: Long): String? =
+    resumeSince?.takeIf { it.isNotBlank() }
+        ?: if (liveOnly) UidNames.formatThreadTime(nowMillis) else null
+
+/**
+ * Android 13+ declines a new app-uid logcat immediately when the process is
+ * not top, and remembers that decline for about a minute. A background
+ * start therefore hides the prompt the user would have seen on screen.
+ * Shizuku and root run as shell, so they are not part of this.
+ */
+fun adbStartNeedsForeground(sdkInt: Int, kind: AccessKind, inForeground: Boolean): Boolean =
+    sdkInt >= 33 && kind == AccessKind.READ_LOGS && !inForeground
+
 /** Runs logcat in the app's own process — requires the READ_LOGS grant. */
 class LocalLogcatSource : LogcatSource {
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashContextStore
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
@@ -51,6 +52,7 @@ class SessionDetailViewModel @Inject constructor(
     private val crashEventDao: CrashEventDao,
     private val bookmarkDao: BookmarkDao,
     private val exporter: SessionExporter,
+    private val contextStore: CrashContextStore,
     private val installedApps: InstalledApps,
     private val filterDao: FilterDao,
 ) : ViewModel() {
@@ -94,6 +96,22 @@ class SessionDetailViewModel @Inject constructor(
             }
         }
     }
+
+    fun rename(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch {
+            sessionDao.rename(sessionId, trimmed)
+            _ui.update { it.copy(session = it.session?.copy(name = trimmed)) }
+        }
+    }
+
+    fun shareCrash(crash: CrashEventEntity) {
+        viewModelScope.launch { exporter.shareCrash(crash) }
+    }
+
+    suspend fun readContext(crash: CrashEventEntity): String? =
+        withContext(Dispatchers.IO) { contextStore.read(crash.contextPath) }
 
     fun setFilter(filter: LogFilter) {
         _ui.update { it.copy(filter = filter) }

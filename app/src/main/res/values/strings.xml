@@ -22,7 +22,7 @@
     <string name="setup_root_unknown">Not requested</string>
     <string name="setup_root_checking">Waiting for the root manager…</string>
     <string name="setup_adb_title">ADB one-time grant</string>
-    <string name="setup_adb_desc">With a computer, run this command once. It stays valid until the app is uninstalled.</string>
+    <string name="setup_adb_desc">With a computer, run this command once. The grant stays until you uninstall. On Android 13 and later, Android only shows the log access prompt while LogSleuth is on screen, and a background start is refused for about a minute. Shizuku or root keeps reading in the background.</string>
     <string name="setup_copy_command">Copy command</string>
     <string name="setup_recheck">I ran it — re-check</string>
     <string name="setup_adb_granted">READ_LOGS granted</string>
@@ -318,7 +318,7 @@
     <string name="settings_crash_blacklist">Ignored apps</string>
     <string name="settings_crash_blacklist_desc">Crashes and ANRs from these packages are dropped.</string>
     <string name="settings_watch_boot">Watch for crashes after reboot</string>
-    <string name="settings_watch_boot_desc">Keeps a quiet notification so a crash is caught even when LogSleuth isn\'t open.</string>
+    <string name="settings_watch_boot_desc">Keeps a quiet notification so a crash is caught when LogSleuth isn\'t open. With only the ADB grant on Android 13 and later, watching waits until LogSleuth is on screen. Shizuku and root keep watching after reboot.</string>
     <string name="notif_channel_watch">Crash watch</string>
     <string name="notif_watch_title">Watching for crashes</string>
     <string name="notif_watch_text">LogSleuth is listening in the background</string>
@@ -334,5 +334,39 @@
     <string name="time_format_clock">Clock</string>
     <string name="time_format_datetime">Date and time</string>
     <string name="time_format_epoch">Epoch</string>
+
+    <string name="crash_copied">Crash copied</string>
+    <string name="crash_type_java">Java crash</string>
+    <string name="crash_type_native">Native crash</string>
+    <string name="crash_type_anr">ANR</string>
+    <string name="notif_channel_crash_app">%1$s · %2$s</string>
+    <string name="settings_live_only">Skip old logs on launch</string>
+    <string name="settings_live_only_desc">The next time the stream starts fresh, follow new lines only. A reconnect still continues from where it left off.</string>
+    <string name="settings_collect_java">Save Java crashes</string>
+    <string name="settings_collect_native">Save native crashes</string>
+    <string name="settings_collect_anr">Save ANRs</string>
+    <string name="settings_notify_java">Notify for Java crashes</string>
+    <string name="settings_notify_native">Notify for native crashes</string>
+    <string name="settings_notify_anr">Notify for ANRs</string>
+    <string name="settings_separate_channels">Separate notification channels</string>
+    <string name="settings_separate_channels_desc">Each app and crash type gets its own channel, so you can mute one in system settings and keep the record.</string>
+    <string name="settings_logs_expanded">Show full log lines</string>
+    <string name="settings_search_case">Case-sensitive search</string>
+    <string name="stream_adb_needs_foreground">Waiting until LogSleuth is on screen. On Android 13 and later an ADB logcat cannot start in the background: a refusal is remembered for about a minute and the prompt never appears.</string>
+    <string name="engine_adb_waiting">Waiting</string>
+    <string name="crash_search">Search crashes</string>
+    <string name="crash_sort">Sort</string>
+    <string name="crash_sort_newest">Newest</string>
+    <string name="crash_sort_count">Count</string>
+    <string name="crash_sort_name">Name</string>
+    <string name="crash_sort_reverse">Reverse order</string>
+    <string name="crash_group_count">%1$d</string>
+    <string name="crash_deleted_all">Crashes for this app deleted</string>
+    <string name="crash_open_channel">Notification settings</string>
+    <string name="crash_context_heading">Surrounding logs</string>
+    <string name="crash_version">%1$s (%2$d)</string>
+    <string name="crash_version_name">Version %1$s</string>
+    <string name="session_rename">Rename</string>
+    <string name="session_rename_hint">Session name</string>
 
 </resources>

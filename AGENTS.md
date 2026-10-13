@@ -68,6 +68,9 @@ Mental model:
 - Reading other apps' logs takes one of three grants: Shizuku, root
   (libsu, **viewer app only**, opt-in — do not exec `su` until the user
   turns it on), or `adb shell pm grant <pkg> android.permission.READ_LOGS`.
+  On API 33+, do not start or reconnect an app-uid logcat while LogSleuth
+  is in the background: a decline is cached for about 60 seconds and the
+  approval dialog never appears. Shizuku and root skip that check.
   The SDK reads only the host app's own logs and must not depend on libsu.
 - PID→package mapping beyond the logcat `uid` column needs a shell
   (Shizuku or root). The uid column itself is available on those two paths.

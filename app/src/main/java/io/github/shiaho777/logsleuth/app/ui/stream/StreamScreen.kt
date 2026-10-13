@@ -495,10 +495,11 @@ fun StreamScreen(
                         // A failed stream shows its real cause here —
                         // "logcat exited 1: Permission denied" tells the
                         // user something a bare badge never could.
-                        text = if (ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null) {
-                            stringResource(R.string.stream_error_detail, ui.lastError!!)
-                        } else {
-                            stringResource(R.string.empty_logs)
+                        text = when {
+                            ui.adbHeld -> stringResource(R.string.stream_adb_needs_foreground)
+                            ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null ->
+                                stringResource(R.string.stream_error_detail, ui.lastError!!)
+                            else -> stringResource(R.string.empty_logs)
                         },
                     )
 
@@ -536,6 +537,7 @@ fun StreamScreen(
                 // Engine status chip (connecting / streaming / stopped)
                 EngineStatusChip(
                     state = ui.engineState,
+                    adbHeld = ui.adbHeld,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(8.dp)
@@ -737,12 +739,17 @@ private fun RecordingBanner(
 
 /** Small pill showing the engine state at the top-right of the list. */
 @Composable
-private fun EngineStatusChip(state: LogcatEngine.State, modifier: Modifier = Modifier) {
-    val (label, color) = when (state) {
-        LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to LevelColors.I
-        LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to LevelColors.W
-        LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to LevelColors.V
-        LogcatEngine.State.ERROR -> stringResource(R.string.engine_error) to LevelColors.E
+private fun EngineStatusChip(
+    state: LogcatEngine.State,
+    adbHeld: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val (label, color) = when {
+        adbHeld -> stringResource(R.string.engine_adb_waiting) to LevelColors.W
+        state == LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to LevelColors.I
+        state == LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to LevelColors.W
+        state == LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to LevelColors.V
+        else -> stringResource(R.string.engine_error) to LevelColors.E
     }
     val dotAlpha by if (state == LogcatEngine.State.STARTING) {
         rememberInfiniteTransition(label = "engine").animateFloat(

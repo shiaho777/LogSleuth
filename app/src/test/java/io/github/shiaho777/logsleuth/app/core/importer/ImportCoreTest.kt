@@ -24,6 +24,7 @@ class ImportCoreTest {
             "logs/log_02.log",
             "crash.txt",
             "device.txt",
+            "app.txt",
             "meta.txt",
         )
         val plan = ImportCore.planZip(names)

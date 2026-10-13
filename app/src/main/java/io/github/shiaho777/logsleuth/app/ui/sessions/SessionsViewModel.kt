@@ -4,10 +4,10 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
-import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
@@ -33,7 +33,7 @@ data class SessionRow(val session: SessionEntity, val sizeBytes: Long)
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
     private val sessionDao: SessionDao,
-    private val crashEventDao: CrashEventDao,
+    private val crashDeleter: CrashDeleter,
     private val bookmarkDao: BookmarkDao,
     private val exporter: SessionExporter,
     private val importer: LogImporter,
@@ -84,10 +84,16 @@ class SessionsViewModel @Inject constructor(
     private fun delete(session: SessionEntity) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { File(session.filePath).delete() }
-            crashEventDao.deleteForSession(session.id)
+            crashDeleter.deleteSession(session.id)
             bookmarkDao.deleteForSession(session.id)
             sessionDao.delete(session)
         }
+    }
+
+    fun rename(session: SessionEntity, name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank() || trimmed == session.name) return
+        viewModelScope.launch { sessionDao.rename(session.id, trimmed) }
     }
 
     fun share(session: SessionEntity, format: SessionExporter.Format) {

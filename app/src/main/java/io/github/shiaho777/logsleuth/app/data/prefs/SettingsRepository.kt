@@ -53,6 +53,20 @@ data class Settings(
     val rootEnabled: Boolean = false,
     /** [AccessPolicy] value: auto, shizuku, root, or adb. */
     val accessPreference: String = AccessPolicy.AUTO,
+    /** Cold start follows new lines instead of dumping the ring buffer. */
+    val liveOnlyOnStart: Boolean = false,
+    val collectJava: Boolean = true,
+    val collectNative: Boolean = true,
+    val collectAnr: Boolean = true,
+    val notifyJava: Boolean = true,
+    val notifyNative: Boolean = true,
+    val notifyAnr: Boolean = true,
+    /** One notification channel per crash type and package. */
+    val separateCrashChannels: Boolean = true,
+    /** Draw full log lines in the stream instead of clamping to 8. */
+    val logsExpanded: Boolean = false,
+    /** Search matches case. Default off, which is the previous behavior. */
+    val searchCaseSensitive: Boolean = false,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -82,6 +96,16 @@ class SettingsRepository(private val context: Context) {
         val LOG_TIME_FORMAT = stringPreferencesKey("log_time_format")
         val ROOT_ENABLED = booleanPreferencesKey("root_enabled")
         val ACCESS_PREFERENCE = stringPreferencesKey("access_preference")
+        val LIVE_ONLY_ON_START = booleanPreferencesKey("live_only_on_start")
+        val COLLECT_JAVA = booleanPreferencesKey("collect_java")
+        val COLLECT_NATIVE = booleanPreferencesKey("collect_native")
+        val COLLECT_ANR = booleanPreferencesKey("collect_anr")
+        val NOTIFY_JAVA = booleanPreferencesKey("notify_java")
+        val NOTIFY_NATIVE = booleanPreferencesKey("notify_native")
+        val NOTIFY_ANR = booleanPreferencesKey("notify_anr")
+        val SEPARATE_CRASH_CHANNELS = booleanPreferencesKey("separate_crash_channels")
+        val LOGS_EXPANDED = booleanPreferencesKey("logs_expanded")
+        val SEARCH_CASE_SENSITIVE = booleanPreferencesKey("search_case_sensitive")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -106,6 +130,16 @@ class SettingsRepository(private val context: Context) {
             logTimeFormat = p[Keys.LOG_TIME_FORMAT] ?: "time",
             rootEnabled = p[Keys.ROOT_ENABLED] ?: false,
             accessPreference = p[Keys.ACCESS_PREFERENCE] ?: AccessPolicy.AUTO,
+            liveOnlyOnStart = p[Keys.LIVE_ONLY_ON_START] ?: false,
+            collectJava = p[Keys.COLLECT_JAVA] ?: true,
+            collectNative = p[Keys.COLLECT_NATIVE] ?: true,
+            collectAnr = p[Keys.COLLECT_ANR] ?: true,
+            notifyJava = p[Keys.NOTIFY_JAVA] ?: true,
+            notifyNative = p[Keys.NOTIFY_NATIVE] ?: true,
+            notifyAnr = p[Keys.NOTIFY_ANR] ?: true,
+            separateCrashChannels = p[Keys.SEPARATE_CRASH_CHANNELS] ?: true,
+            logsExpanded = p[Keys.LOGS_EXPANDED] ?: false,
+            searchCaseSensitive = p[Keys.SEARCH_CASE_SENSITIVE] ?: false,
         )
     }
 
@@ -188,6 +222,36 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRootEnabled(value: Boolean) =
         context.dataStore.edit { it[Keys.ROOT_ENABLED] = value }
+
+    suspend fun setLiveOnlyOnStart(value: Boolean) =
+        context.dataStore.edit { it[Keys.LIVE_ONLY_ON_START] = value }
+
+    suspend fun setCollectJava(value: Boolean) =
+        context.dataStore.edit { it[Keys.COLLECT_JAVA] = value }
+
+    suspend fun setCollectNative(value: Boolean) =
+        context.dataStore.edit { it[Keys.COLLECT_NATIVE] = value }
+
+    suspend fun setCollectAnr(value: Boolean) =
+        context.dataStore.edit { it[Keys.COLLECT_ANR] = value }
+
+    suspend fun setNotifyJava(value: Boolean) =
+        context.dataStore.edit { it[Keys.NOTIFY_JAVA] = value }
+
+    suspend fun setNotifyNative(value: Boolean) =
+        context.dataStore.edit { it[Keys.NOTIFY_NATIVE] = value }
+
+    suspend fun setNotifyAnr(value: Boolean) =
+        context.dataStore.edit { it[Keys.NOTIFY_ANR] = value }
+
+    suspend fun setSeparateCrashChannels(value: Boolean) =
+        context.dataStore.edit { it[Keys.SEPARATE_CRASH_CHANNELS] = value }
+
+    suspend fun setLogsExpanded(value: Boolean) =
+        context.dataStore.edit { it[Keys.LOGS_EXPANDED] = value }
+
+    suspend fun setSearchCaseSensitive(value: Boolean) =
+        context.dataStore.edit { it[Keys.SEARCH_CASE_SENSITIVE] = value }
 
     suspend fun setAccessPreference(value: String) {
         val allowed = setOf(

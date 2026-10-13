@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import java.io.File
@@ -69,6 +70,31 @@ class SessionExporter @Inject constructor(
         }
     }
 
+    /**
+     * Zip of one crash: the crashed app's version, this device, the stack,
+     * and the surrounding lines when they were saved.
+     */
+    suspend fun shareCrash(crash: CrashEventEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            pruneExports()
+            val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val safe = (crash.packageName ?: "unknown").replace(Regex("""[^\w.-]+"""), "_")
+            val out = File(dir, "crash_${safe}_${crash.id}.zip")
+            ZipOutputStream(out.outputStream().buffered()).use { zip ->
+                zip.putText("app.txt", appInfo(crash))
+                zip.putText("device.txt", deviceInfo())
+                zip.putText("crash.txt", crashBody(crash))
+                val contextFile = crash.contextPath?.let { File(it) }?.takeIf { it.isFile }
+                if (contextFile != null) {
+                    zip.putNextEntry(ZipEntry("context.log"))
+                    contextFile.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+            share(out, "application/zip")
+        }
+    }
+
     /** Shares an arbitrary text payload (e.g. a crash snippet) as a file. */
     suspend fun shareSnippet(name: String, content: String): Result<Unit> =
         withContext(Dispatchers.IO) {
@@ -121,10 +147,35 @@ class SessionExporter @Inject constructor(
 
     private fun deviceInfo(): String = buildString {
         appendLine("manufacturer=${android.os.Build.MANUFACTURER}")
+        appendLine("brand=${android.os.Build.BRAND}")
         appendLine("model=${android.os.Build.MODEL}")
         appendLine("device=${android.os.Build.DEVICE}")
+        appendLine("product=${android.os.Build.PRODUCT}")
+        appendLine("board=${android.os.Build.BOARD}")
+        appendLine("abis=${android.os.Build.SUPPORTED_ABIS.joinToString()}")
         appendLine("android=${android.os.Build.VERSION.RELEASE} (sdk ${android.os.Build.VERSION.SDK_INT})")
         appendLine("app=${context.packageName} ${context.packageManager.getPackageInfo(context.packageName, 0).versionName}")
+    }
+
+    private fun appInfo(crash: CrashEventEntity): String = buildString {
+        crash.appName?.let { appendLine("APP_NAME: $it") }
+        appendLine("PACKAGE: ${crash.packageName ?: "unknown"}")
+        crash.versionName?.let { appendLine("VERSION_NAME: $it") }
+        crash.versionCode?.let { appendLine("VERSION_CODE: $it") }
+    }
+
+    private fun crashBody(crash: CrashEventEntity): String = buildString {
+        appendLine("type=${crash.type}")
+        appendLine("time=${crash.time}")
+        appendLine("pid=${crash.pid}")
+        appendLine()
+        append(crash.snippet)
+    }
+
+    private fun ZipOutputStream.putText(name: String, text: String) {
+        putNextEntry(ZipEntry(name))
+        write(text.toByteArray())
+        closeEntry()
     }
 
     private fun sessionMeta(session: SessionEntity): String = buildString {

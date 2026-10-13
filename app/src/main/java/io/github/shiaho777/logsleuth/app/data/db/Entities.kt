@@ -54,6 +54,12 @@ data class CrashEventEntity(
     val type: String, // CRASH | ANR | NATIVE
     val firstLine: String,
     val snippet: String,
+    /** App label captured when the crash landed. Survives a later uninstall. */
+    val appName: String? = null,
+    val versionName: String? = null,
+    val versionCode: Long? = null,
+    /** File of surrounding log lines. Null when the buffer had nothing to keep. */
+    val contextPath: String? = null,
 )
 
 @Entity(tableName = "bookmarks")

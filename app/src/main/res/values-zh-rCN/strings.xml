@@ -22,7 +22,7 @@
     <string name="setup_root_unknown">尚未请求</string>
     <string name="setup_root_checking">正在等待 Root 管理器…</string>
     <string name="setup_adb_title">ADB 一次性授权</string>
-    <string name="setup_adb_desc">有电脑时执行一次下面的命令即可,卸载前一直有效。</string>
+    <string name="setup_adb_desc">有电脑时执行一次下面的命令。授权会保留到卸载。Android 13 及以后，只有 LogSleuth 在前台时系统才会弹出日志访问确认；在后台启动会被拒绝并记住大约一分钟。要在后台持续读取，请用 Shizuku 或 Root。</string>
     <string name="setup_copy_command">复制命令</string>
     <string name="setup_recheck">我已执行,重新检测</string>
     <string name="setup_adb_granted">已授予 READ_LOGS</string>
@@ -318,7 +318,7 @@
     <string name="settings_crash_blacklist">已忽略的应用</string>
     <string name="settings_crash_blacklist_desc">这些包名的崩溃和 ANR 会被丢掉。</string>
     <string name="settings_watch_boot">开机后继续监听崩溃</string>
-    <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 没打开时也能抓到崩溃。</string>
+    <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 没打开时也能抓到崩溃。Android 13 及以后，如果只有 ADB 授权，要等应用回到前台才会开始读；Shizuku 和 Root 可以在开机后继续听。</string>
     <string name="notif_channel_watch">崩溃监听</string>
     <string name="notif_watch_title">正在监听崩溃</string>
     <string name="notif_watch_text">LogSleuth 在后台听着日志</string>
@@ -334,5 +334,39 @@
     <string name="time_format_clock">时钟</string>
     <string name="time_format_datetime">日期和时间</string>
     <string name="time_format_epoch">时间戳</string>
+
+    <string name="crash_copied">已复制崩溃信息</string>
+    <string name="crash_type_java">Java 崩溃</string>
+    <string name="crash_type_native">原生崩溃</string>
+    <string name="crash_type_anr">ANR</string>
+    <string name="notif_channel_crash_app">%1$s · %2$s</string>
+    <string name="settings_live_only">启动时不加载旧日志</string>
+    <string name="settings_live_only_desc">下次重新开始读取时只跟上新行。中途重连仍会从断开的地方续上。</string>
+    <string name="settings_collect_java">保存 Java 崩溃</string>
+    <string name="settings_collect_native">保存原生崩溃</string>
+    <string name="settings_collect_anr">保存 ANR</string>
+    <string name="settings_notify_java">Java 崩溃通知</string>
+    <string name="settings_notify_native">原生崩溃通知</string>
+    <string name="settings_notify_anr">ANR 通知</string>
+    <string name="settings_separate_channels">按应用分开通知渠道</string>
+    <string name="settings_separate_channels_desc">每种崩溃、每个应用各有一条渠道，可以在系统设置里关掉某一个，记录仍会留下。</string>
+    <string name="settings_logs_expanded">显示完整日志行</string>
+    <string name="settings_search_case">搜索区分大小写</string>
+    <string name="stream_adb_needs_foreground">正在等 LogSleuth 回到前台。Android 13 及以后，ADB 授权不能在后台启动 logcat，否则系统会直接拒绝并记住大约一分钟，确认框也就不会再出现。</string>
+    <string name="engine_adb_waiting">等待前台</string>
+    <string name="crash_search">搜索崩溃</string>
+    <string name="crash_sort">排序</string>
+    <string name="crash_sort_newest">最新</string>
+    <string name="crash_sort_count">数量</string>
+    <string name="crash_sort_name">名称</string>
+    <string name="crash_sort_reverse">倒序</string>
+    <string name="crash_group_count">%1$d</string>
+    <string name="crash_deleted_all">已删除这个应用的崩溃</string>
+    <string name="crash_open_channel">通知设置</string>
+    <string name="crash_context_heading">附近的日志</string>
+    <string name="crash_version">%1$s (%2$d)</string>
+    <string name="crash_version_name">版本 %1$s</string>
+    <string name="session_rename">重命名</string>
+    <string name="session_rename_hint">会话名称</string>
 
 </resources>

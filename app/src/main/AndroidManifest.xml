@@ -98,6 +98,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.CopyCrashReceiver"
+            android:exported="false" />
+
         <service
             android:name=".service.BubbleService"
             android:exported="false" />

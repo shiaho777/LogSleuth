@@ -1,6 +1,12 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
+import android.os.Build
 import android.util.Log
+import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashCapture
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashContext
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashContextStore
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashPolicy
 import io.github.shiaho777.logsleuth.app.core.detect.CrashDetector
 import io.github.shiaho777.logsleuth.app.core.detect.CrashSignal
 import io.github.shiaho777.logsleuth.app.core.root.RootManager
@@ -29,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 private const val TAG = "LogcatEngine"
 
@@ -54,9 +61,19 @@ class LogcatEngine @Inject constructor(
     private val crashEventDao: CrashEventDao,
     private val bookmarkDao: BookmarkDao,
     private val notificationHelper: NotificationHelper,
+    private val installedApps: InstalledApps,
+    private val crashContextStore: CrashContextStore,
     settingsRepository: SettingsRepository,
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
+
+    companion object {
+        /**
+         * [lastError] value while a READ_LOGS start is waiting for the
+         * activity to be resumed. The UI maps this to its own string.
+         */
+        const val ADB_NEEDS_FOREGROUND = "adb_needs_foreground"
+    }
 
     /** Last stream failure detail (e.g. "logcat exited 1: Permission
      *  denied") for the UI to surface; null when healthy/not granted. */
@@ -102,7 +119,26 @@ class LogcatEngine @Inject constructor(
     private var bufferCap = 20_000
 
     @Volatile
-    private var crashNotifications = true
+    private var crashCapture = CrashCapture()
+
+    /** One channel per crash type and package, when the user left this on. */
+    @Volatile
+    private var separateCrashChannels = true
+
+    /** Cold start follows from now instead of dumping the ring. */
+    @Volatile
+    private var liveOnlyOnStart = false
+
+    /** True while [MainActivity] is resumed, which is when the process is top. */
+    @Volatile
+    private var inForeground = false
+
+    /**
+     * A READ_LOGS start was skipped because the app was not on screen.
+     * Coming to the foreground starts it; nothing retries in the background.
+     */
+    @Volatile
+    private var adbStartDeferred = false
 
     private var streamJob: Job? = null
     private var reconnectJob: Job? = null
@@ -147,11 +183,25 @@ class LogcatEngine @Inject constructor(
 
     private val crashWriteMutex = Mutex()
 
+    /** Notify-only crashes have no Room row to dedupe against. */
+    private val recentNotifyKeys = ArrayDeque<String>()
+    private val recentNotifySet = HashSet<String>()
+
     init {
         scope.launch {
             settingsRepository.settings.collect {
                 bufferCap = it.bufferSize
-                crashNotifications = it.crashNotifications
+                crashCapture = CrashCapture(
+                    collectJava = it.collectJava,
+                    collectNative = it.collectNative,
+                    collectAnr = it.collectAnr,
+                    notifyMaster = it.crashNotifications,
+                    notifyJava = it.notifyJava,
+                    notifyNative = it.notifyNative,
+                    notifyAnr = it.notifyAnr,
+                )
+                separateCrashChannels = it.separateCrashChannels
+                liveOnlyOnStart = it.liveOnlyOnStart
                 crashBlacklist = it.crashBlacklist
                 val prefChanged = accessPreference != it.accessPreference
                 val rootChanged = rootEnabled != it.rootEnabled
@@ -192,6 +242,26 @@ class LogcatEngine @Inject constructor(
         }
     }
 
+    /**
+     * The activity calls this from onResume and onPause. Android 13+ only
+     * shows the logcat approval dialog while the process is top, so a
+     * READ_LOGS start waits until then. An already-running stream is left
+     * alone: an approved logcat keeps its fd after the app leaves the screen.
+     */
+    fun setInForeground(foreground: Boolean) {
+        val becameVisible = foreground && !inForeground
+        inForeground = foreground
+        if (!becameVisible) return
+        synchronized(this) {
+            if (consumers > 0 && streamJob == null && adbStartDeferred) {
+                reconnectJob?.cancel()
+                reconnectJob = null
+                backoffMs = 1_000L
+                startStreamLocked()
+            }
+        }
+    }
+
     /** A consumer wants the stream. Starts logcat on first consumer. */
     @Synchronized
     fun acquireClient() {
@@ -228,11 +298,21 @@ class LogcatEngine @Inject constructor(
         _access.value = currentAccess()
         _lastError.value = null
         if (!_access.value.granted) {
+            adbStartDeferred = false
             _state.value = State.ERROR
             streamGeneration++
             streamJob = null
             return
         }
+        if (adbStartNeedsForeground(Build.VERSION.SDK_INT, _access.value.kind, inForeground)) {
+            adbStartDeferred = true
+            _lastError.value = ADB_NEEDS_FOREGROUND
+            _state.value = State.ERROR
+            streamGeneration++
+            streamJob = null
+            return
+        }
+        adbStartDeferred = false
 
         val source: LogcatSource = when (_access.value.kind) {
             AccessKind.SHIZUKU -> ShizukuLogcatSource(shizukuManager)
@@ -246,7 +326,7 @@ class LogcatEngine @Inject constructor(
         streamJob = scope.launch {
             val assembler = EntryAssembler()
             val crashDetector = CrashDetector()
-            val since = resumeSince
+            val since = streamSince(resumeSince, liveOnlyOnStart, System.currentTimeMillis())
             // Set before the first line. A cold start (`since == null`) dumps
             // every buffer, including hours-old crash-buffer fatals. A
             // reconnect with `-T` only replays the boundary line.
@@ -329,6 +409,7 @@ class LogcatEngine @Inject constructor(
         streamJob = null
         reconnectJob?.cancel()
         reconnectJob = null
+        adbStartDeferred = false
         _state.value = State.STOPPED
     }
 
@@ -350,36 +431,73 @@ class LogcatEngine @Inject constructor(
             if (signal.timeMillis < threshold) return@launch
             val pkg = signal.packageName
             if (pkg != null && pkg in crashBlacklist) return@launch
+            // The report wizard listens here. Saving and notifying are
+            // separate choices and must not hide a crash it is waiting for.
+            _crashes.tryEmit(signal)
+            val capture = crashCapture
+            val store = CrashPolicy.stores(signal.type, capture)
+            val notify = CrashPolicy.notifies(signal.type, capture)
+            if (!store && !notify) return@launch
             crashWriteMutex.withLock {
-                if (crashEventDao.findExisting(
-                        time = signal.timeMillis,
-                        pid = signal.pid,
-                        type = signal.type.name,
-                        firstLine = signal.firstLine,
-                    ) != null
-                ) {
-                    return@withLock
+                val key = "${signal.timeMillis}|${signal.pid}|${signal.type.name}|${signal.firstLine}"
+                if (store) {
+                    if (crashEventDao.findExisting(
+                            time = signal.timeMillis,
+                            pid = signal.pid,
+                            type = signal.type.name,
+                            firstLine = signal.firstLine,
+                        ) != null
+                    ) {
+                        return@withLock
+                    }
+                    val identity = pkg?.let { installedApps.identity(it) }
+                    val eventId = crashEventDao.insert(
+                        CrashEventEntity(
+                            sessionId = activeSessionId,
+                            time = signal.timeMillis,
+                            pid = signal.pid,
+                            packageName = signal.packageName,
+                            type = signal.type.name,
+                            firstLine = signal.firstLine,
+                            snippet = signal.snippet,
+                            appName = identity?.label,
+                            versionName = identity?.versionName,
+                            versionCode = identity?.versionCode,
+                        ),
+                    )
+                    val snapshot = bufferMutex.withLock { buffer.toList() }
+                    val text = CrashContext.format(
+                        CrashContext.lines(snapshot, signal.timeMillis),
+                    )
+                    val path = withContext(Dispatchers.IO) {
+                        runCatching { crashContextStore.write(eventId, text) }.getOrNull()
+                    }
+                    if (path != null) crashEventDao.setContextPath(eventId, path)
+                    if (notify) {
+                        rememberNotified(key)
+                        notificationHelper.notifyCrash(
+                            signal,
+                            eventId,
+                            identity?.label,
+                            separateCrashChannels,
+                        )
+                    }
+                } else if (notify && !rememberNotified(key)) {
+                    val label = pkg?.let { installedApps.identity(it)?.label }
+                    notificationHelper.notifyCrash(signal, 0L, label, separateCrashChannels)
                 }
-                val eventId = crashEventDao.insert(
-                    CrashEventEntity(
-                        sessionId = activeSessionId,
-                        time = signal.timeMillis,
-                        pid = signal.pid,
-                        packageName = signal.packageName,
-                        type = signal.type.name,
-                        firstLine = signal.firstLine,
-                        snippet = signal.snippet,
-                    ),
-                )
-                if (crashNotifications) {
-                    notificationHelper.notifyCrash(signal, eventId)
-                }
-                // Non-blocking: with no collector (record-only sessions) a full
-                // buffer would suspend this coroutine forever. Room is the source
-                // of truth, so a dropped live event is harmless.
-                _crashes.tryEmit(signal)
             }
         }
+    }
+
+    /** True when [key] was already announced. Records it otherwise. */
+    private fun rememberNotified(key: String): Boolean {
+        if (!recentNotifySet.add(key)) return true
+        recentNotifyKeys.addLast(key)
+        while (recentNotifyKeys.size > 256) {
+            recentNotifySet.remove(recentNotifyKeys.removeFirst())
+        }
+        return false
     }
 
     suspend fun clearBuffer() {

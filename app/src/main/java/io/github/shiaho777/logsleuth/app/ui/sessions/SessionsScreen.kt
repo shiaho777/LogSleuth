@@ -18,11 +18,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,6 +78,8 @@ fun SessionsScreen(
     val pendingDelete by viewModel.pendingDelete.collectAsState()
     val shown = sessions.filter { it.session.id != pendingDelete?.id }
     var shareTarget by remember { mutableStateOf<SessionEntity?>(null) }
+    var renameTarget by remember { mutableStateOf<SessionEntity?>(null) }
+    var renameText by remember { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -174,6 +178,10 @@ fun SessionsScreen(
                             animatedVisibilityScope = animatedVisibilityScope,
                             onOpen = { onOpenSession(session.id) },
                             onShare = { shareTarget = session },
+                            onRename = {
+                                renameTarget = session
+                                renameText = session.name
+                            },
                             onDelete = { viewModel.requestDelete(session) },
                         )
                     }
@@ -181,6 +189,32 @@ fun SessionsScreen(
             }
         }
         }
+    }
+
+    renameTarget?.let { session ->
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text(stringResource(R.string.session_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.session_rename_hint)) },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.rename(session, renameText)
+                    renameTarget = null
+                }) { Text(stringResource(R.string.session_rename)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameTarget = null }) {
+                    Text(stringResource(R.string.close))
+                }
+            },
+        )
     }
 
     shareTarget?.let { session ->
@@ -212,6 +246,7 @@ private fun SessionCard(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onOpen: () -> Unit,
     onShare: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -272,6 +307,13 @@ private fun SessionCard(
                     sessionMeta(session, liveLines, sizeBytes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onRename) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.session_rename),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onShare) {

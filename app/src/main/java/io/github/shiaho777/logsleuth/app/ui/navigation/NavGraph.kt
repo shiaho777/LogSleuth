@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.navigation
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
@@ -41,6 +42,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.crashes.AppCrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
@@ -61,10 +63,24 @@ object Routes {
     const val SESSION_DETAIL = "session/{sessionId}"
     const val REPORT = "report"
     const val CRASHES = "crashes"
+    const val APP_CRASHES = "crashes/pkg/{packageName}?event={eventId}"
     const val FILTERS = "filters"
     const val SETTINGS = "settings"
 
+    /** Route token for a crash whose package logcat never named. */
+    const val UNKNOWN_PACKAGE = "_unknown"
+
     fun sessionDetail(sessionId: Long) = "session/$sessionId"
+
+    fun appCrashes(packageName: String?, eventId: Long = -1L): String {
+        val key = Uri.encode(packageName?.takeIf { it.isNotBlank() } ?: UNKNOWN_PACKAGE)
+        return "crashes/pkg/$key?event=$eventId"
+    }
+
+    fun packageFromKey(key: String?): String? {
+        val decoded = Uri.decode(key ?: return null)
+        return decoded.takeIf { it.isNotBlank() && it != UNKNOWN_PACKAGE }
+    }
 }
 
 private data class TopLevelDestination(
@@ -198,7 +214,24 @@ fun LogSleuthNavHost(
                         )
                     }
                     composable(Routes.CRASHES) {
-                        CrashesScreen(onBack = { navController.popBackStack() })
+                        CrashesScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenPackage = { pkg ->
+                                navController.navigate(Routes.appCrashes(pkg))
+                            },
+                        )
+                    }
+                    composable(
+                        Routes.APP_CRASHES,
+                        arguments = listOf(
+                            navArgument("packageName") { type = NavType.StringType },
+                            navArgument("eventId") {
+                                type = NavType.LongType
+                                defaultValue = -1L
+                            },
+                        ),
+                    ) {
+                        AppCrashesScreen(onBack = { navController.popBackStack() })
                     }
                     composable(Routes.FILTERS) {
                         FiltersScreen(onBack = { navController.popBackStack() })

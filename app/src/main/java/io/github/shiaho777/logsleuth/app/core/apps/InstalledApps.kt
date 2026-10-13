@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import androidx.core.content.pm.PackageInfoCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,6 +13,13 @@ import kotlinx.coroutines.withContext
 
 /** A launchable app on the device, for pickers and per-app filters. */
 data class AppChoice(val packageName: String, val label: String)
+
+/** Name and version of an installed package, captured when a crash lands. */
+data class AppIdentity(
+    val label: String,
+    val versionName: String?,
+    val versionCode: Long,
+)
 
 /** Loads the list of user-launchable apps (cached after first read). */
 @Singleton
@@ -40,6 +48,23 @@ class InstalledApps @Inject constructor(
             apps
         }
     }
+
+    /** Null when the package is already gone. */
+    fun identity(packageName: String): AppIdentity? = runCatching {
+        val pm = context.packageManager
+        val info = pm.getPackageInfo(packageName, 0)
+        val appInfo = info.applicationInfo
+        val label = if (appInfo != null) {
+            pm.getApplicationLabel(appInfo).toString()
+        } else {
+            packageName
+        }
+        AppIdentity(
+            label = label.ifBlank { packageName },
+            versionName = info.versionName,
+            versionCode = PackageInfoCompat.getLongVersionCode(info),
+        )
+    }.getOrNull()
 
     fun resolveUid(packageName: String?): Int? {
         if (packageName == null) return null

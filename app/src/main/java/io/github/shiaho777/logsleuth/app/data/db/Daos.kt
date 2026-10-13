@@ -30,6 +30,9 @@ interface SessionDao {
     @Query("SELECT * FROM sessions WHERE endedAt IS NULL")
     suspend fun unfinished(): List<SessionEntity>
 
+    @Query("UPDATE sessions SET name = :name WHERE id = :id")
+    suspend fun rename(id: Long, name: String)
+
     @Delete
     suspend fun delete(entity: SessionEntity)
 }
@@ -72,6 +75,27 @@ interface CrashEventDao {
 
     @Query("DELETE FROM crash_events WHERE sessionId = :sessionId")
     suspend fun deleteForSession(sessionId: Long)
+
+    @Query("UPDATE crash_events SET contextPath = :path WHERE id = :id")
+    suspend fun setContextPath(id: Long, path: String)
+
+    @Query(
+        "SELECT contextPath FROM crash_events WHERE sessionId = :sessionId " +
+            "AND contextPath IS NOT NULL",
+    )
+    suspend fun contextPathsForSession(sessionId: Long): List<String>
+
+    @Query("SELECT contextPath FROM crash_events WHERE id = :id")
+    suspend fun contextPath(id: Long): String?
+
+    @Query(
+        "SELECT contextPath FROM crash_events WHERE id IN (:ids) " +
+            "AND contextPath IS NOT NULL",
+    )
+    suspend fun contextPathsForIds(ids: List<Long>): List<String>
+
+    @Query("DELETE FROM crash_events WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 }
 
 @Dao

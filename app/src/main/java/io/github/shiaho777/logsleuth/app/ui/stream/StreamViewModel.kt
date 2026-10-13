@@ -67,6 +67,11 @@ data class StreamUiState(
     /** Last stream failure detail (e.g. "logcat exited 1: Permission
      *  denied"); null while healthy or when access is simply not granted. */
     val lastError: String? = null,
+    /**
+     * Android 13+ is holding a READ_LOGS start until the app is on screen.
+     * Kept apart from [lastError] so the sentinel is never shown raw.
+     */
+    val adbHeld: Boolean = false,
     /** Bumped when a filter is created from a log line, so the screen can toast. */
     val filterNotice: Int = 0,
 )
@@ -91,6 +96,10 @@ class StreamViewModel @Inject constructor(
     private var visible = ArrayList<UiLogEntry>()
     private var seq = 0L
     private var bufferCap = 20_000
+
+    /** Mirrors Settings.searchCaseSensitive. Default matches the old search. */
+    @Volatile
+    private var searchIgnoreCase = true
     private val pending = ArrayList<LogcatEntry>()
     // Declared before init: SharedFlow emissions run on the emitter's
     // thread, so the collector below can touch these while init is still
@@ -109,12 +118,24 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settings.collect { s ->
                 bufferCap = s.bufferSize
+                val ignore = !s.searchCaseSensitive
+                val caseChanged = ignore != searchIgnoreCase
+                searchIgnoreCase = ignore
                 _ui.update { it.copy(bubbleEnabled = s.bubbleEnabled) }
+                if (caseChanged) {
+                    val query = _ui.value.searchQuery
+                    if (query.isNotBlank()) recomputeHits(query, resetIndex = true)
+                }
             }
         }
         viewModelScope.launch { engine.access.collect { a -> _ui.update { it.copy(access = a) } } }
         viewModelScope.launch { engine.state.collect { s -> _ui.update { it.copy(engineState = s) } } }
-        viewModelScope.launch { engine.lastError.collect { e -> _ui.update { it.copy(lastError = e) } } }
+        viewModelScope.launch {
+            engine.lastError.collect { e ->
+                val held = e == LogcatEngine.ADB_NEEDS_FOREGROUND
+                _ui.update { it.copy(lastError = if (held) null else e, adbHeld = held) }
+            }
+        }
         viewModelScope.launch {
             var wasRecording = false
             var lastSessionId: Long? = null
@@ -487,7 +508,8 @@ class StreamViewModel @Inject constructor(
             listMutex.withLock {
                 visible.mapIndexedNotNull { index, uiEntry ->
                     val e = uiEntry.entry
-                    if (e.tag.contains(query, true) || e.message.contains(query, true)) index else null
+                    val ignore = searchIgnoreCase
+                    if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
                 }
             }
         }

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import io.github.shiaho777.logsleuth.app.MainActivity
 import io.github.shiaho777.logsleuth.app.R
@@ -23,6 +24,8 @@ class NotificationHelper(private val context: Context) {
         const val ID_RECORDING_TIMEOUT = 1003
         const val ID_WATCH = 1004
         const val ID_CRASH_BASE = 2000
+        private const val NOTIFICATION_BODY = 1_500
+        private const val COPY_BODY = 6_000
     }
 
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -125,30 +128,121 @@ class NotificationHelper(private val context: Context) {
     }
 
     /**
-     * [eventId] is the Room row id — stable and unique per crash, unlike a
-     * timestamp slice which collides when several crashes land at once.
+     * [eventId] is the Room row id when the crash was stored. Zero means
+     * the user asked to be told without keeping a row, so the tap opens
+     * the crash list.
+     *
+     * With [separateChannels], each app and crash type gets its own channel
+     * so system settings can mute one package and leave the record in place.
      */
-    fun notifyCrash(signal: CrashSignal, eventId: Long) {
-        val label = signal.packageName ?: context.getString(R.string.unknown_app)
+    fun notifyCrash(
+        signal: CrashSignal,
+        eventId: Long,
+        appLabel: String?,
+        separateChannels: Boolean,
+    ) {
+        val label = appLabel?.takeIf { it.isNotBlank() }
+            ?: signal.packageName
+            ?: context.getString(R.string.unknown_app)
         val title = when (signal.type) {
             CrashType.CRASH -> context.getString(R.string.notif_crash_title, label)
             CrashType.NATIVE -> context.getString(R.string.notif_native_title, label)
             CrashType.ANR -> context.getString(R.string.notif_anr_title, label)
         }
+        val channel = channelId(signal.type.name, signal.packageName, separateChannels)
+        ensureChannel(channel, signal.type, label, separateChannels)
+        val open = if (eventId > 0) {
+            MainActivity.crashIntent(context, eventId, signal.packageName)
+        } else {
+            MainActivity.crashesIntent(context)
+        }
         val openIntent = PendingIntent.getActivity(
             context,
-            4,
-            MainActivity.crashesIntent(context),
+            (eventId % 1_000_000).toInt() + 20,
+            open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_CRASHES)
+        val body = signal.snippet.take(NOTIFICATION_BODY)
+        val copy = PendingIntent.getBroadcast(
+            context,
+            (eventId % 1_000_000).toInt() + 40,
+            Intent(context, CopyCrashReceiver::class.java)
+                .putExtra(Intent.EXTRA_TEXT, signal.snippet.take(COPY_BODY)),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(signal.firstLine)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(openIntent)
             .setAutoCancel(true)
+            .addAction(0, context.getString(R.string.copy), copy)
             .build()
-        manager.notify(ID_CRASH_BASE + (eventId % 1_000_000).toInt(), notification)
+        val id = if (eventId > 0) {
+            ID_CRASH_BASE + (eventId % 1_000_000).toInt()
+        } else {
+            ID_CRASH_BASE + (signal.timeMillis % 1_000_000).toInt()
+        }
+        manager.notify(id, notification)
+    }
+
+    /** Opens the system page for this crash's channel, creating it first. */
+    fun openCrashChannel(type: String, packageName: String?, separateChannels: Boolean) {
+        val channel = channelId(type, packageName, separateChannels)
+        val label = packageName ?: context.getString(R.string.unknown_app)
+        val crashType = runCatching { CrashType.valueOf(type) }.getOrDefault(CrashType.CRASH)
+        ensureChannel(channel, crashType, label, separateChannels)
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    fun channelId(type: String, packageName: String?, separateChannels: Boolean): String {
+        if (!separateChannels || packageName.isNullOrBlank()) return CHANNEL_CRASHES
+        return "crash_${type}_$packageName"
+    }
+
+    private fun ensureChannel(
+        channelId: String,
+        type: CrashType,
+        label: String,
+        separateChannels: Boolean,
+    ) {
+        if (!separateChannels || channelId == CHANNEL_CRASHES) {
+            if (manager.getNotificationChannel(CHANNEL_CRASHES) == null) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        CHANNEL_CRASHES,
+                        context.getString(R.string.notif_channel_crashes),
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ),
+                )
+            }
+            return
+        }
+        val typeName = when (type) {
+            CrashType.CRASH -> context.getString(R.string.crash_type_java)
+            CrashType.NATIVE -> context.getString(R.string.crash_type_native)
+            CrashType.ANR -> context.getString(R.string.crash_type_anr)
+        }
+        // Group id stays on the enum name so a locale change does not
+        // fork a second group for the same crash type.
+        val groupId = "crashes_${type.name}"
+        manager.createNotificationChannelGroup(
+            android.app.NotificationChannelGroup(groupId, typeName),
+        )
+        if (manager.getNotificationChannel(channelId) != null) return
+        manager.createNotificationChannel(
+            NotificationChannel(
+                channelId,
+                context.getString(R.string.notif_channel_crash_app, typeName, label),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { group = groupId },
+        )
     }
 
     /**

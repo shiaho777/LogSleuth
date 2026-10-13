@@ -216,6 +216,12 @@ fun SettingsScreen(
                         valueRange = 1_000f..200_000f,
                     )
                 }
+                SettingsSwitchRow(
+                    title = stringResource(R.string.settings_live_only),
+                    subtitle = stringResource(R.string.settings_live_only_desc),
+                    checked = s.liveOnlyOnStart,
+                    onCheckedChange = viewModel::setLiveOnlyOnStart,
+                )
             }
 
             Card {
@@ -288,6 +294,42 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_crash_notifications),
                         checked = s.crashNotifications,
                         onCheckedChange = viewModel::setCrashNotifications,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_collect_java),
+                        checked = s.collectJava,
+                        onCheckedChange = viewModel::setCollectJava,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_collect_native),
+                        checked = s.collectNative,
+                        onCheckedChange = viewModel::setCollectNative,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_collect_anr),
+                        checked = s.collectAnr,
+                        onCheckedChange = viewModel::setCollectAnr,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_notify_java),
+                        checked = s.notifyJava,
+                        onCheckedChange = viewModel::setNotifyJava,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_notify_native),
+                        checked = s.notifyNative,
+                        onCheckedChange = viewModel::setNotifyNative,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_notify_anr),
+                        checked = s.notifyAnr,
+                        onCheckedChange = viewModel::setNotifyAnr,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_separate_channels),
+                        subtitle = stringResource(R.string.settings_separate_channels_desc),
+                        checked = s.separateCrashChannels,
+                        onCheckedChange = viewModel::setSeparateCrashChannels,
                     )
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_bubble),
@@ -391,6 +433,16 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_col_package),
                         checked = s.showLogPackage,
                         onCheckedChange = viewModel::setShowLogPackage,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_logs_expanded),
+                        checked = s.logsExpanded,
+                        onCheckedChange = viewModel::setLogsExpanded,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_search_case),
+                        checked = s.searchCaseSensitive,
+                        onCheckedChange = viewModel::setSearchCaseSensitive,
                     )
                 }
             }

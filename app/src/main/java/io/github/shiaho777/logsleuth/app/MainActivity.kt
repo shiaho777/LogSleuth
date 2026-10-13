@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
                     showTag = settings?.showLogTag ?: true,
                     showPackage = settings?.showLogPackage ?: true,
                     timeFormat = settings?.logTimeFormat ?: "time",
+                    logsExpanded = settings?.logsExpanded ?: false,
+                    searchCaseSensitive = settings?.searchCaseSensitive ?: false,
                 )
                 CompositionLocalProvider(
                     LocalLogTextScale provides logScale,
@@ -127,25 +129,41 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // PROCESS_STATE_TOP, which is what Android 13+ requires before it
+        // will show the logcat approval dialog. onStart is too early.
+        engine.setInForeground(true)
         // Grants toggled in the Shizuku app or via adb while we were away
         // fire no callback — re-evaluate on every return to foreground.
         engine.refreshAccess()
     }
 
+    override fun onPause() {
+        // A live logcat keeps running. This only stops a new READ_LOGS
+        // start from being attempted while a dialog or another app is up.
+        engine.setInForeground(false)
+        super.onPause()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleIntent(intent)
-        if (intent.getBooleanExtra(EXTRA_OPEN_CRASHES, false)) {
-            pendingRoute = Routes.CRASHES
-        }
+        handleIntent(intent, fromNewIntent = true)
     }
 
-    private fun handleIntent(intent: Intent?) {
+    private fun handleIntent(intent: Intent?, fromNewIntent: Boolean = false) {
         intent ?: return
-        // Notification taps deep-link into a specific session.
+        // Notification taps deep-link into a specific session or crash.
         val sessionId = intent.getLongExtra(EXTRA_OPEN_SESSION, -1L)
         if (sessionId > 0) pendingRoute = Routes.sessionDetail(sessionId)
+        val crashId = intent.getLongExtra(EXTRA_OPEN_CRASH, -1L)
+        if (crashId > 0) {
+            pendingRoute = Routes.appCrashes(
+                intent.getStringExtra(EXTRA_OPEN_CRASH_PKG),
+                crashId,
+            )
+        } else if (fromNewIntent && intent.getBooleanExtra(EXTRA_OPEN_CRASHES, false)) {
+            pendingRoute = Routes.CRASHES
+        }
         if (intent.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
         lifecycleScope.launch {
@@ -174,11 +192,20 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_CRASHES = "extra_open_crashes"
+        const val EXTRA_OPEN_CRASH = "extra_open_crash"
+        const val EXTRA_OPEN_CRASH_PKG = "extra_open_crash_pkg"
         const val EXTRA_OPEN_SESSION = "extra_open_session"
 
         fun crashesIntent(context: Context): Intent =
             Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_OPEN_CRASHES, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+
+        fun crashIntent(context: Context, eventId: Long, packageName: String?): Intent =
+            Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_OPEN_CRASH, eventId)
+                if (!packageName.isNullOrBlank()) putExtra(EXTRA_OPEN_CRASH_PKG, packageName)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 

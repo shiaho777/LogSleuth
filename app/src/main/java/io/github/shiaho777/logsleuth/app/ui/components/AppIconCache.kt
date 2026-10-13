@@ -25,9 +25,27 @@ class AppIconCache(context: Context, private val scope: CoroutineScope) {
     private val pm = context.packageManager
     private val icons = mutableStateMapOf<Int, ImageBitmap?>()
     private val labels = mutableStateMapOf<Int, String?>()
+    private val packageIcons = mutableStateMapOf<String, ImageBitmap?>()
     private val pending = ConcurrentHashMap.newKeySet<Int>()
     private val pendingLabels = ConcurrentHashMap.newKeySet<Int>()
+    private val pendingPackages = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var launchable: Set<String>? = null
+
+    /** Bitmap for a package name. Used by the grouped crash list. */
+    fun iconForPackage(packageName: String?): ImageBitmap? {
+        if (packageName.isNullOrBlank()) return null
+        if (packageName !in packageIcons && pendingPackages.add(packageName)) {
+            scope.launch {
+                val bmp = withContext(Dispatchers.IO) {
+                    runCatching {
+                        pm.getApplicationIcon(packageName).toBitmap(96, 96).asImageBitmap()
+                    }.getOrNull()
+                }
+                packageIcons[packageName] = bmp
+            }
+        }
+        return packageIcons[packageName]
+    }
 
     /** Bitmap for [uid], or null while resolving / when the uid maps nowhere. */
     fun iconFor(uid: Int?): ImageBitmap? {

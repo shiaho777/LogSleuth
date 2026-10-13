@@ -29,7 +29,8 @@ object ImportCore {
         val candidates = entryNames.filter { name ->
             val base = name.substringAfterLast('/')
             (base.endsWith(".log") || base.endsWith(".txt")) &&
-                base != "meta.txt" && base != "device.txt" && base != "crash.txt"
+                base != "meta.txt" && base != "device.txt" &&
+                base != "crash.txt" && base != "app.txt"
         }
         val underLogs = candidates.filter { it.startsWith("logs/") }
         val logs = (underLogs.ifEmpty { candidates }).sorted()
