@@ -35,6 +35,9 @@ class SessionExporter @Inject constructor(
 
         /** Shared exports outlive the share sheet by a day, then get pruned. */
         private const val EXPORT_TTL_MS = 24L * 60 * 60 * 1000
+
+        /** Binder transactions cap around 1 MiB; stay well under it. */
+        private const val TEXT_SHARE_MAX = 400_000
     }
 
     enum class Format { TXT, ZIP }
@@ -127,6 +130,26 @@ class SessionExporter @Inject constructor(
             } ?: error("Could not open $uri")
             Unit
         }
+    }
+
+    /**
+     * Share [text] as `text/plain`. Pastes into GitHub, Telegram, mail.
+     * Huge stacks skip the binder and go out as a file instead.
+     */
+    suspend fun sharePlainText(text: String, fileName: String): Result<Unit> {
+        if (text.length <= TEXT_SHARE_MAX) {
+            return runCatching {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                context.startActivity(
+                    Intent.createChooser(send, context.getString(R.string.share_logs))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+        }
+        return shareSnippet(fileName, text)
     }
 
     /** Shares an arbitrary text payload (e.g. a crash snippet) as a file. */

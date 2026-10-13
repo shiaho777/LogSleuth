@@ -18,11 +18,11 @@ sealed interface LogcatSource {
      * filtering is done client-side against this column. Shizuku and root both
      * see it; logd restricts the server-side `--uid` mask to the shell user.
      *
-     * `crash` and `events` buffers are merged in so native crash dumps
-     * (`Fatal signal`, tag DEBUG) and `am_anr` events reach CrashDetector —
-     * the default main buffer alone carries neither.
-     */
-    /**
+     * `system`, `crash`, and `events` join `main` so this matches stock
+     * logcat's default buffers: system_server lives on `system`, native
+     * dumps (`Fatal signal`, tag DEBUG) on `crash`, and `am_anr` on
+     * `events`. `radio` stays out — it is noisy and not in the default set.
+     *
      * @param since threadtime stamp (`MM-dd HH:mm:ss.SSS`). When set, logcat
      *   is started with `-T` so a reconnect does not replay the whole ring
      *   buffer. Null on the first connection, where the dump is the backlog
@@ -31,6 +31,7 @@ sealed interface LogcatSource {
     fun buildCommand(since: String? = null): List<String> = buildList {
         add("logcat")
         add("-b"); add("main")
+        add("-b"); add("system")
         add("-b"); add("crash")
         add("-b"); add("events")
         add("-v"); add("threadtime")

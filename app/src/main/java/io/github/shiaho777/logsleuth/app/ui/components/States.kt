@@ -65,8 +65,17 @@ private fun CenteredState(
 }
 
 @Composable
-fun EmptyState(text: String, modifier: Modifier = Modifier) {
-    CenteredState(icon = Icons.Outlined.Article, text = text, modifier = modifier)
+fun EmptyState(
+    text: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
+) {
+    CenteredState(
+        icon = Icons.Outlined.Article,
+        text = text,
+        modifier = modifier,
+        action = action,
+    )
 }
 
 @Composable
