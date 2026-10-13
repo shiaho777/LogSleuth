@@ -53,7 +53,9 @@
     <string name="filter_tag">Tag</string>
     <string name="filter_tag_exact">Exact tag match</string>
     <string name="filter_expand">More filter fields</string>
+    <string name="filter_levels">Log levels</string>
     <string name="filter_levels_all">All levels</string>
+    <string name="filter_empty_fields">Empty fields are ignored when matching.</string>
     <string name="filter_level_on">Selected</string>
     <string name="filter_exclude">Exclude</string>
     <string name="filter_regex">Regular expressions</string>
@@ -319,7 +321,7 @@
     <string name="filter_import_failed">Couldn\'t read that filter file</string>
     <string name="filter_import_ok">Imported %1$d rules</string>
     <string name="filter_saved_from_line">Saved an including rule for this line</string>
-    <string name="filter_from_line">Save as rule</string>
+    <string name="filter_from_line">Create filter</string>
     <string name="selection_save">Save</string>
 
     <!-- Recording pause -->
@@ -330,7 +332,9 @@
 
     <!-- Crash blacklist and boot watch -->
     <string name="crash_ignore">Ignore this app</string>
+    <string name="crash_unignore">Stop ignoring</string>
     <string name="crash_ignored">Crashes from %1$s will be ignored</string>
+    <string name="crash_unignored">Crashes from %1$s will be recorded again</string>
     <string name="settings_crash_blacklist">Ignored apps</string>
     <string name="settings_crash_blacklist_desc">Crashes and ANRs from these packages are dropped.</string>
     <string name="settings_watch_boot">Watch for crashes in the background</string>
@@ -402,5 +406,9 @@
     <string name="search_prev">Previous match</string>
     <string name="search_next">Next match</string>
     <string name="navigate_back">Back</string>
+    <string name="crash_export_zip">Zip archive</string>
+    <string name="crash_export_text">Plain text</string>
+    <string name="restart_logging">Restart logging</string>
+    <string name="more">More</string>
 
 </resources>

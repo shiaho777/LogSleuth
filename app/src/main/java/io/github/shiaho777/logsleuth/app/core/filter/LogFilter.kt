@@ -104,6 +104,33 @@ data class LogFilter(
 
     companion object {
         val DEFAULT = LogFilter(name = "Default")
+
+        /**
+         * Prefill an including rule from one log line. Blank fields stay
+         * unused. [message] is truncated so the query stays editable.
+         */
+        fun fromLine(
+            tag: String,
+            message: String,
+            pid: Int,
+            tid: Int,
+            uid: Int?,
+            level: LogLevel,
+            packageName: String?,
+        ): LogFilter = LogFilter(
+            name = tag.ifBlank { "pid $pid" }.take(40),
+            allowedLevels = setOf(level),
+            minLevel = level,
+            query = message.take(120),
+            tagQuery = tag,
+            tagExact = true,
+            packageName = packageName,
+            pid = pid.toString(),
+            tid = tid.toString(),
+            uid = uid?.toString().orEmpty(),
+            enabled = true,
+            including = true,
+        )
     }
 }
 
