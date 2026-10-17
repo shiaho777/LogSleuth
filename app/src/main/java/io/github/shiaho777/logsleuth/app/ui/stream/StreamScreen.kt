@@ -132,13 +132,6 @@ fun StreamScreen(
     val haptic = LocalHapticFeedback.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    val canScrollBack by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 ||
-                listState.firstVisibleItemScrollOffset > 0
-        }
-    }
-
     // Tail-follow pin — standard chat-log semantics:
     //   · at the newest line, new logs stick to the bottom of the screen;
     //   · any move toward older lines releases it. The rows on screen then
@@ -160,13 +153,10 @@ fun StreamScreen(
     var selEnd by remember { mutableStateOf(-1L) }
     var extendedCopyText by remember { mutableStateOf<String?>(null) }
     val selecting = selAnchor >= 0L
-    val rowPrefs = LocalLogRowPrefs.current
-    val iconCache = LocalAppIconCache.current
     val selectingNow by rememberUpdatedState(selecting)
-    val entriesNow by rememberUpdatedState(ui.entries)
 
     fun parkAt(index: Int, offset: Int) {
-        entriesNow.getOrNull(index)?.let { parkedSeq = it.seq }
+        viewModel.entries.getOrNull(index)?.let { parkedSeq = it.seq }
         parkedOffset = offset
         followTail = false
     }
@@ -184,7 +174,7 @@ fun StreamScreen(
             val towardOlder = idx < prevIdx || (idx == prevIdx && off < prevOff)
             if (fingerDown && towardOlder && !selectingNow) parkAt(idx, off)
             if (!followTail) {
-                entriesNow.getOrNull(idx)?.let { parkedSeq = it.seq }
+                viewModel.entries.getOrNull(idx)?.let { parkedSeq = it.seq }
                 parkedOffset = off
             }
             prevIdx = idx
@@ -200,14 +190,12 @@ fun StreamScreen(
             !touching &&
                 !listState.isScrollInProgress &&
                 !listState.canScrollForward &&
-                entriesNow.isNotEmpty()
+                viewModel.entries.isNotEmpty()
         }.collect { atTail ->
             if (atTail && !selectingNow) followTail = true
         }
     }
 
-    val selLo = minOf(selAnchor, selEnd)
-    val selHi = maxOf(selAnchor, selEnd)
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
     val filterSavedMsg = stringResource(R.string.filter_saved_from_line)
@@ -279,7 +267,7 @@ fun StreamScreen(
             }
         }
         tour.actions["selectDemo"] = {
-            val visible = ui.entries
+            val visible = viewModel.entries
             if (visible.size > 4 && !selecting) {
                 val i = (listState.firstVisibleItemIndex + 1)
                     .coerceIn(0, visible.size - 3)
@@ -295,7 +283,7 @@ fun StreamScreen(
             }
         }
         tour.actions["fabPeek"] = {
-            if (ui.entries.isNotEmpty()) {
+            if (viewModel.entries.isNotEmpty()) {
                 followTail = false
                 peekedByTour = true
                 scope.launch { listState.scroll { scrollBy(600f) } }
@@ -306,7 +294,7 @@ fun StreamScreen(
                 followTail = true
                 scope.launch {
                     listState.scrollToItem(
-                        viewModel.ui.value.entries.lastIndex.coerceAtLeast(0),
+                        viewModel.entries.lastIndex.coerceAtLeast(0),
                     )
                 }
             }
@@ -336,34 +324,6 @@ fun StreamScreen(
                 "scopeOpenPerApp", "scopeClose", "selectDemo", "selectOff",
                 "fabPeek", "fabBack", "leave.stream",
             ).forEach { tour.actions.remove(it) }
-        }
-    }
-
-    // Pinned tail sticks to the newest line in the same layout pass.
-    // While a finger is down the pin lets go, so a pull is not fighting
-    // a scroll request. Once the reader has left the tail, keep the parked
-    // line on screen: trimming the ring buffer deletes a prefix and the
-    // same index would otherwise show newer lines.
-    if (!followTail && !touching && !listState.isScrollInProgress && parkedSeq >= 0L) {
-        val idx = parkedIndex(ui.entries, parkedSeq)
-        if (
-            idx >= 0 &&
-            (listState.firstVisibleItemIndex != idx ||
-                listState.firstVisibleItemScrollOffset != parkedOffset)
-        ) {
-            SideEffect {
-                val kept = ui.entries.getOrNull(idx)?.seq ?: return@SideEffect
-                if (kept != parkedSeq) {
-                    parkedSeq = kept
-                    parkedOffset = 0
-                }
-                listState.requestScrollToItem(idx, parkedOffset)
-            }
-        }
-    }
-    if (followTail && !touching && !ui.paused && !selecting && ui.entries.isNotEmpty()) {
-        SideEffect {
-            listState.requestScrollToItem(ui.entries.lastIndex)
         }
     }
 
@@ -410,47 +370,17 @@ fun StreamScreen(
             }
         },
         floatingActionButton = {
-            Column(
-                modifier = Modifier.tourTarget("fab"),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Jump to the oldest buffered line.
-                AnimatedVisibility(
-                    visible = canScrollBack && ui.entries.isNotEmpty() && !selecting,
-                    enter = scaleIn(),
-                    exit = scaleOut(),
-                ) {
-                    FloatingActionButton(
-                        onClick = {
-                            parkAt(0, 0)
-                            scope.launch { listState.scrollToItem(0) }
-                        },
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowUp,
-                            contentDescription = stringResource(R.string.scroll_top),
-                        )
-                    }
-                }
-                AnimatedVisibility(
-                    visible = !followTail && ui.entries.isNotEmpty() && !selecting,
-                    enter = scaleIn(),
-                    exit = scaleOut(),
-                ) {
-                    FloatingActionButton(
-                        onClick = { followTail = true },
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ) {
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.scroll_bottom),
-                        )
-                    }
-                }
-            }
+            JumpFabs(
+                listState = listState,
+                entries = viewModel.entries,
+                followTail = followTail,
+                selecting = selecting,
+                onJumpTop = {
+                    parkAt(0, 0)
+                    scope.launch { listState.scrollToItem(0) }
+                },
+                onJumpBottom = { followTail = true },
+            )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -497,128 +427,71 @@ fun StreamScreen(
                     onFilterChange = viewModel::setFilter,
                     onSavePreset = viewModel::savePreset,
                     onApplyPreset = viewModel::applyPreset,
+                    onDisableRule = { viewModel.setRuleEnabled(it, false) },
                     onManageFilters = { onNavigate(Routes.FILTERS) },
                 )
             }
 
-            Box(Modifier.fillMaxSize()) {
-                when {
-                    ui.access?.granted != true -> NoAccessState(
-                        onOpenSetup = { onNavigate(Routes.SETUP) },
-                    )
-
-                    ui.entries.isEmpty() -> EmptyState(
-                        text = when {
-                            ui.adbHeld -> stringResource(R.string.stream_adb_needs_foreground)
-                            ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null ->
-                                stringResource(R.string.stream_error_detail, ui.lastError!!)
-                            ui.engineState == LogcatEngine.State.STARTING ->
-                                stringResource(R.string.empty_logs_waiting)
-                            ui.filteredOut -> stringResource(R.string.empty_logs_filtered)
-                            else -> stringResource(R.string.empty_logs)
-                        },
-                    )
-
-                    else -> LogList(
-                        ui = ui,
-                        listState = listState,
-                        searchQuery = ui.searchQuery,
-                        currentHit = ui.searchHits.getOrNull(ui.searchHitIndex),
-                        snackbar = snackbar,
-                        selAnchor = selAnchor,
-                        selEnd = selEnd,
-                        onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
-                        onSelectExtend = { seq -> selEnd = seq },
-                        onMakeFilter = { viewModel.saveFilterFromLine(it) },
-                        onUserTouch = { down ->
-                            touching = down
-                            if (!down) pullAccum = 0f
-                        },
-                        onUserDrag = { dy ->
-                            // Finger sliding down moves toward older lines.
-                            // Upward jitter must not wipe the accumulated
-                            // pull, or a real scroll never releases the pin.
-                            if (dy > 0f) pullAccum += dy
-                            if (pullAccum > touchSlop && !selecting) {
-                                pullAccum = 0f
-                                parkAt(
-                                    listState.firstVisibleItemIndex,
-                                    listState.firstVisibleItemScrollOffset,
-                                )
-                            }
-                        },
-                    )
-                }
-
-                // Engine status chip (connecting / streaming / stopped)
-                EngineStatusChip(
-                    state = ui.engineState,
-                    adbHeld = ui.adbHeld,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .tourTarget("engineStatus"),
-                )
-
-                SelectionBar(
-                    visible = selecting,
-                    count = ui.entries.count { it.seq in selLo..selHi },
-                    onSelectAll = {
-                        val first = ui.entries.firstOrNull()?.seq ?: return@SelectionBar
-                        val last = ui.entries.lastOrNull()?.seq ?: return@SelectionBar
-                        selAnchor = first
-                        selEnd = last
-                    },
-                    onExtendedCopy = {
-                        val prefs = rowPrefs
-                        val cache = iconCache
-                        extendedCopyText = ui.entries
-                            .filter { it.seq in selLo..selHi }
-                            .joinToString("\n") {
-                                formatVisible(
-                                    it.entry,
-                                    prefs.visibleColumns(),
-                                    appLabel = cache?.labelFor(it.entry.uid),
-                                )
-                            }
-                    },
-                    onSave = {
-                        val selected = ui.entries
-                            .filter { it.seq in selLo..selHi }
-                            .map { it.entry }
-                        selAnchor = -1L
-                        selEnd = -1L
-                        if (selected.isNotEmpty()) viewModel.saveSelection(selected)
-                    },
-                    onCopy = {
-                        val prefs = rowPrefs
-                        val cache = iconCache
-                        val text = ui.entries
-                            .filter { it.seq in selLo..selHi }
-                            .joinToString("\n") {
-                                formatVisible(
-                                    it.entry,
-                                    prefs.visibleColumns(),
-                                    appLabel = cache?.labelFor(it.entry.uid),
-                                )
-                            }
-                        selAnchor = -1L
-                        selEnd = -1L
-                        if (text.isNotEmpty()) {
-                            clipboard.setText(AnnotatedString(text))
-                            scope.launch { snackbar.showSnackbar(copiedMsg) }
-                        }
-                    },
-                    onClear = {
-                        selAnchor = -1L
-                        selEnd = -1L
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 16.dp)
-                        .tourTarget("selectionBar"),
-                )
-            }
+            StreamListPane(
+                ui = ui,
+                entries = viewModel.entries,
+                listState = listState,
+                followTail = followTail,
+                touching = touching,
+                selecting = selecting,
+                parkedSeq = parkedSeq,
+                parkedOffset = parkedOffset,
+                onParkedSeq = { parkedSeq = it },
+                onParkedOffset = { parkedOffset = it },
+                selAnchor = selAnchor,
+                selEnd = selEnd,
+                onSelectStart = { seq -> selAnchor = seq; selEnd = seq },
+                onSelectExtend = { seq -> selEnd = seq },
+                onSelectAll = { first, last ->
+                    selAnchor = first
+                    selEnd = last
+                },
+                onClearSelection = {
+                    selAnchor = -1L
+                    selEnd = -1L
+                },
+                onExtendedCopy = { extendedCopyText = it },
+                onSaveSelection = { selected ->
+                    selAnchor = -1L
+                    selEnd = -1L
+                    if (selected.isNotEmpty()) viewModel.saveSelection(selected)
+                },
+                onCopy = { text ->
+                    selAnchor = -1L
+                    selEnd = -1L
+                    if (text.isNotEmpty()) {
+                        clipboard.setText(AnnotatedString(text))
+                        scope.launch { snackbar.showSnackbar(copiedMsg) }
+                    }
+                },
+                onMakeFilter = { viewModel.saveFilterFromLine(it) },
+                onOpenSetup = { onNavigate(Routes.SETUP) },
+                onDisableRules = viewModel::disableEnabledRules,
+                rulesActive = ui.presets.any { it.enabled },
+                snackbar = snackbar,
+                onUserTouch = { down ->
+                    touching = down
+                    if (!down) pullAccum = 0f
+                },
+                onUserDrag = { dy ->
+                    // Finger sliding down moves toward older lines.
+                    // Upward jitter must not wipe the accumulated
+                    // pull, or a real scroll never releases the pin.
+                    if (dy > 0f) pullAccum += dy
+                    if (pullAccum > touchSlop && !selecting) {
+                        pullAccum = 0f
+                        parkAt(
+                            listState.firstVisibleItemIndex,
+                            listState.firstVisibleItemScrollOffset,
+                        )
+                    }
+                },
+            )
         }
     }
 
@@ -653,7 +526,7 @@ fun StreamScreen(
                 MaterialTheme.colorScheme.primary
             },
             groups = scopeGroups,
-            totalLines = ui.entries.size,
+            totalLines = viewModel.entries.size,
             initialPerApp = scopeStartPerApp,
             // Step 10 hides the overlay card, and this Dialog's own window
             // covers the scrim anyway — the only place tour chrome can
@@ -980,8 +853,220 @@ private fun SearchTopBar(
 }
 
 @Composable
-private fun LogList(
+private fun JumpFabs(
+    listState: LazyListState,
+    entries: List<UiLogEntry>,
+    followTail: Boolean,
+    selecting: Boolean,
+    onJumpTop: () -> Unit,
+    onJumpBottom: () -> Unit,
+) {
+    val canScrollBack by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+    val hasEntries = entries.isNotEmpty()
+    Column(
+        modifier = Modifier.tourTarget("fab"),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AnimatedVisibility(
+            visible = canScrollBack && hasEntries && !selecting,
+            enter = scaleIn(),
+            exit = scaleOut(),
+        ) {
+            FloatingActionButton(
+                onClick = onJumpTop,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) {
+                Icon(
+                    Icons.Default.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.scroll_top),
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = !followTail && hasEntries && !selecting,
+            enter = scaleIn(),
+            exit = scaleOut(),
+        ) {
+            FloatingActionButton(
+                onClick = onJumpBottom,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Icon(
+                    Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.scroll_bottom),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The log list and the chrome that has to move with it. Reading [entries]
+ * here keeps a new line from recomposing the top bar and the filter bar.
+ */
+@Composable
+private fun StreamListPane(
     ui: StreamUiState,
+    entries: List<UiLogEntry>,
+    listState: LazyListState,
+    followTail: Boolean,
+    touching: Boolean,
+    selecting: Boolean,
+    parkedSeq: Long,
+    parkedOffset: Int,
+    onParkedSeq: (Long) -> Unit,
+    onParkedOffset: (Int) -> Unit,
+    selAnchor: Long,
+    selEnd: Long,
+    onSelectStart: (Long) -> Unit,
+    onSelectExtend: (Long) -> Unit,
+    onSelectAll: (Long, Long) -> Unit,
+    onClearSelection: () -> Unit,
+    onExtendedCopy: (String) -> Unit,
+    onSaveSelection: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
+    onCopy: (String) -> Unit,
+    onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit,
+    onOpenSetup: () -> Unit,
+    onDisableRules: () -> Unit,
+    rulesActive: Boolean,
+    snackbar: SnackbarHostState,
+    onUserTouch: (Boolean) -> Unit,
+    onUserDrag: (Float) -> Unit,
+) {
+    // Pinned tail sticks to the newest line in the same layout pass.
+    // While a finger is down the pin lets go, so a pull is not fighting
+    // a scroll request. Once the reader has left the tail, keep the parked
+    // line on screen: trimming the ring buffer deletes a prefix and the
+    // same index would otherwise show newer lines.
+    if (!followTail && !touching && !listState.isScrollInProgress && parkedSeq >= 0L) {
+        val idx = parkedIndex(entries, parkedSeq)
+        if (
+            idx >= 0 &&
+            (listState.firstVisibleItemIndex != idx ||
+                listState.firstVisibleItemScrollOffset != parkedOffset)
+        ) {
+            SideEffect {
+                val kept = entries.getOrNull(idx)?.seq ?: return@SideEffect
+                if (kept != parkedSeq) {
+                    onParkedSeq(kept)
+                    onParkedOffset(0)
+                }
+                listState.requestScrollToItem(idx, parkedOffset)
+            }
+        }
+    }
+    if (followTail && !touching && !ui.paused && !selecting && entries.isNotEmpty()) {
+        SideEffect {
+            listState.requestScrollToItem(entries.lastIndex)
+        }
+    }
+
+    val selLo = minOf(selAnchor, selEnd)
+    val selHi = maxOf(selAnchor, selEnd)
+    val rowPrefs = LocalLogRowPrefs.current
+    val iconCache = LocalAppIconCache.current
+    Box(Modifier.fillMaxSize()) {
+        when {
+            ui.access?.granted != true -> NoAccessState(onOpenSetup = onOpenSetup)
+            entries.isEmpty() -> EmptyState(
+                text = when {
+                    ui.adbHeld -> stringResource(R.string.stream_adb_needs_foreground)
+                    ui.engineState == LogcatEngine.State.ERROR && ui.lastError != null ->
+                        stringResource(R.string.stream_error_detail, ui.lastError!!)
+                    ui.engineState == LogcatEngine.State.STARTING ->
+                        stringResource(R.string.empty_logs_waiting)
+                    ui.filteredOut -> stringResource(R.string.empty_logs_filtered)
+                    else -> stringResource(R.string.empty_logs)
+                },
+                action = if (ui.filteredOut && rulesActive) {
+                    {
+                        TextButton(onClick = onDisableRules) {
+                            Text(stringResource(R.string.filter_rules_clear))
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
+            else -> LogList(
+                entries = entries,
+                listState = listState,
+                searchQuery = ui.searchQuery,
+                currentHit = ui.searchHits.getOrNull(ui.searchHitIndex),
+                selAnchor = selAnchor,
+                selEnd = selEnd,
+                onSelectStart = onSelectStart,
+                onSelectExtend = onSelectExtend,
+                onMakeFilter = onMakeFilter,
+                snackbar = snackbar,
+                onUserTouch = onUserTouch,
+                onUserDrag = onUserDrag,
+            )
+        }
+
+        EngineStatusChip(
+            state = ui.engineState,
+            adbHeld = ui.adbHeld,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .tourTarget("engineStatus"),
+        )
+
+        SelectionBar(
+            visible = selecting,
+            count = entries.count { it.seq in selLo..selHi },
+            onSelectAll = {
+                val first = entries.firstOrNull()?.seq ?: return@SelectionBar
+                val last = entries.lastOrNull()?.seq ?: return@SelectionBar
+                onSelectAll(first, last)
+            },
+            onExtendedCopy = {
+                onExtendedCopy(
+                    entries.filter { it.seq in selLo..selHi }.joinToString("\n") {
+                        formatVisible(
+                            it.entry,
+                            rowPrefs.visibleColumns(),
+                            appLabel = iconCache?.labelFor(it.entry.uid),
+                        )
+                    },
+                )
+            },
+            onSave = {
+                onSaveSelection(
+                    entries.filter { it.seq in selLo..selHi }.map { it.entry },
+                )
+            },
+            onCopy = {
+                onCopy(
+                    entries.filter { it.seq in selLo..selHi }.joinToString("\n") {
+                        formatVisible(
+                            it.entry,
+                            rowPrefs.visibleColumns(),
+                            appLabel = iconCache?.labelFor(it.entry.uid),
+                        )
+                    },
+                )
+            },
+            onClear = onClearSelection,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .tourTarget("selectionBar"),
+        )
+    }
+}
+
+@Composable
+private fun LogList(
+    entries: List<UiLogEntry>,
     listState: LazyListState,
     searchQuery: String,
     currentHit: Int?,
@@ -994,7 +1079,7 @@ private fun LogList(
     onUserTouch: (Boolean) -> Unit = {},
     onUserDrag: (Float) -> Unit = {},
 ) {
-    val currentEntries by rememberUpdatedState(ui.entries)
+    val currentEntries by rememberUpdatedState(entries)
     // Read through State: pointerInput keeps the first lambda instance, so
     // selection state must be dereferenced fresh, not captured by value.
     val selectingState by rememberUpdatedState(selAnchor >= 0L)
@@ -1034,10 +1119,10 @@ private fun LogList(
         // long-press that starts a selection — every Y must land on a row.
     ) {
         items(
-            count = ui.entries.size,
-            key = { index -> ui.entries[index].seq },
+            count = entries.size,
+            key = { index -> entries[index].seq },
         ) { index ->
-            val uiEntry = ui.entries[index]
+            val uiEntry = entries[index]
             // No per-row placement or fade. The viewport pins to the newest
             // line; a spring on top of that is what opened the empty gap.
             LogRow(

@@ -14,12 +14,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -70,6 +72,7 @@ fun FilterBar(
     onFilterChange: (LogFilter) -> Unit,
     onSavePreset: (String) -> Unit,
     onApplyPreset: (LogFilter) -> Unit,
+    onDisableRule: ((LogFilter) -> Unit)? = null,
     onManageFilters: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -159,6 +162,42 @@ fun FilterBar(
                         contentDescription = stringResource(R.string.filter_expand),
                         modifier = Modifier.rotate(chevron),
                     )
+                }
+            }
+
+            val activeRules = presets.filter { it.enabled && it.hasConstraint }
+            if (activeRules.isNotEmpty() && onDisableRule != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    activeRules.forEach { rule ->
+                        val kind = stringResource(
+                            if (rule.including) R.string.filter_including else R.string.filter_excluding,
+                        )
+                        FilterChip(
+                            selected = true,
+                            onClick = { onDisableRule(rule) },
+                            label = {
+                                Text(
+                                    stringResource(R.string.filter_rule_chip, kind, rule.name),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.widthIn(max = 220.dp),
+                                )
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.filter_rule_off, rule.name),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            },
+                        )
+                    }
                 }
             }
 

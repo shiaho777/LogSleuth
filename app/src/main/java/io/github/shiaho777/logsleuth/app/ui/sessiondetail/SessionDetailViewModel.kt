@@ -132,6 +132,18 @@ class SessionDetailViewModel @Inject constructor(
 
     fun applyPreset(preset: LogFilter) = setFilter(preset)
 
+    fun setRuleEnabled(filter: LogFilter, enabled: Boolean) {
+        viewModelScope.launch { filterDao.update(filter.copy(enabled = enabled).toEntity()) }
+    }
+
+    fun disableEnabledRules() {
+        viewModelScope.launch {
+            _ui.value.presets.filter { it.enabled }.forEach { rule ->
+                filterDao.update(rule.copy(enabled = false).toEntity())
+            }
+        }
+    }
+
     fun savePreset(name: String) {
         viewModelScope.launch {
             filterDao.insert(_ui.value.filter.copy(name = name, id = 0).toEntity())

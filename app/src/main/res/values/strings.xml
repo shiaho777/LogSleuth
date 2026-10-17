@@ -104,12 +104,18 @@
     <string name="settings_access_open">Open setup guide</string>
     <string name="settings_buffer_size">Buffer size</string>
     <string name="settings_buffer_size_value">Up to %1$d entries kept in memory</string>
+    <string name="settings_recording_limits">Recording limits</string>
     <string name="settings_recording_max">Recording size limit</string>
     <string name="settings_recording_max_value">Recording auto-stops at %1$d MB</string>
     <string name="settings_recording_hours">Recording duration limit</string>
     <string name="settings_recording_hours_value">Recording auto-stops after %1$d h</string>
     <string name="settings_recording_hours_unlimited">No time limit</string>
     <string name="settings_crash_notifications">Crash notifications</string>
+    <string name="settings_crash_save">Save</string>
+    <string name="settings_crash_notify">Notify</string>
+    <string name="settings_crash_java">Java</string>
+    <string name="settings_crash_native">Native</string>
+    <string name="settings_crash_anr">ANR</string>
     <string name="settings_bubble">Floating controls</string>
     <string name="settings_bubble_desc">Show record, bookmark and hide controls over other apps. Needs the overlay permission.</string>
     <string name="bubble_controls">Floating controls</string>
@@ -298,6 +304,9 @@
 
     <!-- Stackable filters -->
     <string name="filter_manage">Rules</string>
+    <string name="filter_rule_chip">%1$s · %2$s</string>
+    <string name="filter_rule_off">Turn off %1$s</string>
+    <string name="filter_rules_clear">Turn off rules</string>
     <string name="filter_stack_hint">Turn a rule on to add it to the stack. Including rules keep a line when any of them match. Excluding rules drop a line when they match. The filter bar above still applies on top.</string>
     <string name="filter_including">Including</string>
     <string name="filter_excluding">Excluding</string>

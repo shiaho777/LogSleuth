@@ -3,15 +3,20 @@ package io.github.shiaho777.logsleuth.app.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -147,29 +153,17 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
-                    SingleChoiceSegmentedButtonRow(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                    ) {
-                        listOf(
-                            AccessPolicy.AUTO to R.string.access_mode_auto,
-                            AccessPolicy.SHIZUKU to R.string.access_mode_shizuku,
-                            AccessPolicy.ROOT to R.string.access_mode_root,
-                            AccessPolicy.ADB to R.string.access_mode_adb,
-                        ).forEachIndexed { index, (value, labelRes) ->
-                            SegmentedButton(
-                                selected = s.accessPreference == value,
-                                onClick = { viewModel.setAccessPreference(value) },
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = 4),
-                            ) {
-                                Text(
-                                    stringResource(labelRes),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+                    listOf(
+                        AccessPolicy.AUTO to R.string.access_mode_auto,
+                        AccessPolicy.SHIZUKU to R.string.access_mode_shizuku,
+                        AccessPolicy.ROOT to R.string.access_mode_root,
+                        AccessPolicy.ADB to R.string.access_mode_adb,
+                    ).forEach { (value, labelRes) ->
+                        SettingsChoiceRow(
+                            title = stringResource(labelRes),
+                            selected = s.accessPreference == value,
+                            onClick = { viewModel.setAccessPreference(value) },
+                        )
                     }
                     val rootDetail = when {
                         !s.rootEnabled -> stringResource(R.string.settings_root_desc)
@@ -228,10 +222,10 @@ fun SettingsScreen(
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.settings_recording_max),
+                        stringResource(R.string.settings_recording_limits),
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    // Same drag-then-persist pattern as the buffer slider.
+                    // Drag locally; persist once on release.
                     var limitValue by remember(s.recordingMaxMb) {
                         mutableStateOf(s.recordingMaxMb.toFloat())
                     }
@@ -252,15 +246,6 @@ fun SettingsScreen(
                             viewModel.setRecordingMaxMb(limitValue.roundToInt())
                         },
                         valueRange = 8f..512f,
-                    )
-                }
-            }
-
-            Card {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.settings_recording_hours),
-                        style = MaterialTheme.typography.titleSmall,
                     )
                     // 0 means "no time limit"; 1..24 h otherwise.
                     var hoursValue by remember(s.recordingMaxHours) {
@@ -296,35 +281,49 @@ fun SettingsScreen(
                         checked = s.crashNotifications,
                         onCheckedChange = viewModel::setCrashNotifications,
                     )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_collect_java),
-                        checked = s.collectJava,
-                        onCheckedChange = viewModel::setCollectJava,
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            stringResource(R.string.settings_crash_save),
+                            modifier = Modifier.width(64.dp),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Text(
+                            stringResource(R.string.settings_crash_notify),
+                            modifier = Modifier.width(64.dp),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    CrashPolicyRow(
+                        label = stringResource(R.string.settings_crash_java),
+                        save = s.collectJava,
+                        notify = s.notifyJava,
+                        notifyEnabled = s.crashNotifications,
+                        onSave = viewModel::setCollectJava,
+                        onNotify = viewModel::setNotifyJava,
                     )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_collect_native),
-                        checked = s.collectNative,
-                        onCheckedChange = viewModel::setCollectNative,
+                    CrashPolicyRow(
+                        label = stringResource(R.string.settings_crash_native),
+                        save = s.collectNative,
+                        notify = s.notifyNative,
+                        notifyEnabled = s.crashNotifications,
+                        onSave = viewModel::setCollectNative,
+                        onNotify = viewModel::setNotifyNative,
                     )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_collect_anr),
-                        checked = s.collectAnr,
-                        onCheckedChange = viewModel::setCollectAnr,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_notify_java),
-                        checked = s.notifyJava,
-                        onCheckedChange = viewModel::setNotifyJava,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_notify_native),
-                        checked = s.notifyNative,
-                        onCheckedChange = viewModel::setNotifyNative,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.settings_notify_anr),
-                        checked = s.notifyAnr,
-                        onCheckedChange = viewModel::setNotifyAnr,
+                    CrashPolicyRow(
+                        label = stringResource(R.string.settings_crash_anr),
+                        save = s.collectAnr,
+                        notify = s.notifyAnr,
+                        notifyEnabled = s.crashNotifications,
+                        onSave = viewModel::setCollectAnr,
+                        onNotify = viewModel::setNotifyAnr,
                     )
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_separate_channels),
@@ -601,5 +600,61 @@ private fun SettingsSwitchRow(
             }
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+@Composable
+private fun SettingsChoiceRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(title, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun CrashPolicyRow(
+    label: String,
+    save: Boolean,
+    notify: Boolean,
+    notifyEnabled: Boolean,
+    onSave: (Boolean) -> Unit,
+    onNotify: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Checkbox(
+            checked = save,
+            onCheckedChange = onSave,
+            modifier = Modifier.width(64.dp),
+        )
+        Checkbox(
+            checked = notify,
+            onCheckedChange = onNotify,
+            enabled = notifyEnabled,
+            modifier = Modifier.width(64.dp),
+        )
     }
 }

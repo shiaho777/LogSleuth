@@ -31,6 +31,15 @@ class EvictOverflowTest {
     }
 
     @Test
+    fun `prefix drop keeps the surviving tail of a fresh append`() {
+        assertEquals(0 to 0, prefixDrop(sizeBefore = 100, appended = 5, dropped = 0))
+        assertEquals(3 to 0, prefixDrop(sizeBefore = 100, appended = 5, dropped = 3))
+        assertEquals(2 to 1, prefixDrop(sizeBefore = 2, appended = 3, dropped = 3))
+        assertEquals(2 to 3, prefixDrop(sizeBefore = 2, appended = 3, dropped = 5))
+        assertEquals(0 to 0, prefixDrop(sizeBefore = 0, appended = 0, dropped = 0))
+    }
+
+    @Test
     fun `overflow larger than visible evicts all of it`() {
         val all = (0L..9L).map(::entry).toMutableList()
         val visible = mutableListOf(entry(0), entry(3))

@@ -168,16 +168,26 @@ fun SessionDetailScreen(
                             onFilterChange = viewModel::setFilter,
                             onSavePreset = viewModel::savePreset,
                             onApplyPreset = viewModel::applyPreset,
+                            onDisableRule = { viewModel.setRuleEnabled(it, false) },
                             onManageFilters = onOpenFilters,
                         )
                         when {
                             ui.loading -> EmptyState(stringResource(R.string.empty_logs_waiting))
                             ui.missingFile -> EmptyState(stringResource(R.string.session_file_missing))
                             ui.entries.isEmpty() -> EmptyState(
-                                stringResource(
+                                text = stringResource(
                                     if (ui.filteredOut) R.string.empty_logs_filtered
                                     else R.string.empty_logs,
                                 ),
+                                action = if (ui.filteredOut && ui.presets.any { it.enabled }) {
+                                    {
+                                        TextButton(onClick = viewModel::disableEnabledRules) {
+                                            Text(stringResource(R.string.filter_rules_clear))
+                                        }
+                                    }
+                                } else {
+                                    null
+                                },
                             )
                             else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                                 items(

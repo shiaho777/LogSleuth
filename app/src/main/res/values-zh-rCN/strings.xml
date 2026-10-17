@@ -104,12 +104,18 @@
     <string name="settings_access_open">打开设置向导</string>
     <string name="settings_buffer_size">缓冲区大小</string>
     <string name="settings_buffer_size_value">内存中最多保留 %1$d 条日志</string>
+    <string name="settings_recording_limits">录制上限</string>
     <string name="settings_recording_max">录制大小上限</string>
     <string name="settings_recording_max_value">录制达到 %1$d MB 后自动停止</string>
     <string name="settings_recording_hours">录制时长上限</string>
     <string name="settings_recording_hours_value">录制 %1$d 小时后自动停止</string>
     <string name="settings_recording_hours_unlimited">不限时长</string>
     <string name="settings_crash_notifications">崩溃通知</string>
+    <string name="settings_crash_save">保存</string>
+    <string name="settings_crash_notify">通知</string>
+    <string name="settings_crash_java">Java</string>
+    <string name="settings_crash_native">原生</string>
+    <string name="settings_crash_anr">ANR</string>
     <string name="settings_bubble">悬浮控件</string>
     <string name="settings_bubble_desc">在其他应用上显示录制、书签与隐藏控件。需要悬浮窗权限。</string>
     <string name="bubble_controls">悬浮控件</string>
@@ -298,6 +304,9 @@
 
     <!-- Stackable filters -->
     <string name="filter_manage">规则</string>
+    <string name="filter_rule_chip">%1$s · %2$s</string>
+    <string name="filter_rule_off">关闭「%1$s」</string>
+    <string name="filter_rules_clear">关掉这些规则</string>
     <string name="filter_stack_hint">打开开关后，这条规则加入叠加。包含规则：命中任意一条就留下。排除规则：命中就丢掉。上方过滤栏仍然同时生效。</string>
     <string name="filter_including">包含</string>
     <string name="filter_excluding">排除</string>

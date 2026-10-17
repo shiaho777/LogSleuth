@@ -2,6 +2,8 @@ package io.github.shiaho777.logsleuth.app.ui.stream
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,12 +29,14 @@ import io.github.shiaho777.logsleuth.app.service.RecordingState
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
@@ -46,7 +50,6 @@ data class StreamUiState(
     val engineState: LogcatEngine.State = LogcatEngine.State.STOPPED,
     val filter: LogFilter = LogFilter.DEFAULT,
     val regexInvalid: Boolean = false,
-    val entries: List<UiLogEntry> = emptyList(),
     val paused: Boolean = false,
     val pausedIncoming: Int = 0,
     val recording: RecordingState = RecordingState(),
@@ -54,7 +57,7 @@ data class StreamUiState(
     val presets: List<LogFilter> = emptyList(),
     val searching: Boolean = false,
     val searchQuery: String = "",
-    /** Indices into [entries] that match the search query. */
+    /** Indices into [StreamViewModel.entries] that match the search query. */
     val searchHits: List<Int> = emptyList(),
     val searchHitIndex: Int = -1,
     /** Session just finished — prompt the user to share it. */
@@ -98,6 +101,17 @@ class StreamViewModel @Inject constructor(
     private val listMutex = Mutex()
     private val all = ArrayList<UiLogEntry>()
     private var visible = ArrayList<UiLogEntry>()
+
+    /**
+     * What the list draws. Appends and prefix drops land here; the screen
+     * reads it directly so a new line does not copy the buffer or rebuild
+     * the bars around the list. Mutated only on the main thread.
+     */
+    val entries: SnapshotStateList<UiLogEntry> = mutableStateListOf()
+
+    /** Edits queued under [listMutex], applied in that order on the main thread. */
+    private val edits = Channel<ListPublish>(Channel.UNLIMITED)
+
     private var seq = 0L
     private var bufferCap = 20_000
 
@@ -110,12 +124,16 @@ class StreamViewModel @Inject constructor(
     // running — a post-init declaration reads as null there (NPE crash).
     private val staged = ArrayList<LogcatEntry>(512)
     private val stagedMutex = Mutex()
+    private val stagedSignal = Channel<Unit>(Channel.CONFLATED)
 
     /** Enabled saved rules. AND-ed with the quick filter on the bar. */
     @Volatile
     private var enabledStack = FilterStack.PASS
 
     init {
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            for (edit in edits) applyEdit(edit)
+        }
         engine.refreshAccess()
         engine.acquireClient()
 
@@ -160,11 +178,12 @@ class StreamViewModel @Inject constructor(
                     val backfill = lastBackfill
                     lastSessionId = null
                     lastBackfill = 0L
-                    // Session row finalizes asynchronously; fetch after a beat.
-                    kotlinx.coroutines.delay(400)
-                    val session = sessionDao.getById(id!!)
-                    _ui.update {
-                        it.copy(finishedSession = session, finishedBackfill = backfill)
+                    // stop() writes the session row before it clears this state.
+                    val session = id?.let { sessionDao.getById(it) }
+                    if (session != null) {
+                        _ui.update {
+                            it.copy(finishedSession = session, finishedBackfill = backfill)
+                        }
                     }
                 }
                 wasRecording = r.isRecording
@@ -182,8 +201,8 @@ class StreamViewModel @Inject constructor(
             _ui.update { it.copy(apps = installedApps.load()) }
         }
 
-        // Collector: stage entries; a ticker publishes them once per frame so
-        // a busy logcat cannot trigger a recompose per line. On Default —
+        // Collector: stage entries; a drainer publishes them once per frame
+        // so a busy logcat cannot trigger a recompose per line. On Default —
         // the snapshot path filter-matches up to bufferCap entries and must
         // not run on the main thread (it froze cold/warm starts).
         //
@@ -191,6 +210,9 @@ class StreamViewModel @Inject constructor(
         // it receives anything: the snapshot taken inside therefore covers
         // every emission this subscription could miss, and seq dedup drops
         // entries already included in it. No gap, no duplicates.
+        //
+        // The drainer suspends until a line arrives, then waits one frame so
+        // a burst becomes one update. Idle does not wake.
         viewModelScope.launch(Dispatchers.Default) {
             var snapshotSeq = 0L
             engine.entries
@@ -202,15 +224,14 @@ class StreamViewModel @Inject constructor(
                 .collect { entry ->
                     if (entry.seq <= snapshotSeq) return@collect
                     stagedMutex.withLock { staged.add(entry) }
+                    stagedSignal.trySend(Unit)
                 }
         }
         viewModelScope.launch(Dispatchers.Default) {
-            while (true) {
-                // One publish per frame. Holding a flood for 200ms and then
-                // revealing it is the slice-by-slice load. Lines that
-                // arrived since the last frame show up together, already
-                // at the tail.
+            while (isActive) {
+                stagedSignal.receive()
                 delay(16)
+                while (stagedSignal.tryReceive().isSuccess) Unit
                 drainStaged()
             }
         }
@@ -226,8 +247,8 @@ class StreamViewModel @Inject constructor(
                 all.add(uiEntry)
                 if (accepts(compiled, e)) visible.add(uiEntry)
             }
-            trimLocked()
-            publishLocked()
+            trimCountLocked()
+            enqueueReplaceLocked()
         }
     }
 
@@ -238,8 +259,10 @@ class StreamViewModel @Inject constructor(
         }
         val compiled = currentCompiled()
         val pausedNow = _ui.value.paused
-        var addedVisible = 0
+        var published = false
         listMutex.withLock {
+            val sizeBefore = visible.size
+            val appended = ArrayList<UiLogEntry>()
             for (e in batch) {
                 if (pausedNow) {
                     pending.add(e)
@@ -249,7 +272,7 @@ class StreamViewModel @Inject constructor(
                 all.add(uiEntry)
                 if (accepts(compiled, e)) {
                     visible.add(uiEntry)
-                    addedVisible++
+                    appended.add(uiEntry)
                 }
             }
             // Paused entries are bounded too: without this, pausing during a
@@ -257,12 +280,19 @@ class StreamViewModel @Inject constructor(
             if (pending.size > bufferCap) {
                 pending.subList(0, pending.size - bufferCap).clear()
             }
-            trimLocked()
-            if (!pausedNow && addedVisible > 0) publishLocked()
+            if (pausedNow) return@withLock
+            val dropped = trimCountLocked()
+            val (dropOld, dropNew) = prefixDrop(sizeBefore, appended.size, dropped)
+            if (dropNew > 0) appended.subList(0, dropNew).clear()
+            val filtered = all.isNotEmpty() && visible.isEmpty()
+            val listChanged = dropOld > 0 || appended.isNotEmpty()
+            if (!listChanged && filtered == _ui.value.filteredOut) return@withLock
+            edits.trySend(ListPublish.Append(dropOld, ArrayList(appended), filtered))
+            published = true
         }
         if (pausedNow) {
             _ui.update { it.copy(pausedIncoming = it.pausedIncoming + batch.size) }
-        } else if (addedVisible > 0) {
+        } else if (published) {
             // Keep hit indices fresh while the search bar is open — the stream
             // keeps appending, so a one-shot scan goes stale within seconds.
             val s = _ui.value
@@ -270,13 +300,39 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    private fun trimLocked() = evictOverflow(all, visible, bufferCap)
+    /** How many visible rows [evictOverflow] removed. Call with [listMutex] held. */
+    private fun trimCountLocked(): Int {
+        val before = visible.size
+        evictOverflow(all, visible, bufferCap)
+        return before - visible.size
+    }
 
-    /** Call with [listMutex] held. */
-    private fun publishLocked() {
-        val snapshot = ArrayList(visible)
-        val filteredOut = all.isNotEmpty() && snapshot.isEmpty()
-        _ui.update { it.copy(entries = snapshot, filteredOut = filteredOut) }
+    /** Call with [listMutex] held. Queued ahead of any later edit. */
+    private fun enqueueReplaceLocked() {
+        edits.trySend(
+            ListPublish.Replace(
+                items = ArrayList(visible),
+                filteredOut = all.isNotEmpty() && visible.isEmpty(),
+            ),
+        )
+    }
+
+    /** Main thread. [filteredOut] is written only when it changes. */
+    private fun applyEdit(edit: ListPublish) {
+        when (edit) {
+            is ListPublish.Replace -> {
+                entries.clear()
+                if (edit.items.isNotEmpty()) entries.addAll(edit.items)
+            }
+            is ListPublish.Append -> {
+                val drop = edit.dropPrefix.coerceAtMost(entries.size)
+                if (drop > 0) entries.subList(0, drop).clear()
+                if (edit.items.isNotEmpty()) entries.addAll(edit.items)
+            }
+        }
+        if (_ui.value.filteredOut != edit.filteredOut) {
+            _ui.update { it.copy(filteredOut = edit.filteredOut) }
+        }
     }
 
     private fun currentCompiled(): CompiledFilter =
@@ -304,8 +360,8 @@ class StreamViewModel @Inject constructor(
                         if (accepts(compiled, e)) visible.add(uiEntry)
                     }
                     pending.clear()
-                    trimLocked()
-                    publishLocked()
+                    trimCountLocked()
+                    enqueueReplaceLocked()
                 }
                 _ui.update { it.copy(pausedIncoming = 0) }
             }
@@ -322,7 +378,7 @@ class StreamViewModel @Inject constructor(
                 all.clear()
                 visible.clear()
                 pending.clear()
-                publishLocked()
+                enqueueReplaceLocked()
             }
             _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList()) }
         }
@@ -363,7 +419,7 @@ class StreamViewModel @Inject constructor(
                 all.removeAll { it.entry.uid in uids }
                 visible.removeAll { it.entry.uid in uids }
                 pending.removeAll { it.uid in uids }
-                publishLocked()
+                enqueueReplaceLocked()
             }
         }
     }
@@ -492,6 +548,19 @@ class StreamViewModel @Inject constructor(
         }
     }
 
+    /** Turns one saved rule on or off. The stack refreshes from the database. */
+    fun setRuleEnabled(filter: LogFilter, enabled: Boolean) {
+        viewModelScope.launch { filterDao.update(filter.copy(enabled = enabled).toEntity()) }
+    }
+
+    fun disableEnabledRules() {
+        viewModelScope.launch {
+            _ui.value.presets.filter { it.enabled }.forEach { rule ->
+                filterDao.update(rule.copy(enabled = false).toEntity())
+            }
+        }
+    }
+
     fun applyPreset(preset: LogFilter) = setFilter(preset.copy(id = preset.id, name = preset.name))
 
     fun deletePreset(preset: LogFilter) {
@@ -556,7 +625,7 @@ class StreamViewModel @Inject constructor(
         val stack = enabledStack
         listMutex.withLock {
             visible = all.filterTo(ArrayList()) { accepts(compiled, it.entry) }
-            publishLocked()
+            enqueueReplaceLocked()
         }
         _ui.update { it.copy(regexInvalid = compiled.regexInvalid || stack.regexInvalid) }
     }
@@ -586,10 +655,37 @@ class StreamViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        edits.close()
         engine.releaseClient()
         super.onCleared()
     }
 
+}
+
+private sealed interface ListPublish {
+    val filteredOut: Boolean
+
+    data class Replace(
+        val items: List<UiLogEntry>,
+        override val filteredOut: Boolean,
+    ) : ListPublish
+
+    data class Append(
+        val dropPrefix: Int,
+        val items: List<UiLogEntry>,
+        override val filteredOut: Boolean,
+    ) : ListPublish
+}
+
+/**
+ * Split a prefix eviction across the rows that were already on screen and
+ * the ones just appended. [dropped] is how many visible rows the trim
+ * removed, counted from the front.
+ */
+internal fun prefixDrop(sizeBefore: Int, appended: Int, dropped: Int): Pair<Int, Int> {
+    val dropOld = minOf(dropped.coerceAtLeast(0), sizeBefore.coerceAtLeast(0))
+    val dropNew = (dropped - dropOld).coerceAtLeast(0).coerceAtMost(appended.coerceAtLeast(0))
+    return dropOld to dropNew
 }
 
 /**
