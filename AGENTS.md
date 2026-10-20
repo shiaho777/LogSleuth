@@ -79,7 +79,10 @@ Mental model:
 
 ## Workflow
 
-- Do not commit secrets, `local.properties`, keystores, or IDE/cache junk.
+- Do not commit `local.properties` or IDE/cache junk. The release
+  keystore is the exception: `app/release.keystore` and
+  `keystore.properties` stay in git so `assembleRelease` signs without a
+  password prompt. Do not delete or regenerate them.
 - Do not create commits, push, open PRs, or file Issues unless the user asks to
   deliver / ship / push / open a PR (or equivalent).
 - Version pins at the time of writing: Gradle 8.11.1, AGP 8.9.3, Kotlin 2.2.21,
