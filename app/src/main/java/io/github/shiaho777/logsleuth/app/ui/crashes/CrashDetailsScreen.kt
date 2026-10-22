@@ -1,10 +1,14 @@
 package io.github.shiaho777.logsleuth.app.ui.crashes
 
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,19 +17,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.automirrored.filled.WrapText
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -33,26 +43,36 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchHit
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchSection
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import kotlinx.coroutines.launch
@@ -66,13 +86,26 @@ fun CrashDetailsScreen(
     val ui by viewModel.ui.collectAsState()
     val crash = ui.crash
     val scope = rememberCoroutineScope()
-    val saveLauncher = rememberLauncherForActivityResult(
+    val snackbar = remember { SnackbarHostState() }
+    var saveMenu by remember { mutableStateOf(false) }
+    val zipLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
         if (uri != null) scope.launch { viewModel.saveZip(uri) }
     }
+    val txtLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri != null) scope.launch { viewModel.saveText(uri) }
+    }
+
+    BackHandler(enabled = ui.searching) { viewModel.setSearching(false) }
+
+    val ignoredMsg = stringResource(R.string.crash_ignored, crash?.packageName.orEmpty())
+    val unignoredMsg = stringResource(R.string.crash_unignored, crash?.packageName.orEmpty())
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = {
@@ -85,7 +118,11 @@ fun CrashDetailsScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            if (ui.searching) viewModel.setSearching(false) else onBack()
+                        },
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.navigate_back),
@@ -112,11 +149,29 @@ fun CrashDetailsScreen(
                             },
                         )
                     }
-                    IconButton(onClick = { saveLauncher.launch(viewModel.zipFileName()) }) {
-                        Icon(
-                            Icons.Default.Save,
-                            contentDescription = stringResource(R.string.save_to),
-                        )
+                    Box {
+                        IconButton(onClick = { saveMenu = true }) {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = stringResource(R.string.save_to),
+                            )
+                        }
+                        DropdownMenu(expanded = saveMenu, onDismissRequest = { saveMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.crash_export_zip)) },
+                                onClick = {
+                                    saveMenu = false
+                                    zipLauncher.launch(viewModel.zipFileName())
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.crash_export_text)) },
+                                onClick = {
+                                    saveMenu = false
+                                    txtLauncher.launch(viewModel.txtFileName())
+                                },
+                            )
+                        }
                     }
                     IconButton(onClick = viewModel::share) {
                         Icon(
@@ -141,6 +196,7 @@ fun CrashDetailsScreen(
             )
             return@Scaffold
         }
+        val currentHit = ui.searchHits.getOrNull(ui.searchHitIndex)
         Column(
             Modifier
                 .fillMaxSize()
@@ -201,8 +257,20 @@ fun CrashDetailsScreen(
                 Text(stringResource(R.string.crash_open_channel))
             }
             crash.packageName?.let { pkg ->
-                TextButton(onClick = viewModel::ignore) {
-                    Text(stringResource(R.string.crash_ignore))
+                TextButton(
+                    onClick = {
+                        val wasIgnored = ui.ignored
+                        viewModel.toggleIgnore()
+                        scope.launch {
+                            snackbar.showSnackbar(if (wasIgnored) unignoredMsg else ignoredMsg)
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (ui.ignored) R.string.crash_unignore else R.string.crash_ignore,
+                        ),
+                    )
                 }
             }
             if (ui.searching) {
@@ -216,18 +284,50 @@ fun CrashDetailsScreen(
                         Icon(Icons.Default.Search, contentDescription = stringResource(R.string.crash_search))
                     },
                 )
+                if (ui.searchHits.isNotEmpty() || ui.searchQuery.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (ui.searchHits.isEmpty()) {
+                                "0/0"
+                            } else {
+                                "${ui.searchHitIndex + 1}/${ui.searchHits.size}"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        IconButton(
+                            onClick = { viewModel.nextSearchHit(-1) },
+                            enabled = ui.searchHits.isNotEmpty(),
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowUp,
+                                contentDescription = stringResource(R.string.search_prev),
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.nextSearchHit(1) },
+                            enabled = ui.searchHits.isNotEmpty(),
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.search_next),
+                            )
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
-            SelectionContainer {
-                Text(
-                    text = highlighted(crash.snippet, ui.searchRanges),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    softWrap = ui.wrap,
-                    overflow = if (ui.wrap) TextOverflow.Visible else TextOverflow.Clip,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            CrashLogText(
+                text = crash.snippet,
+                ranges = ui.searchRanges,
+                currentHit = currentHit?.takeIf { it.section == CrashSearchSection.SNIPPET },
+                wrap = ui.wrap,
+                fontSize = 12.sp,
+            )
             if (!ui.contextText.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -236,34 +336,73 @@ fun CrashDetailsScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
-                SelectionContainer {
-                    Text(
-                        text = highlighted(ui.contextText.orEmpty(), ui.contextSearchRanges),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        softWrap = ui.wrap,
-                        overflow = if (ui.wrap) TextOverflow.Visible else TextOverflow.Clip,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                CrashLogText(
+                    text = ui.contextText.orEmpty(),
+                    ranges = ui.contextSearchRanges,
+                    currentHit = currentHit?.takeIf { it.section == CrashSearchSection.CONTEXT },
+                    wrap = ui.wrap,
+                    fontSize = 11.sp,
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun highlighted(text: String, ranges: List<IntRange>) = buildAnnotatedString {
+private fun CrashLogText(
+    text: String,
+    ranges: List<IntRange>,
+    currentHit: CrashSearchHit?,
+    wrap: Boolean,
+    fontSize: TextUnit,
+) {
+    val requester = remember { BringIntoViewRequester() }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val currentRange = currentHit?.range
+    LaunchedEffect(currentRange, layout, text) {
+        val range = currentRange ?: return@LaunchedEffect
+        val result = layout ?: return@LaunchedEffect
+        val last = (result.layoutInput.text.length - 1).coerceAtLeast(0)
+        if (last == 0 && text.isEmpty()) return@LaunchedEffect
+        val start = range.first.coerceIn(0, last)
+        requester.bringIntoView(result.getBoundingBox(start))
+    }
+    val hScroll = rememberScrollState()
+    SelectionContainer {
+        Text(
+            text = highlighted(text, ranges, currentRange),
+            fontFamily = FontFamily.Monospace,
+            fontSize = fontSize,
+            softWrap = wrap,
+            overflow = TextOverflow.Visible,
+            onTextLayout = { layout = it },
+            modifier = Modifier
+                .then(if (wrap) Modifier.fillMaxWidth() else Modifier.horizontalScroll(hScroll))
+                .bringIntoViewRequester(requester),
+        )
+    }
+}
+
+@Composable
+private fun highlighted(
+    text: String,
+    ranges: List<IntRange>,
+    current: IntRange?,
+) = buildAnnotatedString {
     if (ranges.isEmpty()) {
         append(text)
         return@buildAnnotatedString
     }
-    val highlight = SpanStyle(background = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f))
+    val dim = SpanStyle(background = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f))
+    val focus = SpanStyle(background = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
     var cursor = 0
     for (range in ranges.sortedBy { it.first }) {
         if (range.first > cursor) append(text.substring(cursor, range.first))
         val end = (range.last + 1).coerceAtMost(text.length)
         if (range.first < end) {
-            withStyle(highlight) { append(text.substring(range.first, end)) }
+            val style = if (current != null && range.first == current.first) focus else dim
+            withStyle(style) { append(text.substring(range.first, end)) }
         }
         cursor = end
     }

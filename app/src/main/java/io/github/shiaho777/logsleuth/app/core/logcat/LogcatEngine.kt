@@ -386,6 +386,12 @@ class LogcatEngine @Inject constructor(
     }
 
     /**
+     * Kill the live logcat process and open a new one. Keeps [resumeSince]
+     * so the ring is not dumped again. Use when the stream looks wedged.
+     */
+    fun restart() = resetBackoffAndRestart()
+
+    /**
      * Access changed while clients are attached. Cancel the live process and
      * open the new source immediately. [streamGeneration] keeps the old
      * job's `finally` from clearing the job we assign here.

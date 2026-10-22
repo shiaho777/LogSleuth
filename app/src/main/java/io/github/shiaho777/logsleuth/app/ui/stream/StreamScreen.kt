@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
@@ -54,6 +55,8 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -108,8 +111,10 @@ import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
+import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
+import io.github.shiaho777.logsleuth.app.ui.filters.FilterEditorDialog
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
@@ -152,6 +157,7 @@ fun StreamScreen(
     var selAnchor by remember { mutableStateOf(-1L) }
     var selEnd by remember { mutableStateOf(-1L) }
     var extendedCopyText by remember { mutableStateOf<String?>(null) }
+    var filterDraft by remember { mutableStateOf<LogFilter?>(null) }
     val selecting = selAnchor >= 0L
     val selectingNow by rememberUpdatedState(selecting)
 
@@ -366,6 +372,7 @@ fun StreamScreen(
                     },
                     onClear = { scopeDialog = ScopeAction.CLEAR },
                     onSave = { scopeDialog = ScopeAction.SAVE },
+                    onRestart = viewModel::restartLogging,
                 )
             }
         },
@@ -469,9 +476,10 @@ fun StreamScreen(
                         scope.launch { snackbar.showSnackbar(copiedMsg) }
                     }
                 },
-                onMakeFilter = { viewModel.saveFilterFromLine(it) },
+                onMakeFilter = { filterDraft = viewModel.draftFilterFromLine(it) },
                 onOpenSetup = { onNavigate(Routes.SETUP) },
                 onDisableRules = viewModel::disableEnabledRules,
+                onRestartLogging = viewModel::restartLogging,
                 rulesActive = ui.presets.any { it.enabled },
                 snackbar = snackbar,
                 onUserTouch = { down ->
@@ -575,6 +583,18 @@ fun StreamScreen(
             isSnapshot = ui.finishedSnapshot,
             onShare = { viewModel.shareFinishedSession(it) },
             onDismiss = viewModel::dismissFinishedSession,
+        )
+    }
+
+    filterDraft?.let { draft ->
+        FilterEditorDialog(
+            initial = draft,
+            apps = ui.apps,
+            onDismiss = { filterDraft = null },
+            onSave = { filter ->
+                viewModel.saveFilter(filter)
+                filterDraft = null
+            },
         )
     }
 
@@ -734,6 +754,7 @@ private fun StreamTopBar(
     onBubbleToggle: () -> Unit,
     onClear: () -> Unit,
     onSave: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -784,6 +805,24 @@ private fun StreamTopBar(
                         Icons.Default.Save,
                         contentDescription = stringResource(R.string.save_to_session),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            var more by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { more = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.more),
+                    )
+                }
+                DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.restart_logging)) },
+                        onClick = {
+                            more = false
+                            onRestart()
+                        },
                     )
                 }
             }
@@ -935,6 +974,7 @@ private fun StreamListPane(
     onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit,
     onOpenSetup: () -> Unit,
     onDisableRules: () -> Unit,
+    onRestartLogging: () -> Unit,
     rulesActive: Boolean,
     snackbar: SnackbarHostState,
     onUserTouch: (Boolean) -> Unit,
@@ -985,14 +1025,22 @@ private fun StreamListPane(
                     ui.filteredOut -> stringResource(R.string.empty_logs_filtered)
                     else -> stringResource(R.string.empty_logs)
                 },
-                action = if (ui.filteredOut && rulesActive) {
-                    {
-                        TextButton(onClick = onDisableRules) {
-                            Text(stringResource(R.string.filter_rules_clear))
+                action = when {
+                    ui.filteredOut && rulesActive -> {
+                        {
+                            TextButton(onClick = onDisableRules) {
+                                Text(stringResource(R.string.filter_rules_clear))
+                            }
                         }
                     }
-                } else {
-                    null
+                    ui.engineState == LogcatEngine.State.ERROR && !ui.adbHeld -> {
+                        {
+                            TextButton(onClick = onRestartLogging) {
+                                Text(stringResource(R.string.restart_logging))
+                            }
+                        }
+                    }
+                    else -> null
                 },
             )
             else -> LogList(

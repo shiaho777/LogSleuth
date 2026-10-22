@@ -477,24 +477,29 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    /** Saves an including rule for this line's tag and pid, and turns it on. */
-    fun saveFilterFromLine(entry: LogcatEntry) {
+    /**
+     * Prefills an including rule from this line so the editor can drop
+     * fields before saving.
+     */
+    fun draftFilterFromLine(entry: LogcatEntry): LogFilter =
+        LogFilter.fromLine(
+            tag = entry.tag,
+            message = entry.message,
+            pid = entry.pid,
+            tid = entry.tid,
+            uid = entry.uid,
+            level = entry.level,
+            packageName = installedApps.packageForUid(entry.uid),
+        )
+
+    fun saveFilter(filter: LogFilter) {
         viewModelScope.launch {
-            val name = entry.tag.ifBlank { "pid ${entry.pid}" }.take(40)
-            filterDao.insert(
-                LogFilter(
-                    name = name,
-                    tagQuery = entry.tag,
-                    tagExact = true,
-                    pid = entry.pid.toString(),
-                    uid = entry.uid?.toString().orEmpty(),
-                    enabled = true,
-                    including = true,
-                ).toEntity(),
-            )
+            filterDao.insert(filter.copy(id = 0).toEntity())
             _ui.update { it.copy(filterNotice = it.filterNotice + 1) }
         }
     }
+
+    fun restartLogging() = engine.restart()
 
     fun toggleRecording() {
         val recording = _ui.value.recording.isRecording
