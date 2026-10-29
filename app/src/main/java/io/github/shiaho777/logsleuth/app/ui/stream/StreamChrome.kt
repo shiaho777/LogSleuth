@@ -13,6 +13,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +23,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Clear
@@ -50,7 +56,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -64,7 +69,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
@@ -266,7 +274,15 @@ internal fun StreamTopBar(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Search mode's top bar.
+ *
+ * The query, the hit counter and the prev/next steppers live inside one
+ * filled pill; only the case toggle and the close button sit outside it. Four
+ * 48dp buttons sharing the row with a stock [TextField] used to squeeze the
+ * query down to a couple of characters and left the field with a hard outline
+ * that read as a form control, not as search.
+ */
 @Composable
 internal fun SearchTopBar(
     query: String,
@@ -281,25 +297,102 @@ internal fun SearchTopBar(
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    TopAppBar(
-        title = {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text(stringResource(R.string.search_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-            )
-        },
-        actions = {
-            Text(
-                if (hits == 0) "0/0" else "${hitIndex + 1}/$hits",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
+
+    val counter = when {
+        query.isEmpty() -> ""
+        hits <= 0 -> "0/0"
+        else -> "${hitIndex + 1}/$hits"
+    }
+
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 14.dp, end = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    BasicTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { if (hits > 0) onNext() }),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 10.dp)
+                            .focusRequester(focusRequester),
+                        decorationBox = { field ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (query.isEmpty()) {
+                                    Text(
+                                        text = stringResource(R.string.search_hint),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        // Clear of the caret, which sits at x=0
+                                        // while the field is empty and focused.
+                                        modifier = Modifier.padding(start = 3.dp),
+                                    )
+                                }
+                                field()
+                            }
+                        },
+                    )
+                    if (counter.isNotEmpty()) {
+                        Text(
+                            text = counter,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            // Fixed slot: the pills must not resize per hit.
+                            modifier = Modifier.padding(start = 2.dp, end = 4.dp),
+                        )
+                    }
+                    if (query.isNotEmpty()) {
+                        PillIconButton(
+                            onClick = { onQueryChange("") },
+                            contentDescription = stringResource(R.string.search_clear),
+                            icon = Icons.Default.Close,
+                        )
+                    }
+                    PillIconButton(
+                        onClick = onPrev,
+                        enabled = hits > 0,
+                        contentDescription = stringResource(R.string.search_prev),
+                        icon = Icons.Default.KeyboardArrowUp,
+                    )
+                    PillIconButton(
+                        onClick = onNext,
+                        enabled = hits > 0,
+                        contentDescription = stringResource(R.string.search_next),
+                        icon = Icons.Default.KeyboardArrowDown,
+                    )
+                }
+            }
             IconButton(onClick = { onCaseSensitiveChange(!caseSensitive) }) {
                 Icon(
-                    Icons.Default.TextFields,
+                    imageVector = Icons.Default.TextFields,
                     contentDescription = stringResource(R.string.search_case_sensitive),
                     tint = if (caseSensitive) {
                         MaterialTheme.colorScheme.primary
@@ -308,23 +401,40 @@ internal fun SearchTopBar(
                     },
                 )
             }
-            IconButton(onClick = onPrev, enabled = hits > 0) {
-                Icon(
-                    Icons.Default.KeyboardArrowUp,
-                    contentDescription = stringResource(R.string.search_prev),
-                )
-            }
-            IconButton(onClick = onNext, enabled = hits > 0) {
-                Icon(
-                    Icons.Default.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.search_next),
-                )
-            }
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
             }
-        },
-    )
+        }
+    }
+}
+
+/**
+ * Icon button sized to the pill it sits in. [IconButton] enforces a 48dp
+ * minimum touch target, which no longer fits once three of them share a 48dp
+ * tall bar with the query.
+ */
+@Composable
+private fun PillIconButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    icon: ImageVector,
+    enabled: Boolean = true,
+) {
+    val tint = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(18.dp),
+            tint = if (enabled) tint else tint.copy(alpha = 0.38f),
+        )
+    }
 }
 
 @Composable
@@ -344,7 +454,9 @@ internal fun JumpFabs(
     }
     val hasEntries = entries.isNotEmpty()
     Column(
-        modifier = Modifier.tourTarget("fab"),
+        // Clear of the progress rail hugging the right edge, and of the
+        // line-count caption that sits at its foot.
+        modifier = Modifier.tourTarget("fab").padding(end = 26.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         AnimatedVisibility(

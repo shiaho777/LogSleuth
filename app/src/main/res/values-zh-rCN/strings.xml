@@ -33,10 +33,14 @@
     <string name="resume">继续</string>
     <string name="clear">清空</string>
     <string name="search_hint">搜索日志…</string>
+    <string name="search_clear">清除搜索</string>
     <string name="record_start">开始录制</string>
     <string name="record_stop">停止录制</string>
     <string name="scroll_bottom">回到底部</string>
     <string name="scroll_top">回到顶部</string>
+    <string name="scrollbar_description">日志滚动条</string>
+    <string name="scrollbar_line_of">第 %1$s 行 / 共 %2$s 行</string>
+    <string name="scrollbar_total">共 %1$s 行</string>
     <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
     <string name="empty_logs_waiting">正在等待日志。</string>
     <string name="empty_logs_filtered">当前过滤器把所有行都挡掉了。放宽过滤才能看到日志。</string>
