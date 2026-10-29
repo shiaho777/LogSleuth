@@ -1,0 +1,116 @@
+# Cuts a GitHub Release from a version tag (vX.Y.Z).
+#
+# The signing key is committed on purpose (see AGENTS.md), so this workflow
+# needs no secrets beyond the default token: it builds the same release APK a
+# maintainer would build locally and attaches it to the Release page, which is
+# what the in-app updater reads.
+#
+# Preconditions: versionName in app/build.gradle.kts equals the tag (minus the
+# leading "v") and versionCode was bumped. The guard below fails the run
+# otherwise, so a tag can never ship a stale version number.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Download code
+        uses: actions/checkout@v4
+
+      - name: Prepare Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Prepare Android tools
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install needed SDK components
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0"
+
+      - name: Prepare Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Same gate as CI: a release must not skip the bilingual string check.
+      - name: String parity gate (values vs values-zh-rCN)
+        run: python3 scripts/check_string_parity.py
+
+      # A tag that disagrees with the build file would publish an APK whose
+      # version name is older than the Release it hangs under.
+      - name: Check tag matches versionName
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n1)"
+          code="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts | head -n1)"
+          if [ -z "$version" ] || [ -z "$code" ]; then
+            echo "::error::Could not read versionName/versionCode from app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match versionName ${version}"
+            exit 1
+          fi
+          echo "Releasing ${version} (versionCode ${code})"
+
+      - name: Unit tests
+        run: ./gradlew test --no-daemon
+
+      # Signed by app/release.keystore + keystore.properties, both in git.
+      - name: Assemble signed release
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Stage the APK under its release name
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          src="app/build/outputs/apk/release/app-release.apk"
+          [ -f "$src" ] || { echo "::error::$src was not produced"; exit 1; }
+          cp "$src" "LogSleuth-${tag#v}.apk"
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          apk="LogSleuth-${tag#v}.apk"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # Re-running the workflow for an existing tag replaces the asset
+            # instead of failing on a duplicate upload.
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --title "LogSleuth ${tag#v}" \
+              --generate-notes
+          fi
+
+      # Debug-signed artifacts are never distributed; this one is the release.
+      - name: Upload APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogSleuth-release-${{ github.ref_name }}
+          path: LogSleuth-*.apk
+          if-no-files-found: error
+          retention-days: 14

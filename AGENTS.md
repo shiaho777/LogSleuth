@@ -20,7 +20,7 @@ Instructions for coding agents working in this repository.
 | `sdk/` | `logsleuth-sdk` — the embeddable zero-permission logging library other apps integrate. |
 | `sample/` | Demo app consuming `:sdk`; used for manual verification of the SDK loop. |
 | `scripts/` | Repo gates (`check_string_parity.py`). |
-| `docs/screenshots/` | README screenshot set (currently branded placeholders). |
+| `docs/screenshots/` | README screenshot set (15 real device captures, both READMEs). |
 | `fastlane/metadata/` | Store listing copy (en-US + zh-CN), shared by F-Droid and Play. |
 
 ## How the main pieces connect
@@ -28,9 +28,9 @@ Instructions for coding agents working in this repository.
 ```text
 LogcatSource (local / Shizuku / root)
   → LogcatEngine (singleton, owns THE logcat process)
-      SharedFlow<LogcatEntry> ─┬→ StreamViewModel (120ms batches) → UI list
+      SharedFlow<LogcatEntry> ─┬→ StreamViewModel (per-frame batches) → UI list
                                 ├→ RecordingManager → session file + Room row
-                                └→ CrashDetector → crash_events + notification
+                                └→ CrashDetector → CrashRecorder → crash_events + notification
 
 logsleuth-sdk (inside a host app, no permissions):
   Sleuth.init → LogcatCaptureThread (logcat --pid=self)
@@ -43,6 +43,13 @@ Mental model:
 
 - **The engine is the single logcat owner.** UI and services consume its
   SharedFlow. Never spawn `logcat` anywhere else.
+- Crash persistence, surrounding-log capture and notification live in
+  `CrashRecorder` (same package as `CrashPolicy`). The engine only decides
+  *that* a crash happened and hands over a buffer snapshot; keep it that way
+  so the engine file stays about the process.
+- `ui/stream/StreamScreen.kt` owns state and gestures; the pure chrome
+  (top bars, banners, FABs, selection bar, saved sheet) lives in
+  `StreamChrome.kt`. New presentational pieces go there.
 - The engine reconnects with backoff when the process dies. A Shizuku or
   root grant change restarts it when that change switches the active path.
   Auto mode tries Shizuku, then root, then the ADB grant, so an existing
@@ -86,8 +93,21 @@ Mental model:
 - Do not create commits, push, open PRs, or file Issues unless the user asks to
   deliver / ship / push / open a PR (or equivalent).
 - Version pins at the time of writing: Gradle 8.11.1, AGP 8.9.3, Kotlin 2.2.21,
-  compileSdk 36, minSdk 26. Do not bump dependency versions without checking
-  the whole build still passes.
+  compileSdk 36, targetSdk 36, minSdk 26. Do not bump dependency versions
+  without checking the whole build still passes.
+
+### Releasing
+
+Tags are the only release trigger — `.github/workflows/release.yml` runs on
+`v*`, re-runs the string gate and unit tests, then `assembleRelease` (signed by
+the committed keystore) and publishes the APK to the GitHub Release the in-app
+updater reads.
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR.
+2. Merge it.
+3. Tag the merge commit `vX.Y.Z` and push the tag. The workflow fails fast if
+   the tag does not equal `versionName`, so a stale build cannot ship under a
+   newer version.
 
 ### Delivery (Issue + PR + CI)
 

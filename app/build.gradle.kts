@@ -15,7 +15,7 @@ android {
     defaultConfig {
         applicationId = "io.github.shiaho777.logsleuth.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 10
         versionName = "0.3.5"
 
