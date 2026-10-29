@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -169,7 +170,13 @@ fun LogSleuthNavHost(
                 NavHost(
                     navController = navController,
                     startDestination = startDestination,
-                    modifier = Modifier.padding(padding),
+                    // Consume what the Scaffold already inset, so a screen's
+                    // own imePadding() only adds the part the keyboard still
+                    // covers — otherwise the content lifts by the nav bar
+                    // height twice and leaves a blank band above the keyboard.
+                    modifier = Modifier
+                        .padding(padding)
+                        .consumeWindowInsets(padding),
                     enterTransition = {
                         slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start) + fadeIn()
                     },

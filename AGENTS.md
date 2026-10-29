@@ -50,6 +50,12 @@ Mental model:
 - `ui/stream/StreamScreen.kt` owns state and gestures; the pure chrome
   (top bars, banners, FABs, selection bar, saved sheet) lives in
   `StreamChrome.kt`. New presentational pieces go there.
+- `ui/stream/LogScrollRail.kt` is the right-edge rail: a severity
+  fingerprint of the whole buffer, a draggable viewport thumb, and the
+  `Line N of M` readout. Its geometry is pure (`ScrollRailMath`) and unit
+  tested, so drag↔index mapping changes must keep those tests green. The
+  rail is the only thing allowed to be under 48dp wide — it sits on the
+  list's edge, where a wider touch band would eat scroll gestures.
 - The engine reconnects with backoff when the process dies. A Shizuku or
   root grant change restarts it when that change switches the active path.
   Auto mode tries Shizuku, then root, then the ADB grant, so an existing
@@ -69,6 +75,11 @@ Mental model:
   free of Android framework dependencies where possible.
 - Engine/VM state flows publish in batches on hot paths (per 64 lines), never
   per item.
+- Edge-to-edge insets: the root Scaffold pads the NavHost *and*
+  `consumeWindowInsets`s the same values. A screen that adds its own
+  `imePadding()` (only the stream search does) therefore gets the keyboard
+  remainder, not the whole keyboard — stacking it on the raw Scaffold padding
+  lifts the content twice and leaves a blank band above the IME.
 
 ## Platform constraints (do not "fix" these)
 

@@ -416,6 +416,12 @@ fun StreamScreen(
                     selAnchor = -1L
                     selEnd = -1L
                 },
+                onScrubTo = { index ->
+                    // Grabbing the rail leaves the tail first, otherwise the pin
+                    // would snap the list back to the newest line.
+                    parkAt(index, 0)
+                    listState.requestScrollToItem(index)
+                },
                 onExtendedCopy = { extendedCopyText = it },
                 onSaveSelection = { selected ->
                     selAnchor = -1L
@@ -590,6 +596,7 @@ private fun StreamListPane(
     onSelectExtend: (Long) -> Unit,
     onSelectAll: (Long, Long) -> Unit,
     onClearSelection: () -> Unit,
+    onScrubTo: (Int) -> Unit,
     onExtendedCopy: (String) -> Unit,
     onSaveSelection: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
     onCopy: (String) -> Unit,
@@ -678,7 +685,16 @@ private fun StreamListPane(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(8.dp)
+                // Clear of the progress rail on the right edge.
+                .padding(end = 26.dp)
                 .tourTarget("engineStatus"),
+        )
+
+        LogScrollRail(
+            entries = entries,
+            listState = listState,
+            onScrubTo = onScrubTo,
+            modifier = Modifier.align(Alignment.CenterEnd),
         )
 
         SelectionBar(
