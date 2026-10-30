@@ -288,6 +288,12 @@
     <string name="tour_done_desc">Replay this tour anytime from Settings → About. Happy log-hunting!</string>
     <string name="settings_replay_guide">Replay guided tour</string>
 
+    <!-- Reset to defaults -->
+    <string name="settings_reset">Reset settings</string>
+    <string name="settings_reset_desc">Put every preference back to its default. The setup wizard and the background crash watch are left alone.</string>
+    <string name="settings_reset_action">Restore defaults</string>
+    <string name="settings_reset_confirm">Appearance, filters, recording limits, crash rules and the ignored-package list all go back to their defaults. Saved sessions, recorded crashes and imported logs are not touched.</string>
+
     <!-- Community / QQ group card -->
     <string name="settings_qq_group">QQ group</string>
     <string name="settings_qq_group_number">1127256026</string>

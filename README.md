@@ -113,6 +113,7 @@ halves that work together:
 | Tunable buffer | On-screen ring buffer from 1,000 to 200,000 entries (default 20,000). Optional cold start that follows only new lines; a reconnect still continues from the last line |
 | Log rows | Optional full lines instead of an 8-line clamp. Search has a match-case toggle on the search bar |
 | Sessions | Rename any session from the list or its detail screen |
+| Restore defaults | One button in Settings puts every preference back to its default — after a confirmation that says what is kept |
 
 ### Embedded SDK (`logsleuth-sdk`)
 

@@ -148,6 +148,11 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.unignorePackage(packageName)
     }
 
+    /** Puts every preference back to its default. */
+    fun resetToDefaults() = viewModelScope.launch {
+        settingsRepository.resetToDefaults()
+    }
+
     fun setShowLogTime(value: Boolean) = viewModelScope.launch {
         settingsRepository.setShowLogTime(value)
     }
