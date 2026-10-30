@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,23 +23,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
-
-/** The QQ group number, shown next to the invite link. */
-internal const val QQ_GROUP_NUMBER = "1127256026"
 
 /** Invite link for the QQ group — opens QQ's join page. */
 internal const val QQ_GROUP_INVITE_URL = "https://qm.qq.com/q/Gzj7CpirAs"
 
+/** The author's Bilibili space. */
+internal const val BILIBILI_SPACE_URL = "https://space.bilibili.com/2127032909"
+
 /**
- * QQ group card. It sits directly above the GitHub card at the bottom of
+ * Community card. It sits directly above the GitHub card at the bottom of
  * Settings, so the community entry is the last thing before the repository
  * link.
  */
 @Composable
-fun CommunityCard(onJoinGroup: () -> Unit) {
+fun CommunityCard(
+    onJoinGroup: () -> Unit,
+    onOpenBilibili: () -> Unit,
+) {
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -53,9 +58,8 @@ fun CommunityCard(onJoinGroup: () -> Unit) {
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        QQ_GROUP_NUMBER,
+                        stringResource(R.string.settings_qq_group_number),
                         style = MaterialTheme.typography.bodyLarge,
-                        textDecoration = TextDecoration.None,
                     )
                 }
             }
@@ -72,6 +76,43 @@ fun CommunityCard(onJoinGroup: () -> Unit) {
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.settings_qq_group_join))
+            }
+
+            HorizontalDivider()
+
+            // Bilibili: a plain link-out row, the same shape as the GitHub
+            // card below it.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenBilibili)
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.settings_bilibili),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        stringResource(R.string.settings_bilibili_handle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

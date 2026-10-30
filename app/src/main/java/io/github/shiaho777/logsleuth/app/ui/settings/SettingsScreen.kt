@@ -580,6 +580,11 @@ fun SettingsScreen(
                         Intent(Intent.ACTION_VIEW, Uri.parse(QQ_GROUP_INVITE_URL)),
                     )
                 },
+                onOpenBilibili = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(BILIBILI_SPACE_URL)),
+                    )
+                },
             )
 
             val updateState by viewModel.update.collectAsState()

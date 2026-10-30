@@ -290,8 +290,11 @@
 
     <!-- Community / QQ group card -->
     <string name="settings_qq_group">QQ 群</string>
+    <string name="settings_qq_group_number">1127256026</string>
     <string name="settings_qq_group_desc">有问题、有想法，或者只是想聊聊日志，都欢迎进来。</string>
     <string name="settings_qq_group_join">点击加入群聊</string>
+    <string name="settings_bilibili">哔哩哔哩</string>
+    <string name="settings_bilibili_handle">space.bilibili.com/2127032909</string>
 
     <!-- GitHub / update card -->
     <string name="update_card_title">GitHub 开源仓库</string>
