@@ -288,6 +288,11 @@
     <string name="tour_done_desc">Replay this tour anytime from Settings → About. Happy log-hunting!</string>
     <string name="settings_replay_guide">Replay guided tour</string>
 
+    <!-- Community / QQ group card -->
+    <string name="settings_qq_group">QQ group</string>
+    <string name="settings_qq_group_desc">Questions, ideas, or just want to talk about logs — come say hi.</string>
+    <string name="settings_qq_group_join">Tap to join the group</string>
+
     <!-- GitHub / update card -->
     <string name="update_card_title">Open source on GitHub</string>
     <string name="update_card_subtitle">shiaho777/LogSleuth · Apache License 2.0</string>

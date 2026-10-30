@@ -294,6 +294,13 @@ python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎通过 GitHub Issues 提交
 Bug 报告和功能建议。
 
+## 联系方式
+
+| 平台 | 入口 |
+| --- | --- |
+| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| QQ 群 | 1127256026 —— [点击加入群聊](https://qm.qq.com/q/Gzj7CpirAs) |
+
 ## 许可证
 
 [Apache-2.0](LICENSE)

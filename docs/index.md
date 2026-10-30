@@ -60,6 +60,13 @@ opens those zips directly.
 
 Requires Android 8.0 (API 26) or newer.
 
+## Community
+
+| Platform | Link |
+| --- | --- |
+| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| QQ Group | 1127256026 — [tap to join](https://qm.qq.com/q/Gzj7CpirAs) |
+
 ## Where to go next
 
 - [Getting started](/guide/) — install, grant access, read your first lines

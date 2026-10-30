@@ -307,6 +307,13 @@ The site source lives in [`docs/`](docs/); run it locally with
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests are
 welcome via GitHub Issues.
 
+## Contact
+
+| Platform | Link |
+| --- | --- |
+| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| QQ Group | 1127256026 — [tap to join](https://qm.qq.com/q/Gzj7CpirAs) |
+
 ## License
 
 [Apache-2.0](LICENSE)

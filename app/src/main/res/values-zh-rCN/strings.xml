@@ -288,6 +288,11 @@
     <string name="tour_done_desc">随时可在 设置 → 关于 中重看本引导。祝捉虫愉快！</string>
     <string name="settings_replay_guide">重看使用引导</string>
 
+    <!-- Community / QQ group card -->
+    <string name="settings_qq_group">QQ 群</string>
+    <string name="settings_qq_group_desc">有问题、有想法，或者只是想聊聊日志，都欢迎进来。</string>
+    <string name="settings_qq_group_join">点击加入群聊</string>
+
     <!-- GitHub / update card -->
     <string name="update_card_title">GitHub 开源仓库</string>
     <string name="update_card_subtitle">shiaho777/LogSleuth · Apache License 2.0</string>
