@@ -1,5 +1,7 @@
 package io.github.shiaho777.logsleuth.app.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -569,6 +571,16 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            // Community first, then the repository: the QQ group is the last
+            // card before the GitHub link at the bottom of the screen.
+            CommunityCard(
+                onJoinGroup = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(QQ_GROUP_INVITE_URL)),
+                    )
+                },
+            )
 
             val updateState by viewModel.update.collectAsState()
             UpdateCard(

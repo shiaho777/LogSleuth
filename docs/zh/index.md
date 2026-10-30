@@ -58,6 +58,13 @@ features:
 
 需要 Android 8.0（API 26）及以上。
 
+## 社区
+
+| 平台 | 入口 |
+| --- | --- |
+| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| QQ 群 | 1127256026 —— [点击加入群聊](https://qm.qq.com/q/Gzj7CpirAs) |
+
 ## 接下来读什么
 
 - [快速开始](/zh/guide/) —— 安装、授权、读到第一行日志
