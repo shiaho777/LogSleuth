@@ -38,8 +38,18 @@ you get the story and not just the stack. Detection can be switched per kind
 in **Settings → Crash detection**, and notifications can be grouped per app or
 per crash type.
 
+**Search inside a crash.** The search on the crash screen covers the stack and
+the saved surrounding logs. It has previous/next, a hit counter, and scrolls
+the current match into view — the snippet first, then the context around it.
+Back closes the search before it leaves the page.
+
 **Ignore an app** if its crashes are noise: the crash detail screen can ignore
 the package that crashed, and the same screen can undo it.
+
+**Share it as text.** GitHub, Telegram and mail want `text/plain`, so the share
+action sends that. A very large stack goes out as a `text/plain` file through
+the system share sheet instead, and **Save** offers a `.txt` next to the zip.
+Both include the surrounding logs that were saved with the crash.
 
 ## The background crash watch
 

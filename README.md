@@ -47,11 +47,13 @@ halves that work together:
 | Feature | Details |
 | --- | --- |
 | Live logcat | `threadtime` rows with level colors, pid·tid·uid columns and per-app icons |
+| Buffer rail | The right edge draws the whole buffer as a severity fingerprint, with a draggable viewport thumb and a `Line N of M` readout |
 | Smooth tail-follow | Conveyor-style auto-scroll that tracks the arrival rate; a fling up detaches, a fling back re-pins |
-| Pause & buffer | Freeze the display while lines keep buffering underneath — the banner counts what's waiting |
+| Pause & buffer | Freeze the display while lines keep buffering underneath — the banner counts what's waiting, under the filter you are actually using |
 | Search | Query across the whole buffer: hit counter, highlighted matches, prev/next jumps |
 | Jump controls | FABs to snap to the oldest buffered line or back to the live tail |
 | Engine chip | Streaming / Connecting / Stopped / Error at a glance — with the real cause (e.g. `logcat exited 1`) shown when it fails; auto-reconnects with backoff |
+| Restart logging | Overflow action that reconnects a wedged stream, keeping the resume stamp so the ring buffer is not dumped again |
 
 ### Narrow it down
 
@@ -59,6 +61,7 @@ halves that work together:
 | --- | --- |
 | Filters | Level threshold (V–A), tag, keyword, exclude-pattern, regex toggle — combinable |
 | Filter presets | Save a filter combo, reapply it later; presets manage their own screen |
+| Filter editor | Pick a package and an allowed level set; creating a filter from a log line opens the editor prefilled instead of saving a fixed rule |
 | Per-app filter | Chip over the stream filters to one app (package names need the uid column, so Shizuku or root) |
 | App picker | Installed-app list with icons and per-app line stats |
 
@@ -90,6 +93,8 @@ halves that work together:
 | --- | --- |
 | Live detection | `FATAL EXCEPTION`, native `Fatal signal` and ANR signatures flagged while streaming or recording |
 | In-app event list | Crashes grouped by app (icon, name, count). Search, sort, and open one app's stack, version, and the surrounding lines. Delete one app's crashes with Undo |
+| Crash search | Search the stack and the saved surrounding logs, with previous/next, a hit counter, and the current match scrolled into view. Back closes the search before leaving the page |
+| Ignore an app | Ignore or un-ignore the crashing package from the crash screen itself |
 | Notifications | Save and notify are separate for Java crashes, native crashes, and ANRs. Each app can have its own channel, so muting one in system settings keeps the record. The alert shows the stack, copies it, and opens that crash |
 | Surrounding logs | Up to 200 lines from the moment of the crash are stored beside it and included in the share zip |
 
@@ -98,7 +103,7 @@ halves that work together:
 | Feature | Details |
 | --- | --- |
 | Report wizard | Three steps: pick the misbehaving app → reproduce while LogSleuth records → share ZIP/TXT or keep it in Sessions. A crash in the target app is flagged automatically |
-| Export | Sessions and the report share as `.txt` or `.zip` (the zip bundles device info) |
+| Export | Sessions and the report share as `.txt` or `.zip` (the zip bundles device info). A crash shares as plain text, or as a file when the stack is too big for the share sheet |
 | Import | Open `.zip`/`.txt`/`.log` from a file manager or share sheet — LogSleuth renders it as a session (this is also how SDK exports arrive) |
 
 ### Quality-of-life
@@ -114,6 +119,8 @@ halves that work together:
 | Log rows | Optional full lines instead of an 8-line clamp. Search has a match-case toggle on the search bar |
 | Sessions | Rename any session from the list or its detail screen |
 | Restore defaults | One button in Settings puts every preference back to its default — after a confirmation that says what is kept |
+| Community | The QQ group and the Bilibili space are one tap away at the bottom of Settings |
+| Background watch | Crash watch that keeps running off screen — with a `specialUse` foreground service, so it no longer trips the Android 15 time limit |
 
 ### Embedded SDK (`logsleuth-sdk`)
 

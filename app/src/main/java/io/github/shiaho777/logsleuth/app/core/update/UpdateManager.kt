@@ -297,10 +297,10 @@ class UpdateManager @Inject constructor(
             } catch (_: Exception) { /* corrupt sidecar → skip */ }
         }
         // A finished APK whose meta was already deleted also counts as done.
-        updatesDir.listFiles { f -> f.name.endsWith(".apk") }?.firstOrNull()?.let { apk ->
+        updatesDir.listFiles { f -> f.name.endsWith(".apk", true) }?.firstOrNull()?.let { apk ->
             _state.value = _state.value.copy(
                 dlRelease = ReleaseInfo(
-                    tag = apk.nameWithoutExtension.removePrefix("LogSleuth-"),
+                    tag = tagFromApkName(apk.name),
                     title = "", notes = "",
                     publishedAt = "", pageUrl = REPO_URL,
                     apkName = apk.name, apkUrl = null, apkSize = apk.length(),
@@ -314,7 +314,6 @@ class UpdateManager @Inject constructor(
     // ---------------- intents ----------------
 
     fun repoIntent() = Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL))
-
     fun openReleaseIntent(r: ReleaseInfo) =
         Intent(Intent.ACTION_VIEW, Uri.parse(r.pageUrl))
 
@@ -337,4 +336,17 @@ class UpdateManager @Inject constructor(
         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
         Uri.parse("package:${context.packageName}"),
     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+}
+
+/**
+ * Reads the version back out of a downloaded APK's file name.
+ *
+ * The release asset is `LogSleuth-<version>.APK`, but the name is not
+ * load-bearing: the prefix is stripped case-insensitively, and anything that
+ * does not look like a prefix is kept, so a renamed asset still shows a
+ * sensible tag.
+ */
+private fun tagFromApkName(name: String): String {
+    val stem = name.substringBeforeLast('.', name)
+    return stem.replaceFirst(Regex("(?i)^logsleuth[-_]"), "")
 }

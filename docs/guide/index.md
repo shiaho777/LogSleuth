@@ -47,7 +47,8 @@ Skip it if you like — **Settings → Feature tour** replays it.
 - **The badge at the rail's foot** is the total number of buffered lines.
 - **The top bar** holds pause, search, the floating-controls toggle, clear,
   save, and an overflow menu with **Restart logging** for a stream that looks
-  wedged.
+  wedged. It reconnects and keeps the resume stamp, so the ring buffer is not
+  dumped a second time.
 - **The filter bar** narrows the stream: level, app, and the rule stack. See
   [Filters & rules](/guide/filters).
 
@@ -60,6 +61,8 @@ Skip it if you like — **Settings → Feature tour** replays it.
 | Copy what you see | Long-press to select a range, then copy the visible columns |
 | Keep a session | **Save** in the top bar, or the tile in quick settings |
 | Read a crash | The **Crashes** tab, or a notification when one is detected |
+| Start over with clean settings | **Settings → Restore defaults**. It asks first, and says what it keeps |
+| Ask a question | The QQ group and the Bilibili space are one tap away at the bottom of **Settings** |
 
 ## Next
 

@@ -103,7 +103,8 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           src="app/build/outputs/apk/release/app-release.apk"
           [ -f "$src" ] || { echo "::error::$src was not produced"; exit 1; }
-          cp "$src" "LogSleuth-${tag#v}.apk"
+          # Same shape as the mature web-to-app releases: <name>-<version>.APK
+          cp "$src" "LogSleuth-${tag#v}.APK"
 
       - name: Publish the GitHub Release
         env:
@@ -111,7 +112,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          apk="LogSleuth-${tag#v}.apk"
+          apk="LogSleuth-${tag#v}.APK"
           notes="docs/releases/${tag}.md"
           if gh release view "$tag" >/dev/null 2>&1; then
             # Re-running the workflow for an existing tag replaces the asset
@@ -129,6 +130,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LogSleuth-release-${{ github.ref_name }}
-          path: LogSleuth-*.apk
+          path: LogSleuth-*.APK
           if-no-files-found: error
           retention-days: 14
