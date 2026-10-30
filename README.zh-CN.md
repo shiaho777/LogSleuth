@@ -299,6 +299,7 @@ Bug 报告和功能建议。
 | 平台 | 入口 |
 | --- | --- |
 | GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| 哔哩哔哩 | [space.bilibili.com/2127032909](https://space.bilibili.com/2127032909) |
 | QQ 群 | 1127256026 —— [点击加入群聊](https://qm.qq.com/q/Gzj7CpirAs) |
 
 ## 许可证

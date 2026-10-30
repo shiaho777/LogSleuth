@@ -312,6 +312,7 @@ welcome via GitHub Issues.
 | Platform | Link |
 | --- | --- |
 | GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
+| Bilibili | [space.bilibili.com/2127032909](https://space.bilibili.com/2127032909) |
 | QQ Group | 1127256026 — [tap to join](https://qm.qq.com/q/Gzj7CpirAs) |
 
 ## License
