@@ -339,6 +339,7 @@
     <string name="settings_crash_blacklist_desc">这些包名的崩溃和 ANR 会被丢掉。</string>
     <string name="settings_watch_boot">后台监听崩溃</string>
     <string name="settings_watch_boot_desc">保留一条安静的通知，这样 LogSleuth 在后台时也能抓到崩溃，开机后同样有效。Android 13 及以后，如果只有 ADB 授权，要等应用回到前台才会开始读；Shizuku 和 Root 可以在离开屏幕后继续听。</string>
+    <string name="settings_watch_blocked">系统拒绝了后台监看的启动，目前处于暂停状态。重新打开一次 LogSleuth，或把开关关掉再打开，即可恢复。</string>
     <string name="notif_channel_watch">崩溃监听</string>
     <string name="notif_watch_title">正在监听崩溃</string>
     <string name="notif_watch_text">LogSleuth 在后台听着日志</string>

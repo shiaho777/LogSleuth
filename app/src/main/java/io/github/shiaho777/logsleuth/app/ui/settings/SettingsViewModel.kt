@@ -135,6 +135,9 @@ class SettingsViewModel @Inject constructor(
     fun setWatchOnBoot(value: Boolean) = viewModelScope.launch {
         settingsRepository.setWatchOnBoot(value)
         if (value) {
+            // The user asked for it from a visible screen, which is the one
+            // context where the start cannot be refused as "background".
+            settingsRepository.clearWatchBlocked()
             runCatching { CrashWatchService.start(context) }
         } else {
             context.stopService(Intent(context, CrashWatchService::class.java))

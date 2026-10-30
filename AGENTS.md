@@ -92,6 +92,13 @@ Mental model:
   The SDK reads only the host app's own logs and must not depend on libsu.
 - PID→package mapping beyond the logcat `uid` column needs a shell
   (Shizuku or root). The uid column itself is available on those two paths.
+- Both long-running services declare `foregroundServiceType="specialUse"`, not
+  `dataSync`: Android 15 caps `dataSync` at six hours per 24 for apps targeting
+  35+, which a crash watcher can never stay under (#118). Use
+  `startForegroundOrFalse` — `startForeground` throws when the system refuses
+  the start, and letting that escape `onStartCommand` crashes the process and
+  turns a sticky restart into a loop. A refusal is recorded in
+  `watchBlockedAt`, which `WatchRecovery` turns into a retry cooldown.
 - SDK stays permission-free and network-free by design. Root support lives
   in the viewer only.
 

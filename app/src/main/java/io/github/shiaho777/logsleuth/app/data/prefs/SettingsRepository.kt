@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -41,6 +42,12 @@ data class Settings(
     val crashBlacklist: Set<String> = emptySet(),
     /** Keep a foreground watch alive across reboot so crashes are not missed. */
     val watchOnBoot: Boolean = false,
+    /**
+     * Wall-clock millis of the last time the system refused to let the watch
+     * go foreground; 0 when it is healthy. Used to back off instead of
+     * retrying on every process start.
+     */
+    val watchBlockedAt: Long = 0L,
     val showLogTime: Boolean = true,
     val showLogDate: Boolean = false,
     val showLogUid: Boolean = false,
@@ -100,6 +107,7 @@ class SettingsRepository(private val context: Context) {
         val RECORDING_MAX_HOURS = intPreferencesKey("recording_max_hours")
         val CRASH_BLACKLIST = stringSetPreferencesKey("crash_blacklist")
         val WATCH_ON_BOOT = booleanPreferencesKey("watch_on_boot")
+        val WATCH_BLOCKED_AT = longPreferencesKey("watch_blocked_at")
         val SHOW_LOG_TIME = booleanPreferencesKey("show_log_time")
         val SHOW_LOG_DATE = booleanPreferencesKey("show_log_date")
         val SHOW_LOG_UID = booleanPreferencesKey("show_log_uid")
@@ -148,6 +156,7 @@ class SettingsRepository(private val context: Context) {
             recordingMaxHours = p[Keys.RECORDING_MAX_HOURS] ?: 0,
             crashBlacklist = p[Keys.CRASH_BLACKLIST] ?: emptySet(),
             watchOnBoot = p[Keys.WATCH_ON_BOOT] ?: false,
+            watchBlockedAt = p[Keys.WATCH_BLOCKED_AT] ?: 0L,
             showLogTime = p[Keys.SHOW_LOG_TIME] ?: true,
             showLogDate = p[Keys.SHOW_LOG_DATE] ?: false,
             showLogUid = p[Keys.SHOW_LOG_UID] ?: false,
@@ -222,6 +231,25 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setWatchOnBoot(value: Boolean) =
         context.dataStore.edit { it[Keys.WATCH_ON_BOOT] = value }
+
+    fun setWatchOnBootAsync(value: Boolean) {
+        writeScope.launch { setWatchOnBoot(value) }
+    }
+
+    /** Records a refused foreground start so the next attempt is not immediate. */
+    suspend fun setWatchBlockedAt(value: Long) =
+        context.dataStore.edit { it[Keys.WATCH_BLOCKED_AT] = value }
+
+    fun setWatchBlockedAtAsync(value: Long) {
+        writeScope.launch { setWatchBlockedAt(value) }
+    }
+
+    suspend fun clearWatchBlocked() =
+        context.dataStore.edit { it[Keys.WATCH_BLOCKED_AT] = 0L }
+
+    fun clearWatchBlockedAsync() {
+        writeScope.launch { clearWatchBlocked() }
+    }
 
     suspend fun ignorePackage(packageName: String) {
         if (packageName.isBlank()) return
