@@ -24,8 +24,11 @@ class BootReceiver : BroadcastReceiver() {
         val appContext = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                if (settingsRepository.settings.first().watchOnBoot) {
-                    CrashWatchService.start(appContext)
+                val settings = settingsRepository.settings.first()
+                if (settings.watchOnBoot &&
+                    WatchRecovery.shouldRetry(settings.watchBlockedAt, System.currentTimeMillis())
+                ) {
+                    runCatching { CrashWatchService.start(appContext) }
                 }
             } finally {
                 pending.finish()

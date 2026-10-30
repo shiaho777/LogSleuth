@@ -80,6 +80,18 @@ python3 scripts/check_string_parity.py   # bilingual string gate
 Please write issues and PRs in English so the widest audience can follow
 along; conversational Chinese is fine in review comments.
 
+### Releasing (maintainers)
+
+Releases are cut from tags, not from `main` directly:
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` via a normal
+   PR.
+2. Tag the merged commit `vX.Y.Z` and push the tag.
+3. `.github/workflows/release.yml` runs the string gate, the unit tests and
+   `assembleRelease` (signed with the keystore committed in this repo), then
+   attaches `LogSleuth-X.Y.Z.apk` to the GitHub Release that the in-app updater
+   downloads. The tag must match `versionName` or the run stops before building.
+
 
 ---
 
@@ -109,3 +121,14 @@ python3 scripts/check_string_parity.py   # 双语字符串奇偶校验
 - 用户可见字符串必须同时加进 `values/strings.xml` 和 `values-zh-rCN/strings.xml`
   (CI 门禁会强制校验)
 - 尽量不加新依赖;SDK 模块必须保持零权限、零网络
+
+### 发版(维护者)
+
+版本由 tag 触发,不直接从 `main` 发布:
+
+1. 在普通 PR 里改 `app/build.gradle.kts` 的 `versionCode` 和 `versionName`。
+2. 合并后给该提交打 `vX.Y.Z` 标签并推送。
+3. `.github/workflows/release.yml` 会跑字符串门禁、单测和 `assembleRelease`
+   (用仓库内的 keystore 签名),然后把 `LogSleuth-X.Y.Z.apk` 挂到 GitHub
+   Release 上,应用内更新读的就是它。标签与 `versionName` 不一致时会在构建前
+   直接失败。

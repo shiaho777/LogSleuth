@@ -260,11 +260,18 @@ class StreamViewModel @Inject constructor(
         val compiled = currentCompiled()
         val pausedNow = _ui.value.paused
         var published = false
+        var matchedWhilePaused = 0
+        var pendingTrimmed = false
         listMutex.withLock {
             val sizeBefore = visible.size
             val appended = ArrayList<UiLogEntry>()
             for (e in batch) {
                 if (pausedNow) {
+                    // Keep every line — the filter can change while paused and
+                    // must still be able to reveal them — but only the ones the
+                    // active filter admits are "new lines" to the user, so only
+                    // those count toward the banner.
+                    if (accepts(compiled, e)) matchedWhilePaused++
                     pending.add(e)
                     continue
                 }
@@ -279,6 +286,7 @@ class StreamViewModel @Inject constructor(
             // log storm grows `pending` without limit.
             if (pending.size > bufferCap) {
                 pending.subList(0, pending.size - bufferCap).clear()
+                pendingTrimmed = true
             }
             if (pausedNow) return@withLock
             val dropped = trimCountLocked()
@@ -291,7 +299,15 @@ class StreamViewModel @Inject constructor(
             published = true
         }
         if (pausedNow) {
-            _ui.update { it.copy(pausedIncoming = it.pausedIncoming + batch.size) }
+            // Trimming deleted an unknown number of matching lines, so the
+            // running total is no longer trustworthy — recount.
+            val next = if (pendingTrimmed) {
+                val current = currentCompiled()
+                listMutex.withLock { pending.count { accepts(current, it) } }
+            } else {
+                _ui.value.pausedIncoming + matchedWhilePaused
+            }
+            _ui.update { it.copy(pausedIncoming = next) }
         } else if (published) {
             // Keep hit indices fresh while the search bar is open — the stream
             // keeps appending, so a one-shot scan goes stale within seconds.
@@ -349,7 +365,9 @@ class StreamViewModel @Inject constructor(
     }
 
     fun setPaused(paused: Boolean) {
-        _ui.update { it.copy(paused = paused) }
+        // Pausing starts a fresh count; resuming surfaces the backlog and
+        // clears it (below).
+        _ui.update { it.copy(paused = paused, pausedIncoming = 0) }
         if (!paused) {
             viewModelScope.launch(Dispatchers.Default) {
                 val compiled = currentCompiled()
@@ -415,12 +433,18 @@ class StreamViewModel @Inject constructor(
     fun clearApps(uids: Set<Int?>) {
         viewModelScope.launch(Dispatchers.Default) {
             stagedMutex.withLock { staged.removeAll { it.uid in uids } }
+            var pendingMatches = -1
             listMutex.withLock {
                 all.removeAll { it.entry.uid in uids }
                 visible.removeAll { it.entry.uid in uids }
                 pending.removeAll { it.uid in uids }
+                if (_ui.value.paused) {
+                    val compiled = currentCompiled()
+                    pendingMatches = pending.count { accepts(compiled, it) }
+                }
                 enqueueReplaceLocked()
             }
+            if (pendingMatches >= 0) _ui.update { it.copy(pausedIncoming = pendingMatches) }
         }
     }
 
@@ -628,11 +652,20 @@ class StreamViewModel @Inject constructor(
     private suspend fun refilter() {
         val compiled = CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
         val stack = enabledStack
+        // The banner counts lines that match the *active* filter, so a filter
+        // change while paused has to re-count what is waiting.
+        var pendingMatches = -1
         listMutex.withLock {
             visible = all.filterTo(ArrayList()) { accepts(compiled, it.entry) }
+            if (_ui.value.paused) pendingMatches = pending.count { accepts(compiled, it) }
             enqueueReplaceLocked()
         }
-        _ui.update { it.copy(regexInvalid = compiled.regexInvalid || stack.regexInvalid) }
+        _ui.update {
+            it.copy(
+                regexInvalid = compiled.regexInvalid || stack.regexInvalid,
+                pausedIncoming = if (pendingMatches >= 0) pendingMatches else it.pausedIncoming,
+            )
+        }
     }
 
     private fun resolveUid(packageName: String?): Int? =

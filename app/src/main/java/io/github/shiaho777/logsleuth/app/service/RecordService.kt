@@ -3,10 +3,10 @@ package io.github.shiaho777.logsleuth.app.service
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import androidx.annotation.RequiresApi
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
@@ -80,8 +80,17 @@ class RecordService : Service() {
                 scope.launch {
                     // Foreground first: the FGS deadline runs from
                     // startForegroundService, and start() burns it on file
-                    // IO + Room. A missed window crashes the service.
-                    startForegroundWithNotification()
+                    // IO + Room. A missed window crashes the service — or
+                    // used to, before the refusal was handled.
+                    if (!startForegroundWithNotification()) {
+                        android.widget.Toast.makeText(
+                            this@RecordService,
+                            R.string.recording_start_failed,
+                            android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                        stopSelf()
+                        return@launch
+                    }
                     val result = recordingManager.start(name = null, filter = filter)
                     if (!recordingManager.state.value.isRecording) {
                         // Start failed (no log access, IO error) — nothing
@@ -128,16 +137,31 @@ class RecordService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startForegroundWithNotification() {
+    private fun startForegroundWithNotification(): Boolean {
         val notification = notificationHelper.recordingNotification(0)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NotificationHelper.ID_RECORDING,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-            )
-        } else {
-            startForeground(NotificationHelper.ID_RECORDING, notification)
+        return startForegroundOrFalse(
+            NotificationHelper.ID_RECORDING,
+            notification,
+            FGS_TYPE_LONG_RUNNING,
+        )
+    }
+
+    /**
+     * A recording can outlast any cap the system decides to apply. Stop it
+     * cleanly so the session is finished and saved, instead of being killed
+     * with the file half written.
+     */
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    override fun onTimeout(startId: Int) = onRecordingTimeout()
+
+    @RequiresApi(36)
+    override fun onTimeout(startId: Int, fgsType: Int) = onRecordingTimeout()
+
+    private fun onRecordingTimeout() {
+        scope.launch {
+            runCatching { recordingManager.stop() }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
     }
 

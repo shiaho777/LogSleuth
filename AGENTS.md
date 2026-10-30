@@ -20,7 +20,7 @@ Instructions for coding agents working in this repository.
 | `sdk/` | `logsleuth-sdk` — the embeddable zero-permission logging library other apps integrate. |
 | `sample/` | Demo app consuming `:sdk`; used for manual verification of the SDK loop. |
 | `scripts/` | Repo gates (`check_string_parity.py`). |
-| `docs/screenshots/` | README screenshot set (currently branded placeholders). |
+| `docs/screenshots/` | README screenshot set (15 real device captures, both READMEs). |
 | `fastlane/metadata/` | Store listing copy (en-US + zh-CN), shared by F-Droid and Play. |
 
 ## How the main pieces connect
@@ -28,9 +28,9 @@ Instructions for coding agents working in this repository.
 ```text
 LogcatSource (local / Shizuku / root)
   → LogcatEngine (singleton, owns THE logcat process)
-      SharedFlow<LogcatEntry> ─┬→ StreamViewModel (120ms batches) → UI list
+      SharedFlow<LogcatEntry> ─┬→ StreamViewModel (per-frame batches) → UI list
                                 ├→ RecordingManager → session file + Room row
-                                └→ CrashDetector → crash_events + notification
+                                └→ CrashDetector → CrashRecorder → crash_events + notification
 
 logsleuth-sdk (inside a host app, no permissions):
   Sleuth.init → LogcatCaptureThread (logcat --pid=self)
@@ -43,6 +43,19 @@ Mental model:
 
 - **The engine is the single logcat owner.** UI and services consume its
   SharedFlow. Never spawn `logcat` anywhere else.
+- Crash persistence, surrounding-log capture and notification live in
+  `CrashRecorder` (same package as `CrashPolicy`). The engine only decides
+  *that* a crash happened and hands over a buffer snapshot; keep it that way
+  so the engine file stays about the process.
+- `ui/stream/StreamScreen.kt` owns state and gestures; the pure chrome
+  (top bars, banners, FABs, selection bar, saved sheet) lives in
+  `StreamChrome.kt`. New presentational pieces go there.
+- `ui/stream/LogScrollRail.kt` is the right-edge rail: a severity
+  fingerprint of the whole buffer, a draggable viewport thumb, and the
+  `Line N of M` readout. Its geometry is pure (`ScrollRailMath`) and unit
+  tested, so drag↔index mapping changes must keep those tests green. The
+  rail is the only thing allowed to be under 48dp wide — it sits on the
+  list's edge, where a wider touch band would eat scroll gestures.
 - The engine reconnects with backoff when the process dies. A Shizuku or
   root grant change restarts it when that change switches the active path.
   Auto mode tries Shizuku, then root, then the ADB grant, so an existing
@@ -62,6 +75,11 @@ Mental model:
   free of Android framework dependencies where possible.
 - Engine/VM state flows publish in batches on hot paths (per 64 lines), never
   per item.
+- Edge-to-edge insets: the root Scaffold pads the NavHost *and*
+  `consumeWindowInsets`s the same values. A screen that adds its own
+  `imePadding()` (only the stream search does) therefore gets the keyboard
+  remainder, not the whole keyboard — stacking it on the raw Scaffold padding
+  lifts the content twice and leaves a blank band above the IME.
 
 ## Platform constraints (do not "fix" these)
 
@@ -74,6 +92,13 @@ Mental model:
   The SDK reads only the host app's own logs and must not depend on libsu.
 - PID→package mapping beyond the logcat `uid` column needs a shell
   (Shizuku or root). The uid column itself is available on those two paths.
+- Both long-running services declare `foregroundServiceType="specialUse"`, not
+  `dataSync`: Android 15 caps `dataSync` at six hours per 24 for apps targeting
+  35+, which a crash watcher can never stay under (#118). Use
+  `startForegroundOrFalse` — `startForeground` throws when the system refuses
+  the start, and letting that escape `onStartCommand` crashes the process and
+  turns a sticky restart into a loop. A refusal is recorded in
+  `watchBlockedAt`, which `WatchRecovery` turns into a retry cooldown.
 - SDK stays permission-free and network-free by design. Root support lives
   in the viewer only.
 
@@ -86,8 +111,21 @@ Mental model:
 - Do not create commits, push, open PRs, or file Issues unless the user asks to
   deliver / ship / push / open a PR (or equivalent).
 - Version pins at the time of writing: Gradle 8.11.1, AGP 8.9.3, Kotlin 2.2.21,
-  compileSdk 36, minSdk 26. Do not bump dependency versions without checking
-  the whole build still passes.
+  compileSdk 36, targetSdk 36, minSdk 26. Do not bump dependency versions
+  without checking the whole build still passes.
+
+### Releasing
+
+Tags are the only release trigger — `.github/workflows/release.yml` runs on
+`v*`, re-runs the string gate and unit tests, then `assembleRelease` (signed by
+the committed keystore) and publishes the APK to the GitHub Release the in-app
+updater reads.
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR.
+2. Merge it.
+3. Tag the merge commit `vX.Y.Z` and push the tag. The workflow fails fast if
+   the tag does not equal `versionName`, so a stale build cannot ship under a
+   newer version.
 
 ### Delivery (Issue + PR + CI)
 

@@ -10,6 +10,7 @@ import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.BubbleService
 import io.github.shiaho777.logsleuth.app.service.CrashWatchService
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
+import io.github.shiaho777.logsleuth.app.service.WatchRecovery
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,9 +44,15 @@ class LogSleuthApp : Application() {
      *  user still wants it. Boot itself is handled by [BootReceiver]. */
     private fun restoreWatch() {
         scope.launch {
-            if (settingsRepository.settings.first().watchOnBoot) {
-                runCatching { CrashWatchService.start(this@LogSleuthApp) }
+            val settings = settingsRepository.settings.first()
+            if (!settings.watchOnBoot) return@launch
+            // A refused start is remembered: retrying from the same background
+            // process cannot succeed, and doing it on every process creation
+            // is what made the loop so expensive.
+            if (!WatchRecovery.shouldRetry(settings.watchBlockedAt, System.currentTimeMillis())) {
+                return@launch
             }
+            runCatching { CrashWatchService.start(this@LogSleuthApp) }
         }
     }
 

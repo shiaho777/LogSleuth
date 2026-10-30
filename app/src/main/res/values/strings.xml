@@ -33,10 +33,14 @@
     <string name="resume">Resume</string>
     <string name="clear">Clear</string>
     <string name="search_hint">Search logs…</string>
+    <string name="search_clear">Clear search</string>
     <string name="record_start">Start recording</string>
     <string name="record_stop">Stop recording</string>
     <string name="scroll_bottom">Scroll to bottom</string>
     <string name="scroll_top">Scroll to top</string>
+    <string name="scrollbar_description">Log scrollbar</string>
+    <string name="scrollbar_line_of">Line %1$s of %2$s</string>
+    <string name="scrollbar_total">%1$s lines</string>
     <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
     <string name="empty_logs_waiting">Waiting for logs.</string>
     <string name="empty_logs_filtered">The active filters hide every line. Relax the filter to see the stream.</string>
@@ -339,6 +343,7 @@
     <string name="settings_crash_blacklist_desc">Crashes and ANRs from these packages are dropped.</string>
     <string name="settings_watch_boot">Watch for crashes in the background</string>
     <string name="settings_watch_boot_desc">Keeps a quiet notification so crashes are caught while LogSleuth is in the background, including after reboot. With only the ADB grant on Android 13 and later, watching waits until LogSleuth is on screen. Shizuku and root keep watching off-screen.</string>
+    <string name="settings_watch_blocked">The system refused to keep the background watch running, so it is paused for now. Open LogSleuth again, or switch this off and on, to restart it.</string>
     <string name="notif_channel_watch">Crash watch</string>
     <string name="notif_watch_title">Watching for crashes</string>
     <string name="notif_watch_text">LogSleuth is listening in the background</string>

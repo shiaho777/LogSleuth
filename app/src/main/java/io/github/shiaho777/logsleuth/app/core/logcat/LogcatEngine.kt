@@ -2,11 +2,8 @@ package io.github.shiaho777.logsleuth.app.core.logcat
 
 import android.os.Build
 import android.util.Log
-import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashCapture
-import io.github.shiaho777.logsleuth.app.core.crashes.CrashContext
-import io.github.shiaho777.logsleuth.app.core.crashes.CrashContextStore
-import io.github.shiaho777.logsleuth.app.core.crashes.CrashPolicy
+import io.github.shiaho777.logsleuth.app.core.crashes.CrashRecorder
 import io.github.shiaho777.logsleuth.app.core.detect.CrashDetector
 import io.github.shiaho777.logsleuth.app.core.detect.CrashSignal
 import io.github.shiaho777.logsleuth.app.core.root.RootManager
@@ -14,10 +11,7 @@ import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkEntity
-import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
-import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
-import io.github.shiaho777.logsleuth.app.service.NotificationHelper
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -35,7 +29,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 private const val TAG = "LogcatEngine"
 
@@ -58,11 +51,8 @@ class LogcatEngine @Inject constructor(
     private val shizukuManager: ShizukuManager,
     private val rootManager: RootManager,
     private val accessChecker: AccessChecker,
-    private val crashEventDao: CrashEventDao,
+    private val crashRecorder: CrashRecorder,
     private val bookmarkDao: BookmarkDao,
-    private val notificationHelper: NotificationHelper,
-    private val installedApps: InstalledApps,
-    private val crashContextStore: CrashContextStore,
     settingsRepository: SettingsRepository,
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
@@ -118,13 +108,6 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var bufferCap = 20_000
 
-    @Volatile
-    private var crashCapture = CrashCapture()
-
-    /** One channel per crash type and package, when the user left this on. */
-    @Volatile
-    private var separateCrashChannels = true
-
     /** Cold start follows from now instead of dumping the ring. */
     @Volatile
     private var liveOnlyOnStart = false
@@ -161,10 +144,6 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var resumeSince: String? = null
 
-    /** Packages the user asked us to stop recording crashes for. */
-    @Volatile
-    private var crashBlacklist: Set<String> = emptySet()
-
     /** User's preferred grant. `auto` tries Shizuku, then root, then READ_LOGS. */
     @Volatile
     private var accessPreference: String = AccessPolicy.AUTO
@@ -181,17 +160,11 @@ class LogcatEngine @Inject constructor(
     @Volatile
     private var streamGeneration = 0
 
-    private val crashWriteMutex = Mutex()
-
-    /** Notify-only crashes have no Room row to dedupe against. */
-    private val recentNotifyKeys = ArrayDeque<String>()
-    private val recentNotifySet = HashSet<String>()
-
     init {
         scope.launch {
             settingsRepository.settings.collect {
                 bufferCap = it.bufferSize
-                crashCapture = CrashCapture(
+                crashRecorder.capture = CrashCapture(
                     collectJava = it.collectJava,
                     collectNative = it.collectNative,
                     collectAnr = it.collectAnr,
@@ -200,9 +173,9 @@ class LogcatEngine @Inject constructor(
                     notifyNative = it.notifyNative,
                     notifyAnr = it.notifyAnr,
                 )
-                separateCrashChannels = it.separateCrashChannels
+                crashRecorder.separateChannels = it.separateCrashChannels
+                crashRecorder.blacklist = it.crashBlacklist
                 liveOnlyOnStart = it.liveOnlyOnStart
-                crashBlacklist = it.crashBlacklist
                 val prefChanged = accessPreference != it.accessPreference
                 val rootChanged = rootEnabled != it.rootEnabled
                 accessPreference = it.accessPreference
@@ -435,75 +408,14 @@ class LogcatEngine @Inject constructor(
         val threshold = acceptCrashesAfter
         scope.launch {
             if (signal.timeMillis < threshold) return@launch
-            val pkg = signal.packageName
-            if (pkg != null && pkg in crashBlacklist) return@launch
+            if (crashRecorder.ignores(signal.packageName)) return@launch
             // The report wizard listens here. Saving and notifying are
             // separate choices and must not hide a crash it is waiting for.
             _crashes.tryEmit(signal)
-            val capture = crashCapture
-            val store = CrashPolicy.stores(signal.type, capture)
-            val notify = CrashPolicy.notifies(signal.type, capture)
-            if (!store && !notify) return@launch
-            crashWriteMutex.withLock {
-                val key = "${signal.timeMillis}|${signal.pid}|${signal.type.name}|${signal.firstLine}"
-                if (store) {
-                    if (crashEventDao.findExisting(
-                            time = signal.timeMillis,
-                            pid = signal.pid,
-                            type = signal.type.name,
-                            firstLine = signal.firstLine,
-                        ) != null
-                    ) {
-                        return@withLock
-                    }
-                    val identity = pkg?.let { installedApps.identity(it) }
-                    val eventId = crashEventDao.insert(
-                        CrashEventEntity(
-                            sessionId = activeSessionId,
-                            time = signal.timeMillis,
-                            pid = signal.pid,
-                            packageName = signal.packageName,
-                            type = signal.type.name,
-                            firstLine = signal.firstLine,
-                            snippet = signal.snippet,
-                            appName = identity?.label,
-                            versionName = identity?.versionName,
-                            versionCode = identity?.versionCode,
-                        ),
-                    )
-                    val snapshot = bufferMutex.withLock { buffer.toList() }
-                    val text = CrashContext.format(
-                        CrashContext.lines(snapshot, signal.timeMillis),
-                    )
-                    val path = withContext(Dispatchers.IO) {
-                        runCatching { crashContextStore.write(eventId, text) }.getOrNull()
-                    }
-                    if (path != null) crashEventDao.setContextPath(eventId, path)
-                    if (notify) {
-                        rememberNotified(key)
-                        notificationHelper.notifyCrash(
-                            signal,
-                            eventId,
-                            identity?.label,
-                            separateCrashChannels,
-                        )
-                    }
-                } else if (notify && !rememberNotified(key)) {
-                    val label = pkg?.let { installedApps.identity(it)?.label }
-                    notificationHelper.notifyCrash(signal, 0L, label, separateCrashChannels)
-                }
+            crashRecorder.record(signal, activeSessionId) {
+                bufferMutex.withLock { buffer.toList() }
             }
         }
-    }
-
-    /** True when [key] was already announced. Records it otherwise. */
-    private fun rememberNotified(key: String): Boolean {
-        if (!recentNotifySet.add(key)) return true
-        recentNotifyKeys.addLast(key)
-        while (recentNotifyKeys.size > 256) {
-            recentNotifySet.remove(recentNotifyKeys.removeFirst())
-        }
-        return false
     }
 
     suspend fun clearBuffer() {
