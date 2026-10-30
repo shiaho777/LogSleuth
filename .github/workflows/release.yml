@@ -6,8 +6,9 @@
 # what the in-app updater reads.
 #
 # Preconditions: versionName in app/build.gradle.kts equals the tag (minus the
-# leading "v") and versionCode was bumped. The guard below fails the run
-# otherwise, so a tag can never ship a stale version number.
+# leading "v"), versionCode was bumped, and docs/releases/<tag>.md holds the
+# bilingual release notes. The guards below fail the run otherwise, so a tag
+# can never ship a stale version number or an unreviewed changelog.
 name: Release
 
 on:
@@ -74,6 +75,21 @@ jobs:
           fi
           echo "Releasing ${version} (versionCode ${code})"
 
+      # The notes are a committed file, reviewed in the version-bump PR, so
+      # the Release page shows the same bilingual text the repository holds.
+      # A missing file is a hard failure: machine-generated commit subjects
+      # would ship an English-only changelog nobody reviewed.
+      - name: Check the release notes exist
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          notes="docs/releases/${tag}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::error::Missing ${notes}. Write it with scripts/draft_release_notes.py and commit it in the version-bump PR."
+            exit 1
+          fi
+          echo "Release notes: ${notes}"
+
       - name: Unit tests
         run: ./gradlew test --no-daemon
 
@@ -96,14 +112,16 @@ jobs:
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
           apk="LogSleuth-${tag#v}.apk"
+          notes="docs/releases/${tag}.md"
           if gh release view "$tag" >/dev/null 2>&1; then
             # Re-running the workflow for an existing tag replaces the asset
-            # instead of failing on a duplicate upload.
+            # and the notes instead of failing on a duplicate upload.
             gh release upload "$tag" "$apk" --clobber
+            gh release edit "$tag" --notes-file "$notes" --title "LogSleuth ${tag#v}"
           else
             gh release create "$tag" "$apk" \
               --title "LogSleuth ${tag#v}" \
-              --generate-notes
+              --notes-file "$notes"
           fi
 
       # Debug-signed artifacts are never distributed; this one is the release.

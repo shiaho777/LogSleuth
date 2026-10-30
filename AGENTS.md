@@ -7,6 +7,10 @@ Instructions for coding agents working in this repository.
 - Do what you believe is right. Make the change complete and correct, not the
   smallest possible diff. If a fix calls for refactoring, renaming, or touching
   multiple files, do it.
+- Fix root causes, not symptoms. Do not paper over a defect with
+  catch-and-swallow, degraded fallbacks, or UI workarounds that leave the
+  underlying behavior broken. Trace the failure to where it originates and
+  repair it there — even when that is harder.
 - Match the patterns and conventions already in the surrounding code.
 - Do not add copyright or license headers unless asked.
 - Avoid new third-party dependencies unless strongly justified. The `:sdk`
@@ -19,9 +23,14 @@ Instructions for coding agents working in this repository.
 | `app/` | The LogSleuth viewer app: logcat engine, UI, recording, detection. |
 | `sdk/` | `logsleuth-sdk` — the embeddable zero-permission logging library other apps integrate. |
 | `sample/` | Demo app consuming `:sdk`; used for manual verification of the SDK loop. |
-| `scripts/` | Repo gates (`check_string_parity.py`). |
+| `scripts/` | Repo gates (`check_string_parity.py`) and release helpers (`draft_release_notes.py`). |
+| `docs/` | Documentation site source (`docs/guide`, `docs/developer`, `docs/zh`) and the per-release notes in `docs/releases/`. |
 | `docs/screenshots/` | README screenshot set (15 real device captures, both READMEs). |
 | `fastlane/metadata/` | Store listing copy (en-US + zh-CN), shared by F-Droid and Play. |
+
+User-facing product docs: `README.md`, `README.zh-CN.md`, `CONTRIBUTING.md`,
+and the published site under `docs/` (see the Documentation section of the
+README for the URL).
 
 ## How the main pieces connect
 
@@ -121,11 +130,21 @@ Tags are the only release trigger — `.github/workflows/release.yml` runs on
 the committed keystore) and publishes the APK to the GitHub Release the in-app
 updater reads.
 
-1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR.
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR, and
+   add `docs/releases/vX.Y.Z.md` — the bilingual notes the Release page will
+   show. `python3 scripts/draft_release_notes.py` prints a skeleton with the
+   merged pull requests since the last tag; rewrite each bullet as what the
+   user gets. The conventions are in [docs/releases/README.md](docs/releases/README.md).
 2. Merge it.
 3. Tag the merge commit `vX.Y.Z` and push the tag. The workflow fails fast if
-   the tag does not equal `versionName`, so a stale build cannot ship under a
-   newer version.
+   the tag does not equal `versionName`, or if the notes file is missing, so a
+   stale build cannot ship under a newer version and a release cannot ship an
+   unreviewed changelog.
+
+Release notes are written for the person reading them: **Added / Improved /
+Fixed**, one line each, saying what changed for them and pointing at the pull
+request it came from (`(#124)`, or `(#124, closes #121)`). The same text is
+repeated in Chinese after a `<!-- zh-CN -->` marker.
 
 ### Delivery (Issue + PR + CI)
 
@@ -139,20 +158,72 @@ titles, bodies, labels text you author, and delivery comments on the
 Issue/PR. Local chat with the user may be Chinese or any language; do not copy
 that language into Issue/PR text.
 
+**Links the user can open (required):** when you point at an Issue or PR — in
+chat, in a commit message, or in an Issue/PR body — give the full URL and
+nothing else glued to it:
+
+- `https://github.com/shiaho777/LogSleuth/issues/N`
+- `https://github.com/shiaho777/LogSleuth/pull/N`
+
+Do not write `121（已关闭）`, `#121 closed`, or `author:121`. A number plus a
+status word is not a link, and pasted into the GitHub search box it becomes a
+broken qualifier. Put the status in its own sentence: the link, then
+"Closed." or "Merged.".
+
+**Branch naming:** plain `type/slug` — `fix/…`, `feat/…`, `refactor/…`,
+`docs/…`, `perf/…`, `chore/…`. Do not use tool or agent namespaces
+(`codex/…`); the branch belongs to the repository, not to the agent.
+
 When the user asks to deliver a change, run the loop end-to-end:
 
 1. **Issue first** — reuse an open Issue if one already tracks the work.
-2. **Branch** from up-to-date `main` (`codex/` prefix unless told otherwise).
+2. **Branch** from up-to-date `main`.
 3. **PR into `main`** — body includes `Fixes #N` (or `Closes #N`), what/why,
    and test notes. Use the PR template.
 4. **Comment on the Issue** with the PR URL and status.
 5. **CI is the merge gate** — the required check is the `build` job in
-   `.github/workflows/ci.yml`. Do not merge red; fix and push instead.
-   CI never closes Issues.
-6. **Merge when green**, confirm the Issue auto-closed; if it did not, close
-   it pointing at the merged PR.
+   `.github/workflows/ci.yml`. Do not merge red; fix and push to the same
+   branch instead of opening a second PR.
+6. **Merge when green**, confirm the Issue auto-closed. Do not close the Issue
+   yourself before the merge; if it stayed open, close it pointing at the
+   merged PR.
 7. If merge permission is missing: leave the PR open, comment on the Issue,
    and hand off to a maintainer.
 
+Do not tell the user the delivery is finished while the PR is still open, CI
+is still running or red, or the Issue is still open.
+
 User overrides (skip Issue, direct push, ignore red CI) win for that turn
 only — state the override in the PR/Issue comment.
+
+### Common change recipes
+
+- **Add a user-visible string.** Add it to `res/values/strings.xml` *and*
+  `res/values-zh-rCN/strings.xml` with matching positional format args, then
+  run `python3 scripts/check_string_parity.py`. The gate fails on a missing
+  or mismatched key.
+- **Add parsing, filtering or detection logic.** Keep it pure Kotlin, free of
+  Android framework types, and put it next to its siblings in `core/<area>/`
+  with a unit test in `app/src/test/`. The ViewModel and the engine stay thin.
+- **Change the logcat stream.** One process, owned by `LogcatEngine`. Never
+  spawn a second `logcat`. Keep the `-T` resume stamp so a reconnect does not
+  dump the ring again, and keep the API 33+ foreground rule.
+- **Change a foreground service.** Use `specialUse` (never `dataSync` — it is
+  capped) and `startForegroundOrFalse`, so a refused start stops the service
+  instead of the process.
+- **Change the list UI.** New presentational pieces go in `StreamChrome.kt`;
+  `StreamScreen.kt` keeps state and gestures. Geometry that maps positions to
+  indices belongs in a pure object with tests (`ScrollRailMath`).
+
+### Verify commands
+
+```bash
+python3 scripts/check_string_parity.py   # bilingual string gate
+./gradlew test                            # unit tests
+./gradlew lint                            # Android lint
+./gradlew assembleDebug                   # debug APK
+```
+
+CI runs the same four. `lint` currently reports warnings only; the bar is
+zero errors.
+
