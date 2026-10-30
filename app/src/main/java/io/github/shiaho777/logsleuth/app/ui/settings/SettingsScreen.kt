@@ -572,8 +572,10 @@ fun SettingsScreen(
                 }
             }
 
-            // Community first, then the repository: the QQ group is the last
-            // card before the GitHub link at the bottom of the screen.
+            // Reset sits above the community and repository cards: the last
+            // things on the screen are the way out, not the way in.
+            ResetSettingsCard(onReset = viewModel::resetToDefaults)
+
             CommunityCard(
                 onJoinGroup = {
                     context.startActivity(

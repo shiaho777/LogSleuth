@@ -251,6 +251,25 @@ class SettingsRepository(private val context: Context) {
         writeScope.launch { clearWatchBlocked() }
     }
 
+    /**
+     * Puts every stored preference back to its default.
+     *
+     * Clearing the store is enough: [settings] falls back to the default for
+     * every key it does not find. Two keys are carried over on purpose:
+     * [Keys.SETUP_COMPLETED], because a reset must not send the user back
+     * through the setup wizard, and [Keys.WATCH_ON_BOOT], because a reset
+     * must not silently stop a background service the user started.
+     */
+    suspend fun resetToDefaults() {
+        context.dataStore.edit { prefs ->
+            val setup = prefs[Keys.SETUP_COMPLETED]
+            val watch = prefs[Keys.WATCH_ON_BOOT]
+            prefs.clear()
+            if (setup != null) prefs[Keys.SETUP_COMPLETED] = setup
+            if (watch != null) prefs[Keys.WATCH_ON_BOOT] = watch
+        }
+    }
+
     suspend fun ignorePackage(packageName: String) {
         if (packageName.isBlank()) return
         context.dataStore.edit { prefs ->

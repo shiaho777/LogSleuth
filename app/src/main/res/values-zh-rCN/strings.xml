@@ -288,6 +288,12 @@
     <string name="tour_done_desc">随时可在 设置 → 关于 中重看本引导。祝捉虫愉快！</string>
     <string name="settings_replay_guide">重看使用引导</string>
 
+    <!-- Reset to defaults -->
+    <string name="settings_reset">重置设置</string>
+    <string name="settings_reset_desc">把所有偏好恢复为默认值。已完成引导和后台崩溃监看保持不变。</string>
+    <string name="settings_reset_action">恢复默认设置</string>
+    <string name="settings_reset_confirm">外观、过滤、录制上限、崩溃规则和忽略列表都会回到默认值。已保存的会话、已记录的崩溃和导入的日志不受影响。</string>
+
     <!-- Community / QQ group card -->
     <string name="settings_qq_group">QQ 群</string>
     <string name="settings_qq_group_number">1127256026</string>
