@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.core.filter
 
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -152,5 +153,43 @@ class LogFilterTest {
         val unknown = CompiledFilter(LogFilter(uid = "not-a-uid"))
         assertFalse(unknown.matches(entry(uid = 10123)))
         assertFalse(unknown.matches(entry(uid = null)))
+    }
+
+    @Test
+    fun `fromLine prefills tag pid tid uid package and a single level`() {
+        val longMsg = "x".repeat(200)
+        val rule = LogFilter.fromLine(
+            tag = "AndroidRuntime",
+            message = longMsg,
+            pid = 42,
+            tid = 7,
+            uid = 10123,
+            level = LogLevel.E,
+            packageName = "com.example.app",
+        )
+        assertEquals("AndroidRuntime", rule.name)
+        assertEquals("AndroidRuntime", rule.tagQuery)
+        assertTrue(rule.tagExact)
+        assertEquals("42", rule.pid)
+        assertEquals("7", rule.tid)
+        assertEquals("10123", rule.uid)
+        assertEquals("com.example.app", rule.packageName)
+        assertEquals(setOf(LogLevel.E), rule.effectiveLevels)
+        assertEquals(120, rule.query.length)
+        assertTrue(rule.enabled)
+        assertTrue(rule.including)
+        val compiled = CompiledFilter(rule, resolvedUid = 10123)
+        val matching = entry(
+            level = LogLevel.E,
+            tag = "AndroidRuntime",
+            message = longMsg,
+            pid = 42,
+            tid = 7,
+            uid = 10123,
+        )
+        assertTrue(compiled.matches(matching))
+        assertFalse(compiled.matches(matching.copy(level = LogLevel.W)))
+        assertFalse(compiled.matches(matching.copy(tag = "Other")))
+        assertFalse(compiled.matches(matching.copy(tid = 8)))
     }
 }

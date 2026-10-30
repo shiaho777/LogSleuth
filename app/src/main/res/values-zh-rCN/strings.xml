@@ -57,7 +57,9 @@
     <string name="filter_tag">Tag</string>
     <string name="filter_tag_exact">精确匹配 Tag</string>
     <string name="filter_expand">更多过滤条件</string>
+    <string name="filter_levels">日志级别</string>
     <string name="filter_levels_all">全部级别</string>
+    <string name="filter_empty_fields">空字段在匹配时会被忽略。</string>
     <string name="filter_level_on">已选</string>
     <string name="filter_exclude">排除</string>
     <string name="filter_regex">使用正则表达式</string>
@@ -323,7 +325,7 @@
     <string name="filter_import_failed">无法读取这份过滤规则文件</string>
     <string name="filter_import_ok">已导入 %1$d 条规则</string>
     <string name="filter_saved_from_line">已为这一行保存一条包含规则</string>
-    <string name="filter_from_line">存为规则</string>
+    <string name="filter_from_line">创建筛选</string>
     <string name="selection_save">保存</string>
 
     <!-- Recording pause -->
@@ -334,7 +336,9 @@
 
     <!-- Crash blacklist and boot watch -->
     <string name="crash_ignore">忽略此应用</string>
+    <string name="crash_unignore">取消忽略</string>
     <string name="crash_ignored">将忽略 %1$s 的崩溃</string>
+    <string name="crash_unignored">将重新记录 %1$s 的崩溃</string>
     <string name="settings_crash_blacklist">已忽略的应用</string>
     <string name="settings_crash_blacklist_desc">这些包名的崩溃和 ANR 会被丢掉。</string>
     <string name="settings_watch_boot">后台监听崩溃</string>
@@ -407,5 +411,9 @@
     <string name="search_prev">上一个匹配</string>
     <string name="search_next">下一个匹配</string>
     <string name="navigate_back">返回</string>
+    <string name="crash_export_zip">Zip 压缩包</string>
+    <string name="crash_export_text">纯文本</string>
+    <string name="restart_logging">重新读取日志</string>
+    <string name="more">更多</string>
 
 </resources>

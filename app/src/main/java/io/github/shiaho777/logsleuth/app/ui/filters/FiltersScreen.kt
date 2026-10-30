@@ -16,14 +16,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,6 +56,7 @@ fun FiltersScreen(
     viewModel: FiltersViewModel = hiltViewModel(),
 ) {
     val presets by viewModel.presets.collectAsState()
+    val apps by viewModel.apps.collectAsState()
     var editing by remember { mutableStateOf<LogFilter?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
@@ -196,6 +195,7 @@ fun FiltersScreen(
     if (showEditor) {
         FilterEditorDialog(
             initial = editing,
+            apps = apps,
             onDismiss = { showEditor = false },
             onSave = { filter ->
                 viewModel.save(filter)
@@ -222,108 +222,4 @@ private fun presetSummary(f: LogFilter): String {
     }
 }
 
-@Composable
-private fun FilterEditorDialog(
-    initial: LogFilter?,
-    onDismiss: () -> Unit,
-    onSave: (LogFilter) -> Unit,
-) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
-    var query by remember { mutableStateOf(initial?.query ?: "") }
-    var tag by remember { mutableStateOf(initial?.tagQuery ?: "") }
-    var exclude by remember { mutableStateOf(initial?.excludeQuery ?: "") }
-    var pid by remember { mutableStateOf(initial?.pid ?: "") }
-    var tid by remember { mutableStateOf(initial?.tid ?: "") }
-    var uid by remember { mutableStateOf(initial?.uid ?: "") }
-    var useRegex by remember { mutableStateOf(initial?.useRegex ?: false) }
-    var tagExact by remember { mutableStateOf(initial?.tagExact ?: false) }
-    var including by remember { mutableStateOf(initial?.including ?: true) }
-    var enabled by remember { mutableStateOf(initial?.enabled ?: false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(
-                    if (initial == null) R.string.filter_add else R.string.filter_edit,
-                ),
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.filter_preset_name)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = query, onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.filter_query)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = tag, onValueChange = { tag = it },
-                    label = { Text(stringResource(R.string.filter_tag)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = exclude, onValueChange = { exclude = it },
-                    label = { Text(stringResource(R.string.filter_exclude)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = pid, onValueChange = { pid = it },
-                    label = { Text(stringResource(R.string.filter_pid)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = tid, onValueChange = { tid = it },
-                    label = { Text(stringResource(R.string.filter_tid)) }, singleLine = true,
-                )
-                OutlinedTextField(
-                    value = uid, onValueChange = { uid = it },
-                    label = { Text(stringResource(R.string.filter_uid)) }, singleLine = true,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = including, onCheckedChange = { including = it })
-                    Text(
-                        stringResource(if (including) R.string.filter_including else R.string.filter_excluding),
-                        modifier = Modifier.padding(start = 8.dp),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = enabled, onCheckedChange = { enabled = it })
-                    Text(stringResource(R.string.filter_enabled), modifier = Modifier.padding(start = 8.dp))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = tagExact, onCheckedChange = { tagExact = it })
-                    Text(stringResource(R.string.filter_tag_exact), modifier = Modifier.padding(start = 8.dp))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = useRegex, onCheckedChange = { useRegex = it })
-                    Text(stringResource(R.string.filter_regex), modifier = Modifier.padding(start = 8.dp))
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = name.isNotBlank(),
-                onClick = {
-                    onSave(
-                        (initial ?: LogFilter.DEFAULT).copy(
-                            name = name.trim(),
-                            query = query.trim(),
-                            tagQuery = tag.trim(),
-                            excludeQuery = exclude.trim(),
-                            pid = pid.trim(),
-                            tid = tid.trim(),
-                            uid = uid.trim(),
-                            tagExact = tagExact,
-                            useRegex = useRegex,
-                            including = including,
-                            enabled = enabled,
-                        ),
-                    )
-                },
-            ) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}

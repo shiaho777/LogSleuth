@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
@@ -46,6 +47,8 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -64,6 +67,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -217,6 +221,7 @@ internal fun StreamTopBar(
     onBubbleToggle: () -> Unit,
     onClear: () -> Unit,
     onSave: () -> Unit,
+    onRestart: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -267,6 +272,31 @@ internal fun StreamTopBar(
                         Icons.Default.Save,
                         contentDescription = stringResource(R.string.save_to_session),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            // Overflow: the engine reconnects on its own, so a manual restart
+            // is only for a stream that looks wedged. It keeps the resume
+            // stamp, which means the ring buffer is not dumped again.
+            var more by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { more = true }) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.more),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                DropdownMenu(
+                    expanded = more,
+                    onDismissRequest = { more = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.restart_logging)) },
+                        onClick = {
+                            more = false
+                            onRestart()
+                        },
                     )
                 }
             }

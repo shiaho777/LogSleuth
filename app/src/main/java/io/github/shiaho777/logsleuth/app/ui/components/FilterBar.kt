@@ -389,7 +389,7 @@ private fun SavePresetDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
 }
 
 @Composable
-private fun AppPickerDialog(
+internal fun AppPickerDialog(
     apps: List<AppChoice>,
     current: String?,
     onSelect: (String?) -> Unit,

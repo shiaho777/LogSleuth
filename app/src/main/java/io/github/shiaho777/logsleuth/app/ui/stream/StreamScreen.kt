@@ -69,11 +69,13 @@ import io.github.shiaho777.logsleuth.app.core.logcat.formatVisible
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
+import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import io.github.shiaho777.logsleuth.app.ui.filters.FilterEditorDialog
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
 import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
@@ -113,6 +115,9 @@ fun StreamScreen(
     var selAnchor by remember { mutableStateOf(-1L) }
     var selEnd by remember { mutableStateOf(-1L) }
     var extendedCopyText by remember { mutableStateOf<String?>(null) }
+    // "Create a filter from this line" opens the editor prefilled, so the
+    // user can drop fields before saving instead of getting a fixed rule.
+    var filterDraft by remember { mutableStateOf<LogFilter?>(null) }
     val selecting = selAnchor >= 0L
     val selectingNow by rememberUpdatedState(selecting)
 
@@ -327,6 +332,7 @@ fun StreamScreen(
                     },
                     onClear = { scopeDialog = ScopeAction.CLEAR },
                     onSave = { scopeDialog = ScopeAction.SAVE },
+                    onRestart = viewModel::restartLogging,
                 )
             }
         },
@@ -436,9 +442,10 @@ fun StreamScreen(
                         scope.launch { snackbar.showSnackbar(copiedMsg) }
                     }
                 },
-                onMakeFilter = { viewModel.saveFilterFromLine(it) },
+                onMakeFilter = { filterDraft = viewModel.draftFilterFromLine(it) },
                 onOpenSetup = { onNavigate(Routes.SETUP) },
                 onDisableRules = viewModel::disableEnabledRules,
+                onRestartLogging = viewModel::restartLogging,
                 rulesActive = ui.presets.any { it.enabled },
                 snackbar = snackbar,
                 onUserTouch = { down ->
@@ -545,6 +552,18 @@ fun StreamScreen(
         )
     }
 
+    filterDraft?.let { draft ->
+        FilterEditorDialog(
+            initial = draft,
+            apps = ui.apps,
+            onDismiss = { filterDraft = null },
+            onSave = { filter ->
+                viewModel.saveFilter(filter)
+                filterDraft = null
+            },
+        )
+    }
+
     extendedCopyText?.let { text ->
         AlertDialog(
             onDismissRequest = { extendedCopyText = null },
@@ -603,6 +622,7 @@ private fun StreamListPane(
     onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit,
     onOpenSetup: () -> Unit,
     onDisableRules: () -> Unit,
+    onRestartLogging: () -> Unit,
     rulesActive: Boolean,
     snackbar: SnackbarHostState,
     onUserTouch: (Boolean) -> Unit,
@@ -653,14 +673,25 @@ private fun StreamListPane(
                     ui.filteredOut -> stringResource(R.string.empty_logs_filtered)
                     else -> stringResource(R.string.empty_logs)
                 },
-                action = if (ui.filteredOut && rulesActive) {
-                    {
-                        TextButton(onClick = onDisableRules) {
-                            Text(stringResource(R.string.filter_rules_clear))
+                action = when {
+                    ui.filteredOut && rulesActive -> {
+                        {
+                            TextButton(onClick = onDisableRules) {
+                                Text(stringResource(R.string.filter_rules_clear))
+                            }
                         }
                     }
-                } else {
-                    null
+                    // The engine reconnects on its own; a wedged stream needs
+                    // a manual kick that keeps the resume stamp, so the ring
+                    // buffer is not dumped a second time.
+                    ui.engineState == LogcatEngine.State.ERROR && !ui.adbHeld -> {
+                        {
+                            TextButton(onClick = onRestartLogging) {
+                                Text(stringResource(R.string.restart_logging))
+                            }
+                        }
+                    }
+                    else -> null
                 },
             )
             else -> LogList(
