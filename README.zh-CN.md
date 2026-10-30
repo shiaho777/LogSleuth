@@ -8,6 +8,9 @@
 [![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/shiaho777/LogSleuth?style=for-the-badge)](https://github.com/shiaho777/LogSleuth/stargazers)
+[![Docs](https://img.shields.io/badge/docs-online-blue?style=for-the-badge)](https://shiaho777.github.io/LogSleuth/zh/guide/)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/guide/topics/manifest/uses-sdk-element#ApiLevels)
 
 ## 截图
 
@@ -267,6 +270,18 @@ cd LogSleuth
 ./gradlew test                   # 单元测试
 python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
 ```
+
+## 文档
+
+文档站发布在 **[shiaho777.github.io/LogSleuth](https://shiaho777.github.io/LogSleuth/)**：
+
+| 板块 | 地址 | 内容 |
+| --- | --- | --- |
+| 指南 | [/zh/guide/](https://shiaho777.github.io/LogSleuth/zh/guide/) | 快速开始、日志权限、过滤与规则、录制与崩溃 |
+| English | [/guide/](https://shiaho777.github.io/LogSleuth/guide/) | 同一份指南的英文版 |
+| 开发者 | [/developer/](https://shiaho777.github.io/LogSleuth/developer/) | 架构、改动配方、发版手册 |
+
+站点源码在 [`docs/`](docs/)，本地预览：`cd docs && npm install && npm run dev`。
 
 ## 下载
 

@@ -8,6 +8,9 @@ On a mission to be the easiest and most delightful logging tool on Android.
 [![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/shiaho777/LogSleuth?style=for-the-badge)](https://github.com/shiaho777/LogSleuth/stargazers)
+[![Docs](https://img.shields.io/badge/docs-online-blue?style=for-the-badge)](https://shiaho777.github.io/LogSleuth/)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/guide/topics/manifest/uses-sdk-element#ApiLevels)
 
 ## Screenshots
 
@@ -279,6 +282,19 @@ cd LogSleuth
 ./gradlew test                   # unit tests
 python3 scripts/check_string_parity.py   # bilingual string gate (runs in CI)
 ```
+
+## Documentation
+
+The documentation site is published at **[shiaho777.github.io/LogSleuth](https://shiaho777.github.io/LogSleuth/)**:
+
+| Section | URL | Covers |
+| --- | --- | --- |
+| Guide | [/guide/](https://shiaho777.github.io/LogSleuth/guide/) | Getting started, log access, filters and rules, recording and crashes |
+| 简体中文 | [/zh/guide/](https://shiaho777.github.io/LogSleuth/zh/guide/) | The same guide in Chinese |
+| Developer | [/developer/](https://shiaho777.github.io/LogSleuth/developer/) | Architecture, change recipes, the release runbook |
+
+The site source lives in [`docs/`](docs/); run it locally with
+`cd docs && npm install && npm run dev`.
 
 ## Download
 
