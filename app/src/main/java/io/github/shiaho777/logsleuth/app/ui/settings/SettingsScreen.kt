@@ -483,6 +483,21 @@ fun SettingsScreen(
                         checked = s.watchOnBoot,
                         onCheckedChange = viewModel::setWatchOnBoot,
                     )
+                    // The switch is the user's intent; this is the system's
+                    // answer. Without it the toggle claims a watch that the
+                    // system has already refused (see #118).
+                    if (s.watchOnBoot && s.watchBlockedAt > 0L) {
+                        Text(
+                            text = stringResource(R.string.settings_watch_blocked),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                bottom = 8.dp,
+                            ),
+                        )
+                    }
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_open_crashes_startup),
                         checked = s.openCrashesOnStartup,
