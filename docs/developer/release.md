@@ -34,13 +34,49 @@ workflow builds from the tagged commit.
 
 5. **Watch the workflow.** `.github/workflows/release.yml` runs the string
    gate, the unit tests and `assembleRelease` (signed with the keystore
-   committed in the repository), then attaches `LogSleuth-X.Y.Z.apk` to the
+   committed in the repository), then attaches `LogSleuth-X.Y.Z.APK` to the
    GitHub Release with the committed notes as the body. The run stops before
    building if the tag does not match `versionName`, or if the notes file is
    missing.
 
+   The asset name is `<app>-<version>.APK`, the same shape the mature
+   `web-to-app` releases use. The in-app updater matches the asset by its
+   `.apk` extension, case-insensitively, so the extension case does not
+   matter to it.
+
 6. **Publish.** The Release page is what the in-app updater reads. The store
    listings live in `fastlane/metadata/`.
+
+### What a release body looks like
+
+The body is `docs/releases/vX.Y.Z.md`, verbatim. It is bilingual — English
+first, then the same text again in Chinese after a `<!-- zh-CN -->` marker —
+and grouped into **Added / Improved / Fixed**, which are the three headings
+the reader is looking for:
+
+```markdown
+**LogSleuth 0.4.0 — one line on what changed.**
+
+`versionName` 0.4.0, `versionCode` 11.
+
+Requires Android 8.0 (API 26)+.
+
+## Added
+
+- **What the user gets** — the behaviour, not the diff. (#124)
+
+<!-- zh-CN -->
+
+**LogSleuth 0.4.0 —— 中文一句话。**
+
+## 新增
+
+- **用户能拿到什么** —— 写行为，不写 diff。(#124)
+```
+
+Mention the signing key whenever it changes: if the certificate is not the one
+that signed the previous release, the new build does not install over it and
+the user has to uninstall first.
 
 ## What the workflow refuses to do
 

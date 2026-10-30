@@ -100,7 +100,7 @@ Releases are cut from tags, not from `main` directly:
 2. Tag the merged commit `vX.Y.Z` and push the tag.
 3. `.github/workflows/release.yml` runs the string gate, the unit tests and
    `assembleRelease` (signed with the keystore committed in this repo), then
-   attaches `LogSleuth-X.Y.Z.apk` to the GitHub Release that the in-app updater
+   attaches `LogSleuth-X.Y.Z.APK` to the GitHub Release that the in-app updater
    downloads, with the committed notes as the release body. The run stops
    before building if the tag does not match `versionName`, or if the notes
    file is missing.
@@ -150,6 +150,6 @@ python3 scripts/check_string_parity.py   # 双语字符串奇偶校验
    重复一遍中文。格式见 [docs/releases/README.md](docs/releases/README.md)。
 2. 合并后给该提交打 `vX.Y.Z` 标签并推送。
 3. `.github/workflows/release.yml` 会跑字符串门禁、单测和 `assembleRelease`
-   (用仓库内的 keystore 签名),然后把 `LogSleuth-X.Y.Z.apk` 挂到 GitHub
+   (用仓库内的 keystore 签名),然后把 `LogSleuth-X.Y.Z.APK` 挂到 GitHub
    Release 上,应用内更新读的就是它;发布说明直接用仓库里那份文件。标签与
    `versionName` 不一致、或者说明文件缺失时,都会在构建前直接失败。
