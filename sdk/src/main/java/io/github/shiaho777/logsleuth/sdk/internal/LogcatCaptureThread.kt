@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * If the logcat process dies (logd restart, SELinux hiccup) the capture
  * reconnects with exponential backoff instead of silently giving up —
  * the whole point of the SDK is that logs are still there when you need them.
+ * A reconnect resumes after the last delivered line ([LogcatResumeCursor])
+ * rather than recording the still-buffered log a second time.
  */
 internal class LogcatCaptureThread(
     config: SleuthConfig,
@@ -25,6 +27,8 @@ internal class LogcatCaptureThread(
 
     private val filter = LineFilter(config.tagFilter)
 
+    private val cursor = LogcatResumeCursor()
+
     init {
         isDaemon = true
     }
@@ -34,10 +38,11 @@ internal class LogcatCaptureThread(
         var backoffMs = 1_000L
         while (running.get()) {
             try {
-                val proc = ProcessBuilder("logcat", "-v", "threadtime", "--pid=$pid")
+                val proc = ProcessBuilder(cursor.command(pid))
                     .redirectErrorStream(true)
                     .start()
                 process = proc
+                cursor.beginConnection()
                 var sawLine = false
                 BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                     while (running.get()) {
@@ -46,7 +51,7 @@ internal class LogcatCaptureThread(
                             sawLine = true
                             backoffMs = 1_000L // healthy stream: reset backoff
                         }
-                        if (filter.accepts(line)) onLine(line)
+                        if (cursor.isNew(line) && filter.accepts(line)) onLine(line)
                     }
                 }
             } catch (_: Throwable) {
