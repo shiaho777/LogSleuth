@@ -150,7 +150,12 @@ class StreamViewModel @Inject constructor(
                 }
                 if (caseChanged) {
                     val query = _ui.value.searchQuery
-                    if (query.isNotBlank()) recomputeHits(query, resetIndex = true)
+                    if (query.isNotBlank()) {
+                        searchJob?.cancel()
+                        searchJob = viewModelScope.launch(Dispatchers.Default) {
+                            recomputeHits(query, resetIndex = true)
+                        }
+                    }
                 }
             }
         }
@@ -380,9 +385,14 @@ class StreamViewModel @Inject constructor(
 
     // ---------------- user actions ----------------
 
+    private var filterJob: Job? = null
+
     fun setFilter(filter: LogFilter) {
         _ui.update { it.copy(filter = filter, regexInvalid = false) }
-        viewModelScope.launch(Dispatchers.Default) { refilter() }
+        // refilter reads the newest filter under the lock, so a rebuild still
+        // queued for an older keystroke would only repeat the scan.
+        filterJob?.cancel()
+        filterJob = viewModelScope.launch(Dispatchers.Default) { refilter() }
     }
 
     fun setPaused(paused: Boolean) {
