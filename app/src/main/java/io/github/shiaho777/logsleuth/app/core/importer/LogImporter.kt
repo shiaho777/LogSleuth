@@ -75,10 +75,7 @@ class LogImporter @Inject constructor(
         context.contentResolver.openInputStream(uri)
 
     private fun sniffIsZip(uri: Uri): Boolean =
-        open(uri)?.use { ins ->
-            val head = ByteArray(4)
-            ImportCore.isZip(head.copyOf(ins.read(head)))
-        } ?: false
+        open(uri)?.use { ins -> ImportCore.isZip(ImportCore.readHead(ins, 4)) } ?: false
 
     /**
      * Writes every line of [ins] to [file], counting bytes (against the cap)

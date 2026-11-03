@@ -1,5 +1,8 @@
 package io.github.shiaho777.logsleuth.app.core.importer
 
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -14,6 +17,40 @@ class ImportCoreTest {
         assertFalse(ImportCore.isZip(byteArrayOf(0x50)))
         assertFalse(ImportCore.isZip(byteArrayOf(0x41, 0x42, 0x43)))
         assertFalse(ImportCore.isZip(ByteArray(0)))
+    }
+
+    /** Hands out at most one byte per read, like a slow pipe or provider stream. */
+    private class TrickleStream(private val data: ByteArray) : InputStream() {
+        private var pos = 0
+        override fun read(): Int = if (pos < data.size) data[pos++].toInt() and 0xFF else -1
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            val c = read()
+            if (c < 0) return -1
+            b[off] = c.toByte()
+            return 1
+        }
+    }
+
+    @Test
+    fun `readHead fills the header across short reads`() {
+        val zip = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x14, 0x00)
+        val head = ImportCore.readHead(TrickleStream(zip), 4)
+        assertArrayEquals(byteArrayOf(0x50, 0x4B, 0x03, 0x04), head)
+        assertTrue(ImportCore.isZip(head))
+    }
+
+    @Test
+    fun `readHead returns empty for an empty stream`() {
+        val head = ImportCore.readHead(ByteArrayInputStream(ByteArray(0)), 4)
+        assertEquals(0, head.size)
+        assertFalse(ImportCore.isZip(head))
+    }
+
+    @Test
+    fun `readHead returns what exists when the stream is shorter than max`() {
+        val head = ImportCore.readHead(TrickleStream(byteArrayOf(0x41, 0x42)), 4)
+        assertArrayEquals(byteArrayOf(0x41, 0x42), head)
     }
 
     @Test

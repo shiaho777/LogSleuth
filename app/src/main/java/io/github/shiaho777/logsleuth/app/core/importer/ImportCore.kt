@@ -1,5 +1,7 @@
 package io.github.shiaho777.logsleuth.app.core.importer
 
+import java.io.InputStream
+
 /**
  * Pure helpers for [LogImporter]: which zip entries to merge, how to read
  * `meta.txt`, and import size limits. Kept Android-free so it is unit-testable.
@@ -12,6 +14,22 @@ object ImportCore {
     /** Zip local-file magic (`PK\x03\x04`) sniffed from the first bytes. */
     fun isZip(header: ByteArray): Boolean =
         header.size >= 2 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte()
+
+    /**
+     * Reads up to [max] bytes from the start of [ins]. A single `read` may
+     * return fewer bytes than are coming (pipes, content providers), so this
+     * loops until [max] bytes or end of stream. Empty input yields an empty array.
+     */
+    fun readHead(ins: InputStream, max: Int): ByteArray {
+        val buf = ByteArray(max)
+        var total = 0
+        while (total < max) {
+            val n = ins.read(buf, total, max - total)
+            if (n <= 0) break
+            total += n
+        }
+        return buf.copyOf(total)
+    }
 
     /**
      * Which zip entries to merge into the imported log, in order.
