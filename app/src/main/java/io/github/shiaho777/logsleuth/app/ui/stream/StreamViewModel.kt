@@ -256,15 +256,31 @@ class StreamViewModel @Inject constructor(
             if (staged.isEmpty()) return
             ArrayList(staged).also { staged.clear() }
         }
-        val compiled = currentCompiled()
-        val pausedNow = _ui.value.paused
         var published = false
         var matchedWhilePaused = 0
-        var pendingTrimmed = false
         listMutex.withLock {
+            // Compiled under the lock for the same reason as in [refilter]: a
+            // refilter that ran between compiling and locking would otherwise
+            // see this batch appended under the rule it just replaced.
+            val compiled = currentCompiled()
+            // Read under the lock: resume flips `paused` first and then flushes
+            // `pending` under this lock, so a batch either lands before that
+            // flush (and is flushed with it) or sees the stream running.
+            val pausedNow = _ui.value.paused
+            // Resumed, but the backlog flush has not run yet: everything in
+            // `pending` is older than this batch, so publish it first rather
+            // than letting the new lines overtake it.
+            val incoming = if (!pausedNow && pending.isNotEmpty()) {
+                ArrayList<LogcatEntry>(pending.size + batch.size).apply {
+                    addAll(pending)
+                    addAll(batch)
+                }.also { pending.clear() }
+            } else {
+                batch
+            }
             val sizeBefore = visible.size
             val appended = ArrayList<UiLogEntry>()
-            for (e in batch) {
+            for (e in incoming) {
                 if (pausedNow) {
                     // Keep every line — the filter can change while paused and
                     // must still be able to reveal them — but only the ones the
@@ -283,9 +299,28 @@ class StreamViewModel @Inject constructor(
             }
             // Paused entries are bounded too: without this, pausing during a
             // log storm grows `pending` without limit.
+            var pendingTrimmed = false
             if (pending.size > bufferCap) {
                 pending.subList(0, pending.size - bufferCap).clear()
                 pendingTrimmed = true
+            }
+            if (pausedNow) {
+                // Written under the lock, like every other recount of `pending`,
+                // so a resume or refilter cannot interleave and count this batch
+                // twice. Trimming deleted an unknown number of matching lines,
+                // so the running total is no longer trustworthy — recount then.
+                val recount = if (pendingTrimmed) {
+                    pending.count { accepts(compiled, it) }
+                } else {
+                    -1
+                }
+                _ui.update {
+                    when {
+                        !it.paused -> it
+                        recount >= 0 -> it.copy(pausedIncoming = recount)
+                        else -> it.copy(pausedIncoming = it.pausedIncoming + matchedWhilePaused)
+                    }
+                }
             }
             if (pausedNow) return@withLock
             val dropped = trimCountLocked()
@@ -297,22 +332,9 @@ class StreamViewModel @Inject constructor(
             edits.trySend(ListPublish.Append(dropOld, ArrayList(appended), filtered))
             published = true
         }
-        if (pausedNow) {
-            // Trimming deleted an unknown number of matching lines, so the
-            // running total is no longer trustworthy — recount.
-            val next = if (pendingTrimmed) {
-                val current = currentCompiled()
-                listMutex.withLock { pending.count { accepts(current, it) } }
-            } else {
-                _ui.value.pausedIncoming + matchedWhilePaused
-            }
-            _ui.update { it.copy(pausedIncoming = next) }
-        } else if (published) {
-            // Keep hit indices fresh while the search bar is open — the stream
-            // keeps appending, so a one-shot scan goes stale within seconds.
-            val s = _ui.value
-            if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
-        }
+        // Keep hit indices fresh while the search bar is open — the stream
+        // keeps appending, so a one-shot scan goes stale within seconds.
+        if (published) refreshSearchHits()
     }
 
     /** How many visible rows [evictOverflow] removed. Call with [listMutex] held. */
@@ -369,8 +391,12 @@ class StreamViewModel @Inject constructor(
         _ui.update { it.copy(paused = paused, pausedIncoming = 0) }
         if (!paused) {
             viewModelScope.launch(Dispatchers.Default) {
-                val compiled = currentCompiled()
-                listMutex.withLock {
+                val flushed = listMutex.withLock {
+                    // Paused again before this ran, or a drain already
+                    // published the backlog: nothing to flush. Leaving `pending`
+                    // alone keeps it for the next resume.
+                    if (_ui.value.paused || pending.isEmpty()) return@withLock false
+                    val compiled = currentCompiled()
                     for (e in pending) {
                         val uiEntry = UiLogEntry(seq++, e)
                         all.add(uiEntry)
@@ -379,8 +405,9 @@ class StreamViewModel @Inject constructor(
                     pending.clear()
                     trimCountLocked()
                     enqueueReplaceLocked()
+                    true
                 }
-                _ui.update { it.copy(pausedIncoming = 0) }
+                if (flushed) refreshSearchHits()
             }
         }
     }
@@ -396,8 +423,8 @@ class StreamViewModel @Inject constructor(
                 visible.clear()
                 pending.clear()
                 enqueueReplaceLocked()
+                _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList(), searchHitIndex = -1) }
             }
-            _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList()) }
         }
     }
 
@@ -432,18 +459,18 @@ class StreamViewModel @Inject constructor(
     fun clearApps(uids: Set<Int?>) {
         viewModelScope.launch(Dispatchers.Default) {
             stagedMutex.withLock { staged.removeAll { it.uid in uids } }
-            var pendingMatches = -1
             listMutex.withLock {
                 all.removeAll { it.entry.uid in uids }
                 visible.removeAll { it.entry.uid in uids }
                 pending.removeAll { it.uid in uids }
                 if (_ui.value.paused) {
                     val compiled = currentCompiled()
-                    pendingMatches = pending.count { accepts(compiled, it) }
+                    val matches = pending.count { accepts(compiled, it) }
+                    _ui.update { if (it.paused) it.copy(pausedIncoming = matches) else it }
                 }
                 enqueueReplaceLocked()
             }
-            if (pendingMatches >= 0) _ui.update { it.copy(pausedIncoming = pendingMatches) }
+            refreshSearchHits()
         }
     }
 
@@ -591,6 +618,7 @@ class StreamViewModel @Inject constructor(
 
     // Search
     fun setSearching(searching: Boolean) {
+        searchJob?.cancel()
         _ui.update { it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1) }
     }
 
@@ -622,6 +650,10 @@ class StreamViewModel @Inject constructor(
             }
         }
         _ui.update {
+            // The scan ran off the main thread; the user may have edited the
+            // query or closed search meanwhile. Hits for any other query would
+            // highlight the wrong rows, so only the current one may land.
+            if (!it.searching || it.searchQuery != query) return@update it
             it.copy(
                 searchHits = hits,
                 searchHitIndex = when {
@@ -631,6 +663,12 @@ class StreamViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    /** Re-indexes hits after [visible] was rebuilt; hit indices point into it. */
+    private suspend fun refreshSearchHits() {
+        val s = _ui.value
+        if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
     }
 
     fun nextSearchHit(direction: Int) {
@@ -643,22 +681,26 @@ class StreamViewModel @Inject constructor(
     }
 
     private suspend fun refilter() {
-        val compiled = CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
-        val stack = enabledStack
-        // The banner counts lines that match the *active* filter, so a filter
-        // change while paused has to re-count what is waiting.
-        var pendingMatches = -1
         listMutex.withLock {
+            // Compiled under the lock: every filter or stack change launches its
+            // own refilter, and they can reach the lock out of order. Reading the
+            // rules here means the last one to run always applies the newest
+            // rules, so the list never settles on a filter the bar no longer shows.
+            val compiled = currentCompiled()
+            val stack = enabledStack
             visible = all.filterTo(ArrayList()) { accepts(compiled, it.entry) }
-            if (_ui.value.paused) pendingMatches = pending.count { accepts(compiled, it) }
             enqueueReplaceLocked()
+            // The banner counts lines that match the *active* filter, so a filter
+            // change while paused has to re-count what is waiting.
+            val pendingMatches = if (_ui.value.paused) pending.count { accepts(compiled, it) } else -1
+            _ui.update {
+                it.copy(
+                    regexInvalid = compiled.regexInvalid || stack.regexInvalid,
+                    pausedIncoming = if (pendingMatches >= 0 && it.paused) pendingMatches else it.pausedIncoming,
+                )
+            }
         }
-        _ui.update {
-            it.copy(
-                regexInvalid = compiled.regexInvalid || stack.regexInvalid,
-                pausedIncoming = if (pendingMatches >= 0) pendingMatches else it.pausedIncoming,
-            )
-        }
+        refreshSearchHits()
     }
 
     private fun resolveUid(packageName: String?): Int? =
