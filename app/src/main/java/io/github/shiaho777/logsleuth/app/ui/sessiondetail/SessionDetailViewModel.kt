@@ -25,6 +25,9 @@ import io.github.shiaho777.logsleuth.app.ui.stream.UiLogEntry
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,7 +118,7 @@ class SessionDetailViewModel @Inject constructor(
                 val models = list.map { it.toLogFilter() }
                 enabledStack = FilterStack.compile(models, ::resolveUid)
                 _ui.update { it.copy(presets = models) }
-                if (all.isNotEmpty()) applyFilter(_ui.value.filter)
+                requestFilter()
             }
         }
     }
@@ -138,7 +141,7 @@ class SessionDetailViewModel @Inject constructor(
 
     fun setFilter(filter: LogFilter) {
         _ui.update { it.copy(filter = filter) }
-        viewModelScope.launch { applyFilter(filter) }
+        requestFilter()
     }
 
     fun applyPreset(preset: LogFilter) = setFilter(preset)
@@ -161,23 +164,40 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun applyFilter(filter: LogFilter) {
-        val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
-        val stack = enabledStack
-        val filtered = withContext(Dispatchers.Default) {
-            all.filter { compiled.matches(it.entry) && stack.matches(it.entry) }
+    /**
+     * Re-filters [all] against the filter and rules in effect now. Each request
+     * cancels the one before it, and both start and publish on the main thread,
+     * so a slow scan for an older filter can never land after a newer one.
+     */
+    private fun requestFilter() {
+        if (!parsed) return
+        filterJob?.cancel()
+        filterJob = viewModelScope.launch {
+            val filter = _ui.value.filter
+            val stack = enabledStack
+            val source = all
+            val (compiled, filtered) = withContext(Dispatchers.Default) {
+                val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
+                compiled to source.filter {
+                    ensureActive()
+                    compiled.matches(it.entry) && stack.matches(it.entry)
+                }
+            }
+            _ui.update {
+                it.copy(
+                    entries = filtered,
+                    regexInvalid = compiled.regexInvalid || stack.regexInvalid,
+                    filteredOut = source.isNotEmpty() && filtered.isEmpty(),
+                    loading = false,
+                )
+            }
+            requestHits()
         }
-        _ui.update {
-            it.copy(
-                entries = filtered,
-                regexInvalid = compiled.regexInvalid || stack.regexInvalid,
-                filteredOut = all.isNotEmpty() && filtered.isEmpty(),
-            )
-        }
-        recomputeHits(_ui.value.searchQuery)
     }
 
     fun setSearching(searching: Boolean) {
+        searchJob?.cancel()
+        resetHitIndex = false
         _ui.update {
             it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1)
         }
@@ -185,7 +205,7 @@ class SessionDetailViewModel @Inject constructor(
 
     fun setSearchQuery(query: String) {
         _ui.update { it.copy(searchQuery = query) }
-        recomputeHits(query, resetIndex = true)
+        requestHits(resetIndex = true, debounce = true)
     }
 
     fun setSearchCaseSensitive(value: Boolean) {
@@ -201,25 +221,44 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
-    private fun recomputeHits(query: String, resetIndex: Boolean = false) {
-        val ignore = !_ui.value.searchCaseSensitive
-        val hits = if (query.isBlank()) {
-            emptyList()
-        } else {
-            _ui.value.entries.mapIndexedNotNull { index, uiEntry ->
-                val e = uiEntry.entry
-                if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
+    /**
+     * Recomputes hits over the published entries off the main thread. Like
+     * [requestFilter], a newer request cancels the older one; a reset the
+     * cancelled one asked for carries over. Typing is debounced so a burst of
+     * keys costs one scan.
+     */
+    private fun requestHits(resetIndex: Boolean = false, debounce: Boolean = false) {
+        searchJob?.cancel()
+        resetHitIndex = resetHitIndex || resetIndex
+        searchJob = viewModelScope.launch {
+            if (debounce) delay(SEARCH_DEBOUNCE_MS)
+            val state = _ui.value
+            val query = state.searchQuery
+            val ignore = !state.searchCaseSensitive
+            val entries = state.entries
+            val hits = if (query.isBlank()) {
+                emptyList()
+            } else {
+                withContext(Dispatchers.Default) {
+                    entries.mapIndexedNotNull { index, uiEntry ->
+                        ensureActive()
+                        val e = uiEntry.entry
+                        if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
+                    }
+                }
             }
-        }
-        _ui.update {
-            it.copy(
-                searchHits = hits,
-                searchHitIndex = when {
-                    hits.isEmpty() -> -1
-                    resetIndex -> 0
-                    else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
-                },
-            )
+            val reset = resetHitIndex
+            resetHitIndex = false
+            _ui.update {
+                it.copy(
+                    searchHits = hits,
+                    searchHitIndex = when {
+                        hits.isEmpty() -> -1
+                        reset -> 0
+                        else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
+                    },
+                )
+            }
         }
     }
 
@@ -259,5 +298,9 @@ class SessionDetailViewModel @Inject constructor(
                 exporter.saveToUri(file, uri)
             }
         }
+    }
+
+    private companion object {
+        const val SEARCH_DEBOUNCE_MS = 250L
     }
 }
