@@ -96,22 +96,20 @@ class SessionsViewModel @Inject constructor(
         viewModelScope.launch { sessionDao.rename(session.id, trimmed) }
     }
 
-    fun share(session: SessionEntity, format: SessionExporter.Format) {
+    fun share(session: SessionEntity, format: SessionExporter.Format, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
-            exporter.export(session.id, format).onSuccess { file ->
-                exporter.share(
-                    file,
-                    if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain",
-                )
-            }
+            onResult(exporter.exportAndShare(session.id, format))
         }
     }
 
-    fun saveToUri(session: SessionEntity, format: SessionExporter.Format, uri: android.net.Uri) {
+    fun saveToUri(
+        session: SessionEntity,
+        format: SessionExporter.Format,
+        uri: android.net.Uri,
+        onResult: (Result<Unit>) -> Unit,
+    ) {
         viewModelScope.launch {
-            exporter.export(session.id, format).onSuccess { file ->
-                exporter.saveToUri(file, uri)
-            }
+            onResult(exporter.exportToUri(session.id, format, uri))
         }
     }
 

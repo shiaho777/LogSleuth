@@ -542,12 +542,17 @@ fun StreamScreen(
     }
 
     // Recording finished → offer to share immediately.
+    val shareFailedMsg = stringResource(R.string.share_failed)
     ui.finishedSession?.let { session ->
         RecordingSavedSheet(
             session = session,
             backfill = ui.finishedBackfill,
             isSnapshot = ui.finishedSnapshot,
-            onShare = { viewModel.shareFinishedSession(it) },
+            onShare = { format ->
+                viewModel.shareFinishedSession(format) { result ->
+                    result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
+                }
+            },
             onDismiss = viewModel::dismissFinishedSession,
         )
     }

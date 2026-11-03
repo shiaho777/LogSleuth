@@ -132,10 +132,6 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
-    fun shareCrash(crash: CrashEventEntity) {
-        viewModelScope.launch { exporter.shareCrash(crash) }
-    }
-
     suspend fun readContext(crash: CrashEventEntity): String? =
         withContext(Dispatchers.IO) { contextStore.read(crash.contextPath) }
 
@@ -284,19 +280,15 @@ class SessionDetailViewModel @Inject constructor(
     // bundles carry no uid column and match nothing either way).
     private fun resolveUid(packageName: String?): Int? = installedApps.resolveUid(packageName)
 
-    fun share(format: SessionExporter.Format) {
+    fun share(format: SessionExporter.Format, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
-            exporter.export(sessionId, format).onSuccess { file ->
-                exporter.share(file, if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain")
-            }
+            onResult(exporter.exportAndShare(sessionId, format))
         }
     }
 
-    fun saveToUri(format: SessionExporter.Format, uri: android.net.Uri) {
+    fun saveToUri(format: SessionExporter.Format, uri: android.net.Uri, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
-            exporter.export(sessionId, format).onSuccess { file ->
-                exporter.saveToUri(file, uri)
-            }
+            onResult(exporter.exportToUri(sessionId, format, uri))
         }
     }
 

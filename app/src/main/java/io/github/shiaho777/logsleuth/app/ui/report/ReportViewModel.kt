@@ -119,15 +119,10 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    fun share(format: SessionExporter.Format) {
+    fun share(format: SessionExporter.Format, onResult: (Result<Unit>) -> Unit) {
         val session = _ui.value.finishedSession ?: return
         viewModelScope.launch {
-            exporter.export(session.id, format).onSuccess { file ->
-                exporter.share(
-                    file,
-                    if (format == SessionExporter.Format.ZIP) "application/zip" else "text/plain",
-                )
-            }
+            onResult(exporter.exportAndShare(session.id, format))
         }
     }
 }
