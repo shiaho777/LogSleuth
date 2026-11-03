@@ -64,14 +64,49 @@ class LogFileStoreTest {
     }
 
     @Test
-    fun `redactions are applied on write`() {
+    fun `redactions mask the whole match on write`() {
         val s = store(
             SleuthConfig.Builder().addRedaction(Regex("token=\\S+")).build(),
         )
         s.append("header token=secretvalue123 tail\n")
         val content = s.logFiles().single().readText()
-        assertTrue(content.contains("toke***"))
-        assertTrue(!content.contains("secretvalue123"))
+        assertEquals("header *** tail\n", content)
+    }
+
+    @Test
+    fun `short secrets are not written out in full`() {
+        val s = store(SleuthConfig.Builder().addRedaction(Regex("\\d{4}")).build())
+        s.append("pin 1234 ok\n")
+        assertEquals("pin *** ok\n", s.logFiles().single().readText())
+    }
+
+    @Test
+    fun `lookbehind keeps the key and masks only the value`() {
+        val s = store(
+            SleuthConfig.Builder().addRedaction(Regex("(?<=token=)\\S+")).build(),
+        )
+        s.append("token=abc def\n")
+        assertEquals("token=*** def\n", s.logFiles().single().readText())
+    }
+
+    @Test
+    fun `empty matches leave the text untouched`() {
+        val s = store(SleuthConfig.Builder().addRedaction(Regex("x*")).build())
+        assertEquals("abc", s.redact("abc"))
+        assertEquals("a***c", s.redact("axxc"))
+    }
+
+    @Test
+    fun `redact applies per line across multi-line text`() {
+        val s = store(SleuthConfig.Builder().addRedaction(Regex("key=\\S+")).build())
+        assertEquals("a ***\nb\n*** c", s.redact("a key=1\nb\nkey=2 c"))
+    }
+
+    @Test
+    fun `block writes are redacted and keep their first line break`() {
+        val s = store(SleuthConfig.Builder().addRedaction(Regex("key=\\S+")).build())
+        s.appendBlock("\nhead key=1\ntail\n")
+        assertEquals("\nhead ***\ntail\n", s.logFiles().single().readText())
     }
 
     @Test
