@@ -71,6 +71,14 @@ class SessionDetailViewModel @Inject constructor(
 
     private var all = emptyList<UiLogEntry>()
 
+    /** Set once the session file is parsed; until then there is nothing to filter. */
+    private var parsed = false
+    private var filterJob: Job? = null
+    private var searchJob: Job? = null
+
+    /** A reset requested by a search job that a newer request cancelled. */
+    private var resetHitIndex = false
+
     @Volatile
     private var enabledStack = FilterStack.PASS
 
@@ -83,9 +91,10 @@ class SessionDetailViewModel @Inject constructor(
                 return@launch
             }
             all = parseFile(session)
+            parsed = true
             val fileMissing = withContext(Dispatchers.IO) { !File(session.filePath).exists() }
-            applyFilter(_ui.value.filter)
-            _ui.update { it.copy(loading = false, missingFile = all.isEmpty() && fileMissing) }
+            _ui.update { it.copy(missingFile = all.isEmpty() && fileMissing) }
+            requestFilter()
         }
         viewModelScope.launch {
             crashEventDao.observeForSession(sessionId).collect { c -> _ui.update { it.copy(crashes = c) } }
@@ -96,7 +105,9 @@ class SessionDetailViewModel @Inject constructor(
         viewModelScope.launch { _ui.update { it.copy(apps = installedApps.load()) } }
         viewModelScope.launch {
             settingsRepository.settings.collect { s ->
+                val changed = s.searchCaseSensitive != _ui.value.searchCaseSensitive
                 _ui.update { it.copy(searchCaseSensitive = s.searchCaseSensitive) }
+                if (changed && _ui.value.searchQuery.isNotBlank()) requestHits(resetIndex = true)
             }
         }
         viewModelScope.launch {

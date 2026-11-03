@@ -150,7 +150,12 @@ class StreamViewModel @Inject constructor(
                 }
                 if (caseChanged) {
                     val query = _ui.value.searchQuery
-                    if (query.isNotBlank()) recomputeHits(query, resetIndex = true)
+                    if (query.isNotBlank()) {
+                        searchJob?.cancel()
+                        searchJob = viewModelScope.launch(Dispatchers.Default) {
+                            recomputeHits(query, resetIndex = true)
+                        }
+                    }
                 }
             }
         }
