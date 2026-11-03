@@ -34,6 +34,29 @@ class FilterExchangeTest {
     }
 
     @Test
+    fun `single rule round trip keeps pid tid uid and a blank name`() {
+        val original = LogFilter(
+            allowedLevels = setOf(LogLevel.E),
+            minLevel = LogLevel.E,
+            query = "boom",
+            tagQuery = "MyTag",
+            tagExact = true,
+            packageName = "com.example",
+            pid = "42",
+            tid = "7",
+            uid = "u0a123",
+        )
+        assertEquals(original, FilterExchange.decodeSingle(FilterExchange.encodeSingle(original)))
+    }
+
+    @Test
+    fun `single rule decode rejects foreign text and multi rule documents`() {
+        assertNull(FilterExchange.decodeSingle("not-ours"))
+        val two = FilterExchange.encode(listOf(LogFilter(name = "a"), LogFilter(name = "b")))
+        assertNull(FilterExchange.decodeSingle(two))
+    }
+
+    @Test
     fun `a foreign header is rejected`() {
         assertNull(FilterExchange.decode("not-ours\n---\nname=x\n"))
     }

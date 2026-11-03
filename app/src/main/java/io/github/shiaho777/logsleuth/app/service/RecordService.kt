@@ -9,6 +9,7 @@ import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.core.filter.FilterExchange
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import javax.inject.Inject
@@ -32,14 +33,14 @@ class RecordService : Service() {
         const val ACTION_PAUSE = "io.github.shiaho777.logsleuth.app.action.PAUSE_RECORDING"
         const val ACTION_RESUME = "io.github.shiaho777.logsleuth.app.action.RESUME_RECORDING"
         const val ACTION_BOOKMARK = "io.github.shiaho777.logsleuth.app.action.BOOKMARK"
-        const val EXTRA_FILTER_PACKAGE = "extra_filter_package"
-        const val EXTRA_FILTER_LEVEL = "extra_filter_level"
-        const val EXTRA_FILTER_QUERY = "extra_filter_query"
-        const val EXTRA_FILTER_TAG = "extra_filter_tag"
-        const val EXTRA_FILTER_EXCLUDE = "extra_filter_exclude"
-        const val EXTRA_FILTER_REGEX = "extra_filter_regex"
-        const val EXTRA_FILTER_LEVELS = "extra_filter_levels"
-        const val EXTRA_FILTER_TAG_EXACT = "extra_filter_tag_exact"
+        /** The whole [LogFilter], in [FilterExchange] form, so no field can be left behind. */
+        const val EXTRA_FILTER = "extra_filter"
+
+        /** An [ACTION_START] intent that records through [filter]. */
+        fun startIntent(context: Context, filter: LogFilter): Intent =
+            Intent(context, RecordService::class.java)
+                .setAction(ACTION_START)
+                .putExtra(EXTRA_FILTER, FilterExchange.encodeSingle(filter))
     }
 
     @Inject lateinit var recordingManager: RecordingManager
@@ -60,23 +61,12 @@ class RecordService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                // Tile/bubble/wizard pass only a package; the stream screen
-                // passes its full active filter so recordings match what the
-                // user currently sees.
-                val filter = LogFilter(
-                    packageName = intent.getStringExtra(EXTRA_FILTER_PACKAGE),
-                    minLevel = intent.getStringExtra(EXTRA_FILTER_LEVEL)
-                        ?.let { runCatching { io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.valueOf(it) }.getOrNull() }
-                        ?: io.github.shiaho777.logsleuth.app.core.logcat.LogLevel.V,
-                    allowedLevels = io.github.shiaho777.logsleuth.app.core.filter.decodeLevels(
-                        intent.getStringExtra(EXTRA_FILTER_LEVELS),
-                    ),
-                    query = intent.getStringExtra(EXTRA_FILTER_QUERY).orEmpty(),
-                    tagQuery = intent.getStringExtra(EXTRA_FILTER_TAG).orEmpty(),
-                    tagExact = intent.getBooleanExtra(EXTRA_FILTER_TAG_EXACT, false),
-                    excludeQuery = intent.getStringExtra(EXTRA_FILTER_EXCLUDE).orEmpty(),
-                    useRegex = intent.getBooleanExtra(EXTRA_FILTER_REGEX, false),
-                )
+                // Tile and bubble send no filter and record everything; the
+                // wizard sends a package; the stream screen sends its full
+                // active filter so recordings match what the user sees.
+                val filter = intent.getStringExtra(EXTRA_FILTER)
+                    ?.let { FilterExchange.decodeSingle(it) }
+                    ?: LogFilter()
                 scope.launch {
                     // Foreground first: the FGS deadline runs from
                     // startForegroundService, and start() burns it on file
