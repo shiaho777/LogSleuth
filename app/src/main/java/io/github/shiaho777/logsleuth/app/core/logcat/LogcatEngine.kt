@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -199,6 +200,7 @@ class LogcatEngine @Inject constructor(
         rootReady = rootManager.status.value == RootStatus.READY,
     )
 
+    @Synchronized
     fun refreshAccess() {
         val previous = _access.value
         val next = currentAccess()
@@ -317,7 +319,9 @@ class LogcatEngine @Inject constructor(
                 // Clean EOF (shouldn't normally happen for logcat) — treat as
                 // a lost process and retry. A stream we already replaced must
                 // not schedule that retry.
-                if (consumers > 0 && generation == streamGeneration) scheduleReconnect()
+                synchronized(this@LogcatEngine) {
+                    if (consumers > 0 && generation == streamGeneration) scheduleReconnectLocked()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -326,30 +330,48 @@ class LogcatEngine @Inject constructor(
                 // path now, so reconnect does not raise the grant dialog again.
                 if (e is RootDeniedException) {
                     rootManager.markDenied()
-                    if (generation == streamGeneration) refreshAccess()
-                } else if (consumers > 0 && generation == streamGeneration) {
-                    _lastError.value = e.message ?: e.javaClass.simpleName
-                    _state.value = State.ERROR
-                    scheduleReconnect()
+                    synchronized(this@LogcatEngine) {
+                        if (generation == streamGeneration) refreshAccess()
+                    }
+                } else {
+                    synchronized(this@LogcatEngine) {
+                        if (consumers > 0 && generation == streamGeneration) {
+                            _lastError.value = e.message ?: e.javaClass.simpleName
+                            _state.value = State.ERROR
+                            scheduleReconnectLocked()
+                        }
+                    }
                 }
             } finally {
                 if (generation == streamGeneration) {
                     assembler.flush()?.let { dispatch(it, crashDetector) }
                     crashDetector.flush()?.let { onCrash(it) }
-                    if (_state.value != State.ERROR) _state.value = State.STOPPED
-                    synchronized(this@LogcatEngine) { streamJob = null }
+                }
+                // Check ownership under the lock: a restart between an
+                // unlocked check and this write would orphan its new stream.
+                synchronized(this@LogcatEngine) {
+                    if (generation == streamGeneration) {
+                        if (_state.value != State.ERROR) _state.value = State.STOPPED
+                        streamJob = null
+                    }
                 }
             }
         }
     }
 
-    /** Retries the stream after [backoffMs]; single pending retry at a time. */
-    private fun scheduleReconnect() {
+    /**
+     * Retries the stream after [backoffMs]; single pending retry at a time.
+     * Caller holds the engine monitor.
+     */
+    private fun scheduleReconnectLocked() {
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
             delay(backoffMs)
-            backoffMs = (backoffMs * 2).coerceAtMost(15_000L)
             synchronized(this@LogcatEngine) {
+                // Whoever replaces reconnectJob cancels it under this lock
+                // first, so a cancelled retry must not touch the new one.
+                if (!isActive) return@launch
+                backoffMs = (backoffMs * 2).coerceAtMost(15_000L)
                 reconnectJob = null
                 if (consumers > 0 && streamJob == null) {
                     startStreamLocked()
