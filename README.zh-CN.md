@@ -251,9 +251,10 @@ App 声明的每个权限及用途:
 | --- | --- |
 | `READ_LOGS` | 走 ADB 授权时读取设备日志。Android 13 及以后,新的 logcat 只在 LogSleuth 处于前台时启动。Shizuku 和 Root 则通过 shell 读日志 |
 | `moe.shizuku…API_V23` | 与 Shizuku 服务通信 |
-| `FOREGROUND_SERVICE` + `…_DATA_SYNC` | 保持后台录制存活 |
+| `FOREGROUND_SERVICE` + `…_SPECIAL_USE` | 保持崩溃监看和后台录制存活 |
 | `POST_NOTIFICATIONS` | 录制状态、崩溃/ANR 提醒、自动停止通知 |
 | `SYSTEM_ALERT_WINDOW` | 悬浮录制/书签气泡——仅在你开启时生效 |
+| `RECEIVE_BOOT_COMPLETED` | 开机后恢复崩溃监看——仅在你保持开启时生效 |
 | `INTERNET` | 仅用于 GitHub Releases 更新检查——无统计、无广告 |
 | `REQUEST_INSTALL_PACKAGES` | 安装下载好的 APK 更新 |
 

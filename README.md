@@ -262,9 +262,10 @@ Everything the app asks for, and why:
 | --- | --- |
 | `READ_LOGS` | Device log when you use the ADB grant. On Android 13+ a new logcat starts only while LogSleuth is on screen. Shizuku and root read logs through a shell instead |
 | `moe.shizuku…API_V23` | Talking to the Shizuku service |
-| `FOREGROUND_SERVICE` + `…_DATA_SYNC` | Keeping background recording alive |
+| `FOREGROUND_SERVICE` + `…_SPECIAL_USE` | Keeping the crash watch and background recording alive |
 | `POST_NOTIFICATIONS` | Recording status, crash/ANR alerts, auto-stop notices |
 | `SYSTEM_ALERT_WINDOW` | Floating record/bookmark bubble — only if you enable it |
+| `RECEIVE_BOOT_COMPLETED` | Restarting the crash watch after a reboot — only if you left it on |
 | `INTERNET` | Update checks against GitHub Releases only — no analytics, no ads |
 | `REQUEST_INSTALL_PACKAGES` | Installing downloaded APK updates |
 
