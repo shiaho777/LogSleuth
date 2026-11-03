@@ -18,16 +18,13 @@ import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.NotificationHelper
-import java.io.File
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class CrashDetailsUi(
     val crash: CrashEventEntity? = null,
@@ -129,30 +126,22 @@ class CrashDetailsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setWrapCrashLogLines(value) }
     }
 
-    fun share() {
+    fun share(onResult: (Result<Unit>) -> Unit) {
         val text = exportText() ?: return
         viewModelScope.launch {
-            exporter.sharePlainText(text, txtFileName())
+            onResult(exporter.sharePlainText(text, txtFileName()))
         }
     }
 
-    suspend fun prepareZip(): File? {
-        val crash = ui.value.crash ?: return null
-        return exporter.crashZip(crash, ui.value.includeApp, ui.value.includeDevice).getOrNull()
+    suspend fun saveZip(uri: Uri): Result<Unit> {
+        val crash = ui.value.crash ?: return Result.failure(IllegalStateException("Crash not loaded"))
+        return exporter.crashZip(crash, ui.value.includeApp, ui.value.includeDevice)
+            .mapCatching { file -> exporter.saveToUri(file, uri).getOrThrow() }
     }
 
-    suspend fun saveZip(uri: Uri) {
-        val file = prepareZip() ?: return
-        exporter.saveToUri(file, uri)
-    }
-
-    suspend fun saveText(uri: Uri) {
-        val text = exportText() ?: return
-        withContext(Dispatchers.IO) {
-            context.contentResolver.openOutputStream(uri)?.use { out ->
-                out.write(text.toByteArray())
-            }
-        }
+    suspend fun saveText(uri: Uri): Result<Unit> {
+        val text = exportText() ?: return Result.failure(IllegalStateException("Crash not loaded"))
+        return exporter.saveTextToUri(text, uri)
     }
 
     /** Stack plus surrounding lines when they were saved. */

@@ -34,6 +34,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +62,7 @@ import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import kotlinx.coroutines.launch
 
 /**
  * Guided 3-step bug-report flow: pick app → reproduce while recording →
@@ -72,6 +76,9 @@ fun ReportScreen(
     viewModel: ReportViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.ui.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    val shareFailedMsg = stringResource(R.string.share_failed)
 
     // Tour hook: the overlay picks the first app and steps the wizard
     // forward so the user sees the reproduce stage, then backs out.
@@ -102,6 +109,7 @@ fun ReportScreen(
         topBar = {
             TopAppBar(title = { Text(stringResource(R.string.nav_report)) })
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(
             Modifier
@@ -127,7 +135,11 @@ fun ReportScreen(
 
                 else -> StepShare(
                     ui = ui,
-                    onShare = viewModel::share,
+                    onShare = { format ->
+                        viewModel.share(format) { result ->
+                            result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
+                        }
+                    },
                     onKeep = onOpenSessions,
                 )
             }

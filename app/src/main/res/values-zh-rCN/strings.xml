@@ -200,6 +200,8 @@
     <string name="import_logs">导入</string>
     <string name="import_success">已导入为新会话</string>
     <string name="import_failed">无法导入此文件</string>
+    <string name="share_failed">分享失败——导出出错</string>
+    <string name="save_failed">无法保存文件</string>
 
     <!-- 上报向导 -->
     <string name="nav_report">上报</string>

@@ -200,6 +200,8 @@
     <string name="import_logs">Import</string>
     <string name="import_success">Imported as a new session</string>
     <string name="import_failed">Could not import this file</string>
+    <string name="share_failed">Couldn\'t share — the export failed</string>
+    <string name="save_failed">Couldn\'t save the file</string>
 
     <!-- Report wizard -->
     <string name="nav_report">Report</string>

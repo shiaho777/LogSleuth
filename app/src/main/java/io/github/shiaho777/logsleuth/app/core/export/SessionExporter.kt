@@ -36,11 +36,18 @@ class SessionExporter @Inject constructor(
         /** Shared exports outlive the share sheet by a day, then get pruned. */
         private const val EXPORT_TTL_MS = 24L * 60 * 60 * 1000
 
-        /** Binder transactions cap around 1 MiB; stay well under it. */
-        private const val TEXT_SHARE_MAX = 400_000
+        /**
+         * Binder transactions cap around 1 MiB for the whole process, chars
+         * cost two bytes each, and the chooser copies EXTRA_TEXT into its own
+         * intent and ClipData. Larger text goes out as a file.
+         */
+        private const val TEXT_SHARE_MAX = 100_000
     }
 
-    enum class Format { TXT, ZIP }
+    enum class Format(val mime: String) {
+        TXT("text/plain"),
+        ZIP("application/zip"),
+    }
 
     suspend fun export(
         sessionId: Long,
@@ -79,22 +86,18 @@ class SessionExporter @Inject constructor(
         }
     }
 
+    /** Exports [sessionId] and opens the share sheet for it. */
+    suspend fun exportAndShare(sessionId: Long, format: Format): Result<Unit> =
+        export(sessionId, format).mapCatching { file -> share(file, format.mime) }
+
+    /** Exports [sessionId] and writes it to a user-picked document. */
+    suspend fun exportToUri(sessionId: Long, format: Format, uri: Uri): Result<Unit> =
+        export(sessionId, format).mapCatching { file -> saveToUri(file, uri).getOrThrow() }
+
     /**
      * Zip of one crash: the crashed app's version, this device, the stack,
      * and the surrounding lines when they were saved.
      */
-    suspend fun shareCrash(
-        crash: CrashEventEntity,
-        includeApp: Boolean? = null,
-        includeDevice: Boolean? = null,
-    ): Result<Unit> = crashZip(crash, includeApp, includeDevice).fold(
-        onSuccess = { file ->
-            share(file, "application/zip")
-            Result.success(Unit)
-        },
-        onFailure = { Result.failure(it) },
-    )
-
     suspend fun crashZip(
         crash: CrashEventEntity,
         includeApp: Boolean? = null,
@@ -127,6 +130,15 @@ class SessionExporter @Inject constructor(
         runCatching {
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 file.inputStream().use { it.copyTo(out) }
+            } ?: error("Could not open $uri")
+            Unit
+        }
+    }
+
+    suspend fun saveTextToUri(text: String, uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                out.write(text.toByteArray())
             } ?: error("Could not open $uri")
             Unit
         }

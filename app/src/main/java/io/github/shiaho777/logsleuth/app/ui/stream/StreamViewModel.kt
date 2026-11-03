@@ -716,20 +716,14 @@ class StreamViewModel @Inject constructor(
     private fun resolveUid(packageName: String?): Int? =
         installedApps.resolveUid(packageName)
 
-    fun shareFinishedSession(format: io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format) {
+    fun shareFinishedSession(
+        format: io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format,
+        onResult: (Result<Unit>) -> Unit,
+    ) {
         val session = _ui.value.finishedSession ?: return
         _ui.update { it.copy(finishedSession = null, finishedBackfill = 0) }
         viewModelScope.launch {
-            exporter.export(session.id, format).onSuccess { file ->
-                exporter.share(
-                    file,
-                    if (format == io.github.shiaho777.logsleuth.app.core.export.SessionExporter.Format.ZIP) {
-                        "application/zip"
-                    } else {
-                        "text/plain"
-                    },
-                )
-            }
+            onResult(exporter.exportAndShare(session.id, format))
         }
     }
 

@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashContextStore
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
-import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
@@ -30,7 +29,6 @@ class AppCrashesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     crashEventDao: CrashEventDao,
     private val deleter: CrashDeleter,
-    private val exporter: SessionExporter,
     private val contextStore: CrashContextStore,
     private val notificationHelper: NotificationHelper,
     private val settingsRepository: SettingsRepository,
@@ -91,10 +89,6 @@ class AppCrashesViewModel @Inject constructor(
         deleteJob?.cancel()
         _pendingId.value = null
         _pendingAll.value = false
-    }
-
-    fun share(crash: CrashEventEntity) {
-        viewModelScope.launch { exporter.shareCrash(crash) }
     }
 
     fun ignore(packageName: String) {

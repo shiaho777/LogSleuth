@@ -276,10 +276,19 @@ fun SessionDetailScreen(
         )
     }
 
+    val shareFailedMsg = stringResource(R.string.share_failed)
+    val saveFailedMsg = stringResource(R.string.save_failed)
+    val onShareResult: (Result<Unit>) -> Unit = { result ->
+        result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
+    }
     val saveZipLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        if (uri != null) viewModel.saveToUri(SessionExporter.Format.ZIP, uri)
+        if (uri != null) {
+            viewModel.saveToUri(SessionExporter.Format.ZIP, uri) { result ->
+                result.onFailure { scope.launch { snackbar.showSnackbar(saveFailedMsg) } }
+            }
+        }
         showShare = false
     }
 
@@ -291,7 +300,7 @@ fun SessionDetailScreen(
             confirmButton = {
                 Column {
                     TextButton(onClick = {
-                        viewModel.share(SessionExporter.Format.ZIP)
+                        viewModel.share(SessionExporter.Format.ZIP, onShareResult)
                         showShare = false
                     }) { Text("ZIP") }
                     TextButton(onClick = {
@@ -301,7 +310,7 @@ fun SessionDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    viewModel.share(SessionExporter.Format.TXT)
+                    viewModel.share(SessionExporter.Format.TXT, onShareResult)
                     showShare = false
                 }) { Text("TXT") }
             },

@@ -88,15 +88,25 @@ fun CrashDetailsScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var saveMenu by remember { mutableStateOf(false) }
+    val shareFailedMsg = stringResource(R.string.share_failed)
+    val saveFailedMsg = stringResource(R.string.save_failed)
     val zipLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        if (uri != null) scope.launch { viewModel.saveZip(uri) }
+        if (uri != null) {
+            scope.launch {
+                viewModel.saveZip(uri).onFailure { snackbar.showSnackbar(saveFailedMsg) }
+            }
+        }
     }
     val txtLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
-        if (uri != null) scope.launch { viewModel.saveText(uri) }
+        if (uri != null) {
+            scope.launch {
+                viewModel.saveText(uri).onFailure { snackbar.showSnackbar(saveFailedMsg) }
+            }
+        }
     }
 
     BackHandler(enabled = ui.searching) { viewModel.setSearching(false) }
@@ -173,7 +183,11 @@ fun CrashDetailsScreen(
                             )
                         }
                     }
-                    IconButton(onClick = viewModel::share) {
+                    IconButton(onClick = {
+                        viewModel.share { result ->
+                            result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
+                        }
+                    }) {
                         Icon(
                             Icons.Default.Share,
                             contentDescription = stringResource(R.string.share_logs),
