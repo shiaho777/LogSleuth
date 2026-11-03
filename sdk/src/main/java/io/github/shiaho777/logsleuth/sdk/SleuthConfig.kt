@@ -38,7 +38,12 @@ class SleuthConfig private constructor(
         fun watchAnr(value: Boolean) = apply { watchAnr = value }
         fun onCrashInvokedOnNextStart(value: Boolean) = apply { onCrashInvokedOnNextStart = value }
 
-        /** Redact secrets from recorded logs, e.g. `addRedaction(Regex("token=\\S+"))`. */
+        /**
+         * Redact secrets from recorded logs and crash reports. Each match is
+         * replaced with `***` in full. To keep a key visible, match only the
+         * value with a lookbehind: `addRedaction(Regex("(?<=token=)\\S+"))`
+         * records `token=***`.
+         */
         fun addRedaction(pattern: Regex) = apply { redactions += pattern }
 
         fun build() = SleuthConfig(

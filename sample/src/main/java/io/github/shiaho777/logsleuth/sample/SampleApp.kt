@@ -15,7 +15,7 @@ class SampleApp : Application() {
             SleuthConfig.Builder()
                 .maxFiles(3)
                 .maxFileBytes(512 * 1024)
-                .addRedaction(Regex("token=\\S+"))
+                .addRedaction(Regex("(?<=token=)\\S+"))
                 .build(),
         )
 

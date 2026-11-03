@@ -28,21 +28,35 @@ internal class SleuthCrashHandler(
 
     override fun uncaughtException(thread: Thread, throwable: Throwable) {
         runCatching {
-            val trace = throwable.stackTraceToString()
-            val report = CrashReport(
-                timeMillis = System.currentTimeMillis(),
-                threadName = thread.name,
-                exceptionClass = throwable.javaClass.name,
-                message = throwable.message,
-                stackTrace = trace,
+            record(
+                CrashReport(
+                    timeMillis = System.currentTimeMillis(),
+                    threadName = thread.name,
+                    exceptionClass = throwable.javaClass.name,
+                    message = throwable.message,
+                    stackTrace = throwable.stackTraceToString(),
+                ),
             )
-            store.appendBlock("\n===== FATAL EXCEPTION on thread ${thread.name} =====\n$trace\n")
-            store.crashFile().writeText(CrashReportCodec.serialize(report))
-            store.pendingCrashFlag().createNewFile()
-            if (!config.onCrashInvokedOnNextStart) {
-                onCrashImmediate(report)
-            }
         }
         previous?.uncaughtException(thread, throwable)
+    }
+
+    /**
+     * Persists [raw] and, in immediate mode, delivers it. The stored report
+     * and the listener both get the redacted text, so `crash.txt` in the
+     * shared zip never carries secrets the ring files already mask.
+     */
+    internal fun record(raw: CrashReport) {
+        val report = raw.copy(
+            message = raw.message?.let(store::redact),
+            stackTrace = store.redact(raw.stackTrace),
+        )
+        // appendBlock redacts per line itself, so it takes the raw trace.
+        store.appendBlock("\n===== FATAL EXCEPTION on thread ${raw.threadName} =====\n${raw.stackTrace}\n")
+        store.crashFile().writeText(CrashReportCodec.serialize(report))
+        store.pendingCrashFlag().createNewFile()
+        if (!config.onCrashInvokedOnNextStart) {
+            onCrashImmediate(report)
+        }
     }
 }

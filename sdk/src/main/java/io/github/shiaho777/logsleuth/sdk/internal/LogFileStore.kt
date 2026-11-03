@@ -32,11 +32,7 @@ internal class LogFileStore(
 
     @Synchronized
     fun append(line: String) {
-        val redacted = redact(line)
-        val bytes = redacted.toByteArray(Charsets.UTF_8)
-        val file = rotateIfNeeded(forceNew = false)
-        file.appendBytes(bytes)
-        currentSize += bytes.size
+        appendRaw(redactLine(line))
     }
 
     @Synchronized
@@ -49,17 +45,32 @@ internal class LogFileStore(
         }
     }
 
+    // Every write goes through rotateIfNeeded so a block's line breaks land in
+    // an open, non-full file and currentSize only counts bytes actually written.
     private fun appendRaw(s: String) {
         val bytes = s.toByteArray(Charsets.UTF_8)
-        currentFile?.appendBytes(bytes)
+        rotateIfNeeded(forceNew = false).appendBytes(bytes)
         currentSize += bytes.size
     }
 
-    private fun redact(line: String): String {
+    /**
+     * Applies the configured redactions line by line, the same way ring-file
+     * writes do, so text stored elsewhere (the crash report) is masked by
+     * exactly the same rules.
+     */
+    fun redact(text: String): String {
+        if (config.redactions.isEmpty()) return text
+        return text.split('\n').joinToString("\n") { redactLine(it) }
+    }
+
+    // The whole match is masked: keeping a prefix would leak part of every
+    // secret, and all of any secret no longer than that prefix. Empty matches
+    // (e.g. `x*`) are left alone so they don't sprinkle markers everywhere.
+    private fun redactLine(line: String): String {
         if (config.redactions.isEmpty()) return line
         var out = line
         for (pattern in config.redactions) {
-            out = pattern.replace(out) { m -> m.value.take(4) + "***" }
+            out = pattern.replace(out) { m -> if (m.value.isEmpty()) "" else MASK }
         }
         return out
     }
@@ -146,6 +157,8 @@ internal class LogFileStore(
     }
 
     companion object {
+        const val MASK = "***"
+
         fun forContext(context: Context, config: SleuthConfig): LogFileStore =
             LogFileStore(
                 dir = File(context.filesDir, "sleuth"),
