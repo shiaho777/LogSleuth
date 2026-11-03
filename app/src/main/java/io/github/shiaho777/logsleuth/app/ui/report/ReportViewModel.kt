@@ -93,10 +93,7 @@ class ReportViewModel @Inject constructor(
         val app = _ui.value.selectedApp
         autoStopHandled = false
         engine.refreshAccess()
-        val intent = Intent(context, RecordService::class.java).apply {
-            action = RecordService.ACTION_START
-            putExtra(RecordService.EXTRA_FILTER_PACKAGE, app?.packageName)
-        }
+        val intent = RecordService.startIntent(context, LogFilter(packageName = app?.packageName))
         androidx.core.content.ContextCompat.startForegroundService(context, intent)
     }
 

@@ -50,7 +50,14 @@ object FilterExchange {
         }
     }
 
-    fun decode(text: String): List<LogFilter>? {
+    fun decode(text: String): List<LogFilter>? = decodeRules(text, unnamed = "Imported")
+
+    /** One rule, e.g. handed to a service; [decodeSingle] gives back an equal rule (ids aside). */
+    fun encodeSingle(filter: LogFilter): String = encode(listOf(filter))
+
+    fun decodeSingle(text: String): LogFilter? = decodeRules(text, unnamed = "")?.singleOrNull()
+
+    private fun decodeRules(text: String, unnamed: String): List<LogFilter>? {
         val lines = text.replace("\r\n", "\n").replace('\r', '\n').lineSequence()
             .map { it.trimEnd() }
             .toList()
@@ -59,7 +66,7 @@ object FilterExchange {
         var current = linkedMapOf<String, String>()
         fun flush() {
             if (current.isEmpty()) return
-            rules += fromFields(current)
+            rules += fromFields(current, unnamed)
             current = linkedMapOf()
         }
         for (line in lines.drop(1)) {
@@ -81,12 +88,12 @@ object FilterExchange {
         appendLine(escape(value))
     }
 
-    private fun fromFields(fields: Map<String, String>): LogFilter {
+    private fun fromFields(fields: Map<String, String>, unnamed: String): LogFilter {
         val level = fields["minLevel"]?.let { runCatching { LogLevel.valueOf(it) }.getOrNull() }
             ?: LogLevel.V
         val pkg = fields["package"].orEmpty().ifBlank { null }
         return LogFilter(
-            name = fields["name"].orEmpty().ifBlank { "Imported" },
+            name = fields["name"].orEmpty().ifBlank { unnamed },
             minLevel = level,
             allowedLevels = decodeLevels(fields["levels"]),
             query = fields["query"].orEmpty(),

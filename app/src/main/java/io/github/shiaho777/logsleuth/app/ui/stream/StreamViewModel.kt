@@ -15,7 +15,6 @@ import io.github.shiaho777.logsleuth.app.core.apps.groupEntriesByApp
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
-import io.github.shiaho777.logsleuth.app.core.filter.encodeLevels
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
 import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
@@ -527,23 +526,17 @@ class StreamViewModel @Inject constructor(
 
     fun toggleRecording() {
         val recording = _ui.value.recording.isRecording
-        val f = _ui.value.filter
-        val intent = Intent(context, RecordService::class.java).apply {
-            action = if (recording) RecordService.ACTION_STOP else RecordService.ACTION_START
-            if (!recording) {
-                // Record what the user currently sees, filters included.
-                putExtra(RecordService.EXTRA_FILTER_PACKAGE, f.packageName)
-                putExtra(RecordService.EXTRA_FILTER_LEVEL, f.minLevel.name)
-                putExtra(RecordService.EXTRA_FILTER_LEVELS, f.allowedLevels.encodeLevels())
-                putExtra(RecordService.EXTRA_FILTER_QUERY, f.query)
-                putExtra(RecordService.EXTRA_FILTER_TAG, f.tagQuery)
-                putExtra(RecordService.EXTRA_FILTER_TAG_EXACT, f.tagExact)
-                putExtra(RecordService.EXTRA_FILTER_EXCLUDE, f.excludeQuery)
-                putExtra(RecordService.EXTRA_FILTER_REGEX, f.useRegex)
-            }
+        if (recording) {
+            context.startService(
+                Intent(context, RecordService::class.java).setAction(RecordService.ACTION_STOP),
+            )
+        } else {
+            // Record what the user currently sees, filters included.
+            androidx.core.content.ContextCompat.startForegroundService(
+                context,
+                RecordService.startIntent(context, _ui.value.filter),
+            )
         }
-        if (recording) context.startService(intent)
-        else androidx.core.content.ContextCompat.startForegroundService(context, intent)
     }
 
     /** Toggles the floating control pill; returns false when the overlay
