@@ -14,21 +14,26 @@ import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import java.io.BufferedWriter
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onSubscription
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 data class RecordingState(
     val isRecording: Boolean = false,
@@ -76,6 +81,13 @@ class RecordingManager @Inject constructor(
     private var writer: BufferedWriter? = null
     private val writeMutex = Mutex()
 
+    /**
+     * Serializes [start], [stop] and [reconcileInterruptedSessions]. Without
+     * it a stop could land while start is half done, or a manual stop and a
+     * limit stop could both release the engine client.
+     */
+    private val lifecycleMutex = Mutex()
+
     /** Session file byte cap captured at start; 0 = not recording. */
     @Volatile
     private var maxBytes = 0L
@@ -88,8 +100,7 @@ class RecordingManager @Inject constructor(
     private var limitHours = 0
 
     /** Set once a cap fires — later emissions must not re-trigger stop/notify. */
-    @Volatile
-    private var limitTriggered = false
+    private val limitTriggered = AtomicBoolean(false)
 
     /** Timer for the duration cap; null when unlimited. */
     private var durationJob: Job? = null
@@ -97,9 +108,13 @@ class RecordingManager @Inject constructor(
     /** Bytes written so far — counted as UTF-8 line bytes, matching the file. */
     private var bytesWritten = 0L
 
-    suspend fun start(name: String?, filter: LogFilter): Result<Long> =
+    suspend fun start(name: String?, filter: LogFilter): Result<Long> = lifecycleMutex.withLock {
+        // Checked outside runCatching: the failure cleanup below tears down the
+        // writer and jobs, which must never hit a recording in progress.
+        if (_state.value.isRecording) {
+            return@withLock Result.failure(IllegalStateException("Already recording"))
+        }
         runCatching {
-            check(!_state.value.isRecording) { "Already recording" }
             // Without a log grant the engine streams nothing; a recording
             // would silently produce a header-only file.
             check(engine.access.value.granted) { "Log access not granted" }
@@ -114,7 +129,7 @@ class RecordingManager @Inject constructor(
             maxBytes = limitMb.toLong() * 1024 * 1024
             limitHours = settings.recordingMaxHours
             bytesWritten = 0L
-            limitTriggered = false
+            limitTriggered.set(false)
 
             val header = buildString {
                 appendLine("# LogSleuth session")
@@ -183,10 +198,7 @@ class RecordingManager @Inject constructor(
                         }
                         count = matched.size.toLong()
                         finalLines = count
-                        _state.value = _state.value.copy(
-                            lineCount = count,
-                            backfillCount = count,
-                        )
+                        _state.update { it.copy(lineCount = count, backfillCount = count) }
                         // A huge engine buffer can already exceed the cap.
                         if (bytesWritten >= maxBytes) stopForLimit()
                     }
@@ -202,7 +214,7 @@ class RecordingManager @Inject constructor(
                                 if (count % FLUSH_BATCH == 0L) w.flush()
                             }
                             if (count % STATE_BATCH == 0L) {
-                                _state.value = _state.value.copy(lineCount = count)
+                                _state.update { it.copy(lineCount = count) }
                             }
                             if (bytesWritten >= maxBytes) stopForLimit()
                         }
@@ -221,18 +233,23 @@ class RecordingManager @Inject constructor(
             engine.acquireClient()
             sessionId
         }.onFailure {
-            collectJob?.cancel()
-            collectJob = null
-            filtersJob?.cancel()
-            filtersJob = null
-            activeStack = FilterStack.PASS
-            durationJob?.cancel()
-            durationJob = null
-            engine.activeSessionId = null
-            _state.value = RecordingState()
-            runCatching { writer?.close() }
-            writer = null
+            withContext(NonCancellable) {
+                collectJob?.cancelAndJoin()
+                collectJob = null
+                filtersJob?.cancelAndJoin()
+                filtersJob = null
+                activeStack = FilterStack.PASS
+                durationJob?.cancelAndJoin()
+                durationJob = null
+                engine.activeSessionId = null
+                _state.value = RecordingState()
+                writeMutex.withLock {
+                    runCatching { writer?.close() }
+                    writer = null
+                }
+            }
         }
+    }
 
     /**
      * Writes an already-buffered set of entries as a finished session —
@@ -280,55 +297,63 @@ class RecordingManager @Inject constructor(
 
     /**
      * Called from the collector when the session file reaches [maxBytes].
-     * Stops the recording on a separate coroutine (cancelling our own job
-     * mid-write would deadlock the mutex) and tells the user why it ended.
+     * Stops the recording on a separate coroutine (stop joins the collector,
+     * so calling it from inside would wait on itself) and tells the user why
+     * it ended. Only the session that hit the cap is stopped: if the user
+     * already stopped it and started another, the new one is left alone.
      */
     private fun stopForLimit() {
-        if (limitTriggered) return
-        limitTriggered = true
+        if (!limitTriggered.compareAndSet(false, true)) return
         val mb = limitMb
-        val sessionId = _state.value.sessionId
+        val sessionId = _state.value.sessionId ?: return
         scope.launch {
-            stop()
-            notificationHelper.notifyRecordingLimit(mb, sessionId)
+            if (stopSession(sessionId)) notificationHelper.notifyRecordingLimit(mb, sessionId)
         }
     }
 
-    /** Called by the duration-cap timer. Same shape as [stopForLimit]: the
-     * actual stop runs on a separate coroutine so the writer mutex is free. */
+    /** Called by the duration-cap timer. Same shape as [stopForLimit]. */
     private fun stopForTimeout() {
-        if (limitTriggered) return
-        limitTriggered = true
+        if (!limitTriggered.compareAndSet(false, true)) return
         val hours = limitHours
-        val sessionId = _state.value.sessionId
+        val sessionId = _state.value.sessionId ?: return
         scope.launch {
-            stop()
-            notificationHelper.notifyRecordingTimeout(hours, sessionId)
+            if (stopSession(sessionId)) notificationHelper.notifyRecordingTimeout(hours, sessionId)
         }
     }
 
     /** Stops writing without closing the session. Lines during the pause are dropped. */
     fun pause() {
-        val s = _state.value
-        if (!s.isRecording || s.paused) return
-        _state.value = s.copy(paused = true)
+        _state.update { if (!it.isRecording || it.paused) it else it.copy(paused = true) }
     }
 
     fun resume() {
-        val s = _state.value
-        if (!s.isRecording || !s.paused) return
-        _state.value = s.copy(paused = false)
+        _state.update { if (!it.isRecording || !it.paused) it else it.copy(paused = false) }
     }
 
     suspend fun stop() {
+        lifecycleMutex.withLock { withContext(NonCancellable) { stopLocked(expectedSessionId = null) } }
+    }
+
+    /** Stops [sessionId] if it is still the active recording; true when it was. */
+    private suspend fun stopSession(sessionId: Long): Boolean =
+        lifecycleMutex.withLock { withContext(NonCancellable) { stopLocked(sessionId) } }
+
+    /**
+     * Caller holds [lifecycleMutex] and runs non-cancellable, so a stop that
+     * has begun always finishes the session. The collector is joined before
+     * the writer closes: a line still being written must land in the file,
+     * not hit a closed stream.
+     */
+    private suspend fun stopLocked(expectedSessionId: Long?): Boolean {
         val s = _state.value
-        if (!s.isRecording) return
-        collectJob?.cancel()
+        if (!s.isRecording) return false
+        if (expectedSessionId != null && s.sessionId != expectedSessionId) return false
+        collectJob?.cancelAndJoin()
         collectJob = null
-        filtersJob?.cancel()
+        filtersJob?.cancelAndJoin()
         filtersJob = null
         activeStack = FilterStack.PASS
-        durationJob?.cancel()
+        durationJob?.cancelAndJoin()
         durationJob = null
         engine.activeSessionId = null
         engine.releaseClient()
@@ -343,6 +368,7 @@ class RecordingManager @Inject constructor(
         }
         s.sessionId?.let { sessionDao.finish(it, System.currentTimeMillis(), finalLines) }
         _state.value = RecordingState()
+        return true
     }
 
     /**
@@ -350,17 +376,21 @@ class RecordingManager @Inject constructor(
      * died with the process, so endedAt was never written. Called once at
      * app start; endedAt falls back to the file's mtime (when recording
      * actually stopped), and the line count is recomputed with the same
-     * assembler logic used live. A recording that is currently active is
-     * never touched.
+     * assembler logic used live. Runs under [lifecycleMutex] so a recording
+     * being started at the same moment is never mistaken for an orphan; the
+     * active session is skipped and every other unfinished one is reconciled.
      */
     fun reconcileInterruptedSessions() {
         scope.launch {
-            if (_state.value.isRecording) return@launch
-            for (s in sessionDao.unfinished()) {
-                val file = File(s.filePath)
-                val endedAt = file.lastModified()
-                    .takeIf { it > 0L } ?: System.currentTimeMillis()
-                sessionDao.finish(s.id, endedAt, countEntries(file))
+            lifecycleMutex.withLock {
+                val activeId = _state.value.sessionId
+                for (s in sessionDao.unfinished()) {
+                    if (s.id == activeId) continue
+                    val file = File(s.filePath)
+                    val endedAt = file.lastModified()
+                        .takeIf { it > 0L } ?: System.currentTimeMillis()
+                    sessionDao.finish(s.id, endedAt, countEntries(file))
+                }
             }
         }
     }
