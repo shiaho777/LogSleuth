@@ -182,18 +182,19 @@ private fun UpdateAvailableBody(
 
         val transferring = state.dlRelease?.tag == release.tag &&
             state.dlStatus != DlStatus.NONE && state.dlStatus != DlStatus.FAILED
-        if (!transferring && release.apkUrl != null) {
-            Button(onClick = { onDownload(release) }, Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.update_download))
-            }
-        } else {
-            Text(
+        when {
+            // Progress and pause/cancel live in the shared block below.
+            transferring -> Unit
+            release.apkUrl == null -> Text(
                 stringResource(R.string.update_no_apk),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            else -> Button(onClick = { onDownload(release) }, Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Download, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.update_download))
+            }
         }
     }
 }
