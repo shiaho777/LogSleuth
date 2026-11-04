@@ -1,5 +1,7 @@
 package io.github.shiaho777.logsleuth.app.core.crashes
 
+import io.github.shiaho777.logsleuth.app.core.text.matchRanges
+
 /** Which block a crash-details search hit sits in. */
 enum class CrashSearchSection { SNIPPET, CONTEXT }
 
@@ -32,24 +34,4 @@ object CrashSearch {
         snippetRanges = matchRanges(snippet, query, ignoreCase),
         contextRanges = matchRanges(context.orEmpty(), query, ignoreCase),
     )
-
-    fun matchRanges(
-        haystack: String,
-        query: String,
-        ignoreCase: Boolean,
-    ): List<IntRange> {
-        if (query.isEmpty() || haystack.isEmpty()) return emptyList()
-        // Matched on the original text: lowercasing can change the length
-        // (e.g. 'İ' becomes two code units), which would shift the following
-        // ranges past the end of the string.
-        val ranges = ArrayList<IntRange>()
-        var start = 0
-        while (true) {
-            val idx = haystack.indexOf(query, start, ignoreCase = ignoreCase)
-            if (idx < 0) break
-            ranges += idx until (idx + query.length)
-            start = idx + query.length
-        }
-        return ranges
-    }
 }

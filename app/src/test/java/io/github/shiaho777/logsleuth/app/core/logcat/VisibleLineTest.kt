@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.core.logcat
 
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearch
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchSection
+import io.github.shiaho777.logsleuth.app.core.text.matchRanges
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -133,14 +134,14 @@ class VisibleLineTest {
     @Test
     fun `crash search finds every range case-insensitively and case-sensitively`() {
         val stack = "FATAL EXCEPTION: main\njava.lang.NullPointerException\nFATAL again"
-        val insensitive = CrashSearch.matchRanges(stack, "fatal", ignoreCase = true)
+        val insensitive = matchRanges(stack, "fatal", ignoreCase = true)
         assertEquals(2, insensitive.size)
         assertEquals("FATAL", stack.substring(insensitive[0].first, insensitive[0].last + 1))
         assertEquals("FATAL", stack.substring(insensitive[1].first, insensitive[1].last + 1))
 
-        val sensitive = CrashSearch.matchRanges(stack, "FATAL", ignoreCase = false)
+        val sensitive = matchRanges(stack, "FATAL", ignoreCase = false)
         assertEquals(2, sensitive.size)
-        val missed = CrashSearch.matchRanges(stack, "fatal", ignoreCase = false)
+        val missed = matchRanges(stack, "fatal", ignoreCase = false)
         assertTrue(missed.isEmpty())
     }
 
