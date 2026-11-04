@@ -488,29 +488,20 @@ class StreamViewModel @Inject constructor(
      * Writes the current buffer (or only the [uids] subset; null = all) to a
      * finished session, then surfaces the share sheet as with a recording.
      */
-    fun saveToSession(uids: Set<Int?>? = null) {
-        viewModelScope.launch(Dispatchers.Default) {
-            val entries = listMutex.withLock {
-                // Include `pending` — paused lines are still part of the stream
-                // the user sees (they surface on resume) and belong in a
-                // "save everything" snapshot. `staged` is a <120ms window and
-                // is intentionally left out.
-                (all.filter { uids == null || it.entry.uid in uids }.map { it.entry } +
-                    pending.filter { uids == null || it.uid in uids })
-                    .sortedBy { it.seq }
-            }
-            recordingManager.snapshotToSession(entries).onSuccess { id ->
-                val session = sessionDao.getById(id)
-                if (session != null) {
-                    _ui.update {
-                        it.copy(
-                            finishedSession = session,
-                            finishedBackfill = 0,
-                            finishedSnapshot = true,
-                        )
-                    }
+    fun saveToSession(uids: Set<Int?>? = null, onResult: (Result<Unit>) -> Unit) {
+        viewModelScope.launch {
+            val entries = withContext(Dispatchers.Default) {
+                listMutex.withLock {
+                    // Include `pending` — paused lines are still part of the stream
+                    // the user sees (they surface on resume) and belong in a
+                    // "save everything" snapshot. `staged` is a <120ms window and
+                    // is intentionally left out.
+                    (all.filter { uids == null || it.entry.uid in uids }.map { it.entry } +
+                        pending.filter { uids == null || it.uid in uids })
+                        .sortedBy { it.seq }
                 }
             }
+            onResult(publishSnapshot(entries))
         }
     }
 
@@ -521,20 +512,29 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    fun saveSelection(entries: List<LogcatEntry>) {
+    fun saveSelection(entries: List<LogcatEntry>, onResult: (Result<Unit>) -> Unit) {
         if (entries.isEmpty()) return
-        viewModelScope.launch(Dispatchers.Default) {
-            recordingManager.snapshotToSession(entries).onSuccess { id ->
-                val session = sessionDao.getById(id) ?: return@onSuccess
-                _ui.update {
-                    it.copy(
-                        finishedSession = session,
-                        finishedBackfill = 0,
-                        finishedSnapshot = true,
-                    )
-                }
-            }
+        viewModelScope.launch { onResult(publishSnapshot(entries)) }
+    }
+
+    /**
+     * Writes [entries] as a finished session and surfaces the share sheet for
+     * it. The row is read back so the sheet shows what was actually stored; a
+     * missing row means the save did not land, which is reported as a failure.
+     */
+    private suspend fun publishSnapshot(entries: List<LogcatEntry>): Result<Unit> {
+        val id = withContext(Dispatchers.IO) { recordingManager.snapshotToSession(entries) }
+            .getOrElse { return Result.failure(it) }
+        val session = sessionDao.getById(id)
+            ?: return Result.failure(IllegalStateException("Session $id missing after insert"))
+        _ui.update {
+            it.copy(
+                finishedSession = session,
+                finishedBackfill = 0,
+                finishedSnapshot = true,
+            )
         }
+        return Result.success(Unit)
     }
 
     /**

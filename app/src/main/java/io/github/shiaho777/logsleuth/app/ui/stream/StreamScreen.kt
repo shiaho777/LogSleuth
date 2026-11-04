@@ -164,6 +164,7 @@ fun StreamScreen(
 
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
+    val saveFailedMsg = stringResource(R.string.save_failed)
     val filterSavedMsg = stringResource(R.string.filter_saved_from_line)
     LaunchedEffect(ui.filterNotice) {
         if (ui.filterNotice > 0) snackbar.showSnackbar(filterSavedMsg)
@@ -432,7 +433,11 @@ fun StreamScreen(
                 onSaveSelection = { selected ->
                     selAnchor = -1L
                     selEnd = -1L
-                    if (selected.isNotEmpty()) viewModel.saveSelection(selected)
+                    if (selected.isNotEmpty()) {
+                        viewModel.saveSelection(selected) { result ->
+                            result.onFailure { scope.launch { snackbar.showSnackbar(saveFailedMsg) } }
+                        }
+                    }
                 },
                 onCopy = { text ->
                     selAnchor = -1L
@@ -533,7 +538,9 @@ fun StreamScreen(
                 } else if (action == ScopeAction.CLEAR) {
                     if (uids == null) viewModel.clear() else viewModel.clearApps(uids)
                 } else {
-                    viewModel.saveToSession(uids)
+                    viewModel.saveToSession(uids) { result ->
+                        result.onFailure { scope.launch { snackbar.showSnackbar(saveFailedMsg) } }
+                    }
                 }
                 scopeDialog = null
                 scopeStartPerApp = false
