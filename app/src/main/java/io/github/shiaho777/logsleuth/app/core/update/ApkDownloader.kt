@@ -15,7 +15,25 @@ internal sealed interface FetchOutcome {
     data class Stopped(val bytes: Long) : FetchOutcome
 
     /** Network, protocol or size verification failure. */
-    data class Failed(val bytes: Long, val message: String) : FetchOutcome
+    data class Failed(val bytes: Long, val failure: FetchFailure) : FetchOutcome
+}
+
+/**
+ * Why a transfer failed, kept structured so the caller can show a localized
+ * message instead of the raw exception text.
+ */
+internal sealed interface FetchFailure {
+    /** The server answered with a non-2xx status (or 416 twice). */
+    data class Http(val code: Int) : FetchFailure
+
+    /** The part file does not hold the asset's advertised size. */
+    data object Incomplete : FetchFailure
+
+    /** The connection stopped delivering data. */
+    data object Stalled : FetchFailure
+
+    /** Anything else, with the exception's message when it had one. */
+    data class Io(val message: String?) : FetchFailure
 }
 
 /**
@@ -59,7 +77,7 @@ internal class ApkDownloader(
         if (first != null) return first
         // 416: the leftover is not a prefix of this asset. One clean retry.
         part.delete()
-        return fetch(0L) ?: FetchOutcome.Failed(0L, "HTTP ${HTTP_RANGE_REJECTED}")
+        return fetch(0L) ?: FetchOutcome.Failed(0L, FetchFailure.Http(HTTP_RANGE_REJECTED))
     }
 
     /** One connection. Null when the server rejected the Range with 416. */
@@ -78,7 +96,7 @@ internal class ApkDownloader(
             val code = conn.responseCode
             if (code == HTTP_RANGE_REJECTED) return null
             if (code !in 200..299) {
-                return FetchOutcome.Failed(bytesOnDisk(), "HTTP $code")
+                return FetchOutcome.Failed(bytesOnDisk(), FetchFailure.Http(code))
             }
             // 206 = the server honoured Range: append. 200 = it ignored the
             // header and is sending the whole asset: the old bytes are not a
@@ -108,7 +126,7 @@ internal class ApkDownloader(
                     } catch (_: SocketTimeoutException) {
                         if (++stalls > maxStalls) {
                             out.flush()
-                            return FetchOutcome.Failed(done, "connection stalled")
+                            return FetchOutcome.Failed(done, FetchFailure.Stalled)
                         }
                         continue
                     }
@@ -132,11 +150,11 @@ internal class ApkDownloader(
             // would otherwise look complete.
             val onDisk = bytesOnDisk()
             if (expectedSize > 0 && onDisk != expectedSize) {
-                return FetchOutcome.Failed(onDisk, "incomplete download: $onDisk of $expectedSize bytes")
+                return FetchOutcome.Failed(onDisk, FetchFailure.Incomplete)
             }
             return FetchOutcome.Complete(onDisk)
         } catch (e: Exception) {
-            return FetchOutcome.Failed(bytesOnDisk(), e.message ?: e.javaClass.simpleName)
+            return FetchOutcome.Failed(bytesOnDisk(), FetchFailure.Io(e.message))
         } finally {
             conn.disconnect()
         }

@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.shiaho777.logsleuth.app.BuildConfig
+import io.github.shiaho777.logsleuth.app.R
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -261,7 +262,7 @@ class UpdateManager @Inject constructor(
             is FetchOutcome.Failed -> publish(gen) {
                 it.copy(
                     dlStatus = DlStatus.FAILED, dlDoneBytes = outcome.bytes,
-                    dlBps = 0, dlError = outcome.message,
+                    dlBps = 0, dlError = errorMessage(outcome.failure),
                 )
             }
         }
@@ -275,7 +276,10 @@ class UpdateManager @Inject constructor(
             finalApk.delete()
             if (!part.renameTo(finalApk)) {
                 publish(gen) {
-                    it.copy(dlStatus = DlStatus.FAILED, dlError = "Could not finalize the download")
+                    it.copy(
+                        dlStatus = DlStatus.FAILED,
+                        dlError = context.getString(R.string.update_error_finalize),
+                    )
                 }
                 return
             }
@@ -287,6 +291,14 @@ class UpdateManager @Inject constructor(
                 dlBps = 0, dlFile = finalApk, dlError = null,
             )
         }
+    }
+
+    /** Turns a transfer failure into the card's message, in the UI language. */
+    private fun errorMessage(failure: FetchFailure): String = when (failure) {
+        is FetchFailure.Http -> context.getString(R.string.update_error_http, failure.code)
+        FetchFailure.Incomplete -> context.getString(R.string.update_error_incomplete)
+        FetchFailure.Stalled -> context.getString(R.string.update_error_stalled)
+        is FetchFailure.Io -> context.getString(R.string.update_error_io, failure.message ?: "?")
     }
 
     private fun publish(gen: Int, block: (UpdateUiState) -> UpdateUiState) {
