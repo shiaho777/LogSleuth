@@ -23,10 +23,10 @@ sealed interface LogcatSource {
      * dumps (`Fatal signal`, tag DEBUG) on `crash`, and `am_anr` on
      * `events`. `radio` stays out — it is noisy and not in the default set.
      *
-     * @param since threadtime stamp (`MM-dd HH:mm:ss.SSS`). When set, logcat
-     *   is started with `-T` so a reconnect does not replay the whole ring
-     *   buffer. Null on the first connection, where the dump is the backlog
-     *   the user expects to see.
+     * @param since threadtime stamp (`yyyy-MM-dd HH:mm:ss.SSS`). When set,
+     *   logcat is started with `-T` so a reconnect does not replay the whole
+     *   ring buffer. Null on the first connection, where the dump is the
+     *   backlog the user expects to see.
      */
     fun buildCommand(since: String? = null): List<String> = buildList {
         add("logcat")
@@ -53,7 +53,7 @@ sealed interface LogcatSource {
  */
 fun streamSince(resumeSince: String?, liveOnly: Boolean, nowMillis: Long): String? =
     resumeSince?.takeIf { it.isNotBlank() }
-        ?: if (liveOnly) UidNames.formatThreadTime(nowMillis) else null
+        ?: if (liveOnly) UidNames.formatSince(nowMillis) else null
 
 /**
  * Android 13+ declines a new app-uid logcat immediately when the process is

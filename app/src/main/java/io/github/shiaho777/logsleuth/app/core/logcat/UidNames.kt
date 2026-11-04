@@ -1,6 +1,8 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
 import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
 
 /**
  * Turns a logcat uid column into an integer uid, and the other way around
@@ -44,11 +46,37 @@ object UidNames {
 
     /**
      * `MM-dd HH:mm:ss.SSS` in the default timezone — the stamp `logcat -T`
-     * accepts alongside `-v threadtime`.
+     * accepts alongside `-v threadtime`, used for display.
      */
     fun formatThreadTime(millis: Long): String {
         val cal = Calendar.getInstance().apply { timeInMillis = millis }
         return "%02d-%02d %02d:%02d:%02d.%03d".format(
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH),
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE),
+            cal.get(Calendar.SECOND),
+            cal.get(Calendar.MILLISECOND),
+        )
+    }
+
+    /**
+     * `yyyy-MM-dd HH:mm:ss.SSS` — the stamp a reconnect passes to `logcat -T`.
+     *
+     * Unlike [formatThreadTime] this carries the year: logcat reads a year-less
+     * stamp as the current year, so resuming from Dec 31 just after New Year
+     * would point a year ahead and the stream would never resume.
+     *
+     * Gregorian and ASCII on purpose: a locale can change the calendar system
+     * (`th-TH` would print 2569) and [String.format] would otherwise use the
+     * locale's own digits, both of which logcat rejects.
+     */
+    fun formatSince(millis: Long): String {
+        val cal = GregorianCalendar().apply { timeInMillis = millis }
+        return String.format(
+            Locale.US,
+            "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+            cal.get(Calendar.YEAR),
             cal.get(Calendar.MONTH) + 1,
             cal.get(Calendar.DAY_OF_MONTH),
             cal.get(Calendar.HOUR_OF_DAY),

@@ -1,6 +1,8 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
 import java.util.Calendar
+import java.util.GregorianCalendar
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -38,5 +40,33 @@ class UidNamesTest {
         val stamp = UidNames.formatThreadTime(millis)
         assertEquals("10-10 08:07:06.009", stamp)
         assertTrue(stamp.matches(Regex("""\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}""")))
+    }
+
+    private fun millisOf(year: Int, month: Int, day: Int, h: Int, m: Int, s: Int, ms: Int): Long =
+        GregorianCalendar().apply {
+            set(year, month, day, h, m, s)
+            set(Calendar.MILLISECOND, ms)
+        }.timeInMillis
+
+    @Test
+    fun `reconnect stamp carries the year so a resume survives New Year`() {
+        val stamp = UidNames.formatSince(millisOf(2026, Calendar.JANUARY, 1, 0, 0, 1, 42))
+        assertEquals("2026-01-01 00:00:01.042", stamp)
+        assertTrue(stamp.matches(Regex("""\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}""")))
+    }
+
+    @Test
+    fun `reconnect stamp stays Gregorian and ASCII under other locales`() {
+        val millis = millisOf(2026, Calendar.JANUARY, 1, 0, 0, 1, 42)
+        val original = Locale.getDefault()
+        try {
+            // th-TH defaults to the Buddhist calendar, ar-EG to its own digits.
+            Locale.setDefault(Locale.forLanguageTag("th-TH"))
+            assertEquals("2026-01-01 00:00:01.042", UidNames.formatSince(millis))
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+            assertEquals("2026-01-01 00:00:01.042", UidNames.formatSince(millis))
+        } finally {
+            Locale.setDefault(original)
+        }
     }
 }

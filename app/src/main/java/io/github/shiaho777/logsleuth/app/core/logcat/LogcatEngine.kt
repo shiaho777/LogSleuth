@@ -421,7 +421,7 @@ class LogcatEngine @Inject constructor(
             while (buffer.size > bufferCap) buffer.removeFirst()
             s
         }
-        resumeSince = UidNames.formatThreadTime(stamped.timestampMillis)
+        resumeSince = UidNames.formatSince(stamped.timestampMillis)
         _entries.emit(stamped)
         crashDetector.onEntry(stamped)?.let { onCrash(it) }
     }
