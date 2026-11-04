@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.core.logcat
 
 import java.util.Calendar
+import java.util.GregorianCalendar
 
 /** Result of parsing a single raw logcat line. */
 sealed interface ParsedLine {
@@ -60,7 +61,10 @@ object LogcatParser {
         val second = head.groupValues[4].toIntOrNull() ?: return ParsedLine.Continuation(clean)
         val milli = head.groupValues[5].toIntOrNull() ?: return ParsedLine.Continuation(clean)
 
-        val cal = Calendar.getInstance().apply {
+        // Gregorian on purpose: Calendar.getInstance() follows the locale's
+        // calendar system, so th-TH (Buddhist) would place every log line
+        // 543 years in the future.
+        val cal = GregorianCalendar().apply {
             timeInMillis = nowMillis
             set(Calendar.MONTH, month - 1)
             set(Calendar.DAY_OF_MONTH, day)
