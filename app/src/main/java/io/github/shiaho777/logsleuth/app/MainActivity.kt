@@ -195,7 +195,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_OPEN_CRASHES = "extra_open_crashes"
         const val EXTRA_OPEN_CRASH = "extra_open_crash"
-        const val EXTRA_OPEN_CRASH_PKG = "extra_open_crash_pkg"
         const val EXTRA_OPEN_SESSION = "extra_open_session"
 
         fun crashesIntent(context: Context): Intent =
@@ -204,10 +203,9 @@ class MainActivity : ComponentActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 
-        fun crashIntent(context: Context, eventId: Long, packageName: String?): Intent =
+        fun crashIntent(context: Context, eventId: Long): Intent =
             Intent(context, MainActivity::class.java).apply {
                 putExtra(EXTRA_OPEN_CRASH, eventId)
-                if (!packageName.isNullOrBlank()) putExtra(EXTRA_OPEN_CRASH_PKG, packageName)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
 
