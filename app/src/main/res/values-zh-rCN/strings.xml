@@ -138,6 +138,7 @@
     <string name="text_size_comfortable">舒适</string>
     <string name="undo">撤销</string>
     <string name="session_deleted">会话已删除</string>
+    <string name="session_delete_failed">无法删除日志文件——会话已保留</string>
     <string name="session_recording_live">录制中</string>
     <string name="lines_count">%1$d 行</string>
     <string name="unit_kb">%1$d KB</string>

@@ -138,6 +138,7 @@
     <string name="text_size_comfortable">Comfortable</string>
     <string name="undo">Undo</string>
     <string name="session_deleted">Session deleted</string>
+    <string name="session_delete_failed">Couldn\'t delete the log file — the session was kept</string>
     <string name="session_recording_live">Recording</string>
     <string name="lines_count">%1$d lines</string>
     <string name="unit_kb">%1$d KB</string>

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,6 +58,10 @@ class SessionsViewModel @Inject constructor(
     private val _pendingDelete = MutableStateFlow<SessionEntity?>(null)
     val pendingDelete: StateFlow<SessionEntity?> = _pendingDelete.asStateFlow()
 
+    /** Bumped when a delete could not remove the log file; the row was kept. */
+    private val _deleteFailed = MutableStateFlow(0)
+    val deleteFailed: StateFlow<Int> = _deleteFailed.asStateFlow()
+
     private var deleteJob: Job? = null
 
     fun requestDelete(session: SessionEntity) {
@@ -83,7 +88,17 @@ class SessionsViewModel @Inject constructor(
 
     private fun delete(session: SessionEntity) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { File(session.filePath).delete() }
+            // Keep the row when the file is still there: removing the row
+            // first would leave the file with nothing pointing at it, and no
+            // way to retry from the UI.
+            val fileGone = withContext(Dispatchers.IO) {
+                val file = File(session.filePath)
+                !file.exists() || file.delete()
+            }
+            if (!fileGone) {
+                _deleteFailed.update { it + 1 }
+                return@launch
+            }
             crashDeleter.deleteSession(session.id)
             bookmarkDao.deleteForSession(session.id)
             sessionDao.delete(session)
