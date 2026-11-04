@@ -39,16 +39,16 @@ object CrashSearch {
         ignoreCase: Boolean,
     ): List<IntRange> {
         if (query.isEmpty() || haystack.isEmpty()) return emptyList()
-        val source = if (ignoreCase) haystack.lowercase() else haystack
-        val needle = if (ignoreCase) query.lowercase() else query
-        if (needle.isEmpty()) return emptyList()
+        // Matched on the original text: lowercasing can change the length
+        // (e.g. 'İ' becomes two code units), which would shift the following
+        // ranges past the end of the string.
         val ranges = ArrayList<IntRange>()
         var start = 0
         while (true) {
-            val idx = source.indexOf(needle, start)
+            val idx = haystack.indexOf(query, start, ignoreCase = ignoreCase)
             if (idx < 0) break
-            ranges += idx until (idx + needle.length)
-            start = idx + needle.length
+            ranges += idx until (idx + query.length)
+            start = idx + query.length
         }
         return ranges
     }
