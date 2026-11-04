@@ -323,6 +323,11 @@
     <string name="update_status_paused">已暂停</string>
     <string name="update_status_done">已完成</string>
     <string name="update_status_failed">失败</string>
+    <string name="update_error_http">下载失败——服务器返回 %1$d</string>
+    <string name="update_error_incomplete">下载不完整——请重试</string>
+    <string name="update_error_stalled">下载已停止响应——请检查网络</string>
+    <string name="update_error_io">下载失败——%1$s</string>
+    <string name="update_error_finalize">无法完成下载文件</string>
     <string name="update_history">历史版本</string>
 
     <!-- Stackable filters -->

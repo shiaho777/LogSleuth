@@ -323,6 +323,11 @@
     <string name="update_status_paused">paused</string>
     <string name="update_status_done">done</string>
     <string name="update_status_failed">failed</string>
+    <string name="update_error_http">Download failed — the server returned %1$d</string>
+    <string name="update_error_incomplete">Download incomplete — try again</string>
+    <string name="update_error_stalled">Download stalled — check your connection</string>
+    <string name="update_error_io">Download failed — %1$s</string>
+    <string name="update_error_finalize">Couldn\'t finish the download file</string>
     <string name="update_history">Version history</string>
 
     <!-- Stackable filters -->

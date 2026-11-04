@@ -34,7 +34,8 @@ class ApkDownloaderTest {
     private fun serve(
         honorRange: Boolean = true,
         truncate: Boolean = false,
-    ): TestServer = TestServer(body, honorRange, truncate).also { servers += it }
+        errorStatus: Int? = null,
+    ): TestServer = TestServer(body, honorRange, truncate, errorStatus).also { servers += it }
 
     private fun downloader(
         port: Int,
@@ -126,7 +127,20 @@ class ApkDownloaderTest {
         val outcome = downloader(server.port, part).run()
 
         assertTrue(outcome is FetchOutcome.Failed)
-        assertTrue((outcome as FetchOutcome.Failed).message.contains("incomplete"))
+        assertTrue((outcome as FetchOutcome.Failed).failure is FetchFailure.Incomplete)
+    }
+
+    @Test
+    fun `an HTTP error keeps the status for the message`() {
+        val server = serve(errorStatus = 503)
+        val part = File(tmp.root, "app.apk.part")
+
+        val outcome = downloader(server.port, part).run()
+
+        assertTrue(outcome is FetchOutcome.Failed)
+        val failure = (outcome as FetchOutcome.Failed).failure
+        assertTrue(failure is FetchFailure.Http)
+        assertEquals(503, (failure as FetchFailure.Http).code)
     }
 
     @Test
@@ -148,6 +162,7 @@ class ApkDownloaderTest {
         private val body: ByteArray,
         private val honorRange: Boolean,
         private val truncate: Boolean,
+        private val errorStatus: Int?,
     ) : AutoCloseable {
 
         private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
@@ -192,8 +207,14 @@ class ApkDownloaderTest {
             ranges += range
             requests.incrementAndGet()
 
-            val start = range?.removePrefix("bytes=")?.substringBefore('-')?.toIntOrNull() ?: 0
             val out = socket.getOutputStream()
+            if (errorStatus != null) {
+                head(out, "$errorStatus Test Error", "Content-Length: 0")
+                out.flush()
+                return
+            }
+
+            val start = range?.removePrefix("bytes=")?.substringBefore('-')?.toIntOrNull() ?: 0
             when {
                 range != null && start >= body.size -> {
                     head(
