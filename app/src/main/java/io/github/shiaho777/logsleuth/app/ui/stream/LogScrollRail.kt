@@ -49,12 +49,10 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
 import java.text.NumberFormat
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Touch strip hugging the right edge; the visible track is narrower. */
 private val RailWidth = 26.dp
@@ -420,9 +418,12 @@ private fun rememberLevelBuckets(entries: List<UiLogEntry>, buckets: Int): IntAr
             if (size != lastSize || head != lastHead) {
                 lastSize = size
                 lastHead = head
-                levels = withContext(Dispatchers.Default) {
-                    ScrollRailMath.bucketLevels(entries, buckets)
-                }
+                // Read on the composition thread: `entries` is a SnapshotStateList
+                // mutated by the list pipeline on the main thread, and a
+                // background pass could resolve its size and an index against
+                // different snapshots. One pass over a 20k buffer is
+                // sub-millisecond and this runs at most every BUCKET_REFRESH_MS.
+                levels = ScrollRailMath.bucketLevels(entries, buckets)
             }
             delay(BUCKET_REFRESH_MS)
         }
