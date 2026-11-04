@@ -476,7 +476,10 @@ fun StreamScreen(
 
     // Search-hit jumping. Leave the tail so the pin does not yank back.
     LaunchedEffect(ui.searchHitIndex) {
-        val target = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
+        // Hits are seqs: a ring-buffer trim shifts list positions, not ids.
+        val targetSeq = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
+        val target = parkedIndex(viewModel.entries, targetSeq)
+        if (target < 0) return@LaunchedEffect
         parkAt(target, 0)
         listState.scrollToItem(target)
     }
@@ -789,7 +792,7 @@ private fun LogList(
     entries: List<UiLogEntry>,
     listState: LazyListState,
     searchQuery: String,
-    currentHit: Int?,
+    currentHit: Long?,
     snackbar: SnackbarHostState,
     selAnchor: Long,
     selEnd: Long,
@@ -848,7 +851,7 @@ private fun LogList(
             LogRow(
                 entry = uiEntry.entry,
                 highlight = searchQuery.takeIf { it.isNotBlank() },
-                isCurrentHit = currentHit == index,
+                isCurrentHit = currentHit == uiEntry.seq,
                 isSelected = uiEntry.seq in lo..hi,
                 snackbar = snackbar,
                 onClick = if (selAnchor >= 0L) {

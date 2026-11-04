@@ -59,8 +59,11 @@ data class StreamUiState(
     val presets: List<LogFilter> = emptyList(),
     val searching: Boolean = false,
     val searchQuery: String = "",
-    /** Indices into [StreamViewModel.entries] that match the search query. */
-    val searchHits: List<Int> = emptyList(),
+    /**
+     * Stable row ids ([UiLogEntry.seq]) that match the search query. Ids, not
+     * list positions: a ring-buffer trim shifts positions but not ids.
+     */
+    val searchHits: List<Long> = emptyList(),
     val searchHitIndex: Int = -1,
     /** Session just finished — prompt the user to share it. */
     val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
@@ -655,10 +658,14 @@ class StreamViewModel @Inject constructor(
             emptyList()
         } else {
             listMutex.withLock {
-                visible.mapIndexedNotNull { index, uiEntry ->
+                visible.mapNotNull { uiEntry ->
                     val e = uiEntry.entry
                     val ignore = searchIgnoreCase
-                    if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
+                    if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) {
+                        uiEntry.seq
+                    } else {
+                        null
+                    }
                 }
             }
         }
