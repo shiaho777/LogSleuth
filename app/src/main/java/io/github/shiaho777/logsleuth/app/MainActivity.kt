@@ -60,7 +60,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handleIntent(intent)
+        // A configuration change or process restore re-delivers the launch
+        // intent. Replaying it would import the shared file a second time and
+        // push the notification's destination onto the restored back stack
+        // again; onNewIntent handles genuinely new deliveries.
+        if (savedInstanceState == null) handleIntent(intent)
 
         setContent {
             val settings by settingsRepository.settings.collectAsState(initial = null)
