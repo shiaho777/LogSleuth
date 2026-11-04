@@ -76,6 +76,7 @@ fun SessionsScreen(
     val sessions by viewModel.sessions.collectAsState()
     val recording by viewModel.recording.collectAsState()
     val pendingDelete by viewModel.pendingDelete.collectAsState()
+    val deleteFailed by viewModel.deleteFailed.collectAsState()
     val shown = sessions.filter { it.session.id != pendingDelete?.id }
     var shareTarget by remember { mutableStateOf<SessionEntity?>(null) }
     var renameTarget by remember { mutableStateOf<SessionEntity?>(null) }
@@ -85,12 +86,17 @@ fun SessionsScreen(
 
     val importFailed = stringResource(R.string.import_failed)
     val deletedMessage = stringResource(R.string.session_deleted)
+    val deleteFailedMessage = stringResource(R.string.session_delete_failed)
     val undoLabel = stringResource(R.string.undo)
 
     LaunchedEffect(pendingDelete) {
         if (pendingDelete == null) return@LaunchedEffect
         val result = snackbar.showSnackbar(deletedMessage, actionLabel = undoLabel)
         if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+    }
+
+    LaunchedEffect(deleteFailed) {
+        if (deleteFailed > 0) snackbar.showSnackbar(deleteFailedMessage)
     }
 
     val importLauncher = rememberLauncherForActivityResult(
