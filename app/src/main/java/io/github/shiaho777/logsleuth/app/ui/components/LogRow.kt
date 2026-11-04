@@ -60,6 +60,7 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 import io.github.shiaho777.logsleuth.app.core.logcat.VisibleColumns
 import io.github.shiaho777.logsleuth.app.core.logcat.formatLogTime
+import io.github.shiaho777.logsleuth.app.core.text.matchRanges
 import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
 import kotlinx.coroutines.CoroutineScope
@@ -467,21 +468,15 @@ private fun highlighted(
     ignoreCase: Boolean,
 ): AnnotatedString {
     if (query.isNullOrBlank()) return AnnotatedString(text)
+    val ranges = matchRanges(text, query, ignoreCase)
+    if (ranges.isEmpty()) return AnnotatedString(text)
     return buildAnnotatedString {
-        var start = 0
-        val lower = if (ignoreCase) text.lowercase() else text
-        val q = if (ignoreCase) query.lowercase() else query
-        while (true) {
-            val idx = lower.indexOf(q, start)
-            if (idx < 0) {
-                append(text.substring(start))
-                break
-            }
-            append(text.substring(start, idx))
-            withStyle(style) {
-                append(text.substring(idx, idx + q.length))
-            }
-            start = idx + q.length
+        var cursor = 0
+        for (range in ranges) {
+            if (range.first > cursor) append(text.substring(cursor, range.first))
+            withStyle(style) { append(text.substring(range.first, range.last + 1)) }
+            cursor = range.last + 1
         }
+        if (cursor < text.length) append(text.substring(cursor))
     }
 }
