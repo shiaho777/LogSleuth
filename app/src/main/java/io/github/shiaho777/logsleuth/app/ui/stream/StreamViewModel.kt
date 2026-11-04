@@ -44,6 +44,9 @@ import kotlinx.coroutines.sync.withLock
 /** A log line with a stable identity for LazyColumn keys. */
 data class UiLogEntry(val seq: Long, val entry: LogcatEntry)
 
+/** Debounce for re-indexing search hits while the stream appends. */
+private const val HITS_REFRESH_MS = 250L
+
 data class StreamUiState(
     val access: AccessState? = null,
     val engineState: LogcatEngine.State = LogcatEngine.State.STOPPED,
@@ -339,7 +342,7 @@ class StreamViewModel @Inject constructor(
         }
         // Keep hit indices fresh while the search bar is open — the stream
         // keeps appending, so a one-shot scan goes stale within seconds.
-        if (published) refreshSearchHits()
+        if (published) refreshSearchHitsThrottled()
     }
 
     /** How many visible rows [evictOverflow] removed. Call with [listMutex] held. */
@@ -679,6 +682,25 @@ class StreamViewModel @Inject constructor(
     private suspend fun refreshSearchHits() {
         val s = _ui.value
         if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
+    }
+
+    private var hitsRefreshJob: Job? = null
+
+    /**
+     * Re-indexes hits after an append, trailing by [HITS_REFRESH_MS]. A full
+     * scan per batch would run up to 60 times a second over the whole visible
+     * list while searching a busy stream, competing with the drain for
+     * [listMutex]; one debounced scan per window keeps the count accurate and
+     * still covers the last batch of a burst.
+     */
+    private fun refreshSearchHitsThrottled() {
+        val s = _ui.value
+        if (!s.searching || s.searchQuery.isBlank()) return
+        if (hitsRefreshJob?.isActive == true) return
+        hitsRefreshJob = viewModelScope.launch(Dispatchers.Default) {
+            delay(HITS_REFRESH_MS)
+            recomputeHits(_ui.value.searchQuery)
+        }
     }
 
     fun nextSearchHit(direction: Int) {
