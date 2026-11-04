@@ -152,7 +152,7 @@ class NotificationHelper(private val context: Context) {
         val channel = channelId(signal.type.name, signal.packageName, separateChannels)
         ensureChannel(channel, signal.type, label, separateChannels)
         val open = if (eventId > 0) {
-            MainActivity.crashIntent(context, eventId, signal.packageName)
+            MainActivity.crashIntent(context, eventId)
         } else {
             MainActivity.crashesIntent(context)
         }
