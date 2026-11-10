@@ -12,7 +12,6 @@ import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.apps.groupEntriesByApp
-import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
@@ -103,9 +102,12 @@ class StreamViewModel @Inject constructor(
     private val _ui = MutableStateFlow(StreamUiState())
     val ui: StateFlow<StreamUiState> = _ui.asStateFlow()
 
-    private val listMutex = Mutex()
-    private val all = ArrayList<UiLogEntry>()
-    private var visible = ArrayList<UiLogEntry>()
+    /** Owns the three lists; its edits are mirrored onto [entries] on the main thread. */
+    private val pipeline = LogListPipeline(
+        emit = { edits.trySend(it) },
+        onPausedIncoming = { n -> _ui.update { it.copy(pausedIncoming = n) } },
+        onRegexInvalid = { invalid -> _ui.update { it.copy(regexInvalid = invalid) } },
+    )
 
     /**
      * What the list draws. Appends and prefix drops land here; the screen
@@ -114,16 +116,12 @@ class StreamViewModel @Inject constructor(
      */
     val entries: SnapshotStateList<UiLogEntry> = mutableStateListOf()
 
-    /** Edits queued under [listMutex], applied in that order on the main thread. */
-    private val edits = Channel<ListPublish>(Channel.UNLIMITED)
-
-    private var seq = 0L
-    private var bufferCap = 20_000
+    /** Edits queued by [pipeline], applied in that order on the main thread. */
+    private val edits = Channel<ListEdit>(Channel.UNLIMITED)
 
     /** Mirrors Settings.searchCaseSensitive. Default matches the old search. */
     @Volatile
     private var searchIgnoreCase = true
-    private val pending = ArrayList<LogcatEntry>()
     // Declared before init: SharedFlow emissions run on the emitter's
     // thread, so the collector below can touch these while init is still
     // running — a post-init declaration reads as null there (NPE crash).
@@ -144,7 +142,7 @@ class StreamViewModel @Inject constructor(
 
         viewModelScope.launch {
             settingsRepository.settings.collect { s ->
-                bufferCap = s.bufferSize
+                pipeline.setCap(s.bufferSize)
                 val ignore = !s.searchCaseSensitive
                 val caseChanged = ignore != searchIgnoreCase
                 searchIgnoreCase = ignore
@@ -213,7 +211,7 @@ class StreamViewModel @Inject constructor(
 
         // Collector: stage entries; a drainer publishes them once per frame
         // so a busy logcat cannot trigger a recompose per line. On Default —
-        // the snapshot path filter-matches up to bufferCap entries and must
+        // the snapshot path filter-matches up to the whole buffer cap and must
         // not run on the main thread (it froze cold/warm starts).
         //
         // onSubscription runs after this subscriber is registered but before
@@ -248,18 +246,7 @@ class StreamViewModel @Inject constructor(
     }
 
     private suspend fun snapshotToLists(snapshot: List<LogcatEntry>) {
-        val compiled = currentCompiled()
-        listMutex.withLock {
-            all.clear()
-            visible.clear()
-            snapshot.forEach { e ->
-                val uiEntry = UiLogEntry(seq++, e)
-                all.add(uiEntry)
-                if (accepts(compiled, e)) visible.add(uiEntry)
-            }
-            trimCountLocked()
-            enqueueReplaceLocked()
-        }
+        pipeline.snapshot(snapshot, ::currentRules)
     }
 
     private suspend fun drainStaged() {
@@ -267,112 +254,19 @@ class StreamViewModel @Inject constructor(
             if (staged.isEmpty()) return
             ArrayList(staged).also { staged.clear() }
         }
-        var published = false
-        var matchedWhilePaused = 0
-        listMutex.withLock {
-            // Compiled under the lock for the same reason as in [refilter]: a
-            // refilter that ran between compiling and locking would otherwise
-            // see this batch appended under the rule it just replaced.
-            val compiled = currentCompiled()
-            // Read under the lock: resume flips `paused` first and then flushes
-            // `pending` under this lock, so a batch either lands before that
-            // flush (and is flushed with it) or sees the stream running.
-            val pausedNow = _ui.value.paused
-            // Resumed, but the backlog flush has not run yet: everything in
-            // `pending` is older than this batch, so publish it first rather
-            // than letting the new lines overtake it.
-            val incoming = if (!pausedNow && pending.isNotEmpty()) {
-                ArrayList<LogcatEntry>(pending.size + batch.size).apply {
-                    addAll(pending)
-                    addAll(batch)
-                }.also { pending.clear() }
-            } else {
-                batch
-            }
-            val sizeBefore = visible.size
-            val appended = ArrayList<UiLogEntry>()
-            for (e in incoming) {
-                if (pausedNow) {
-                    // Keep every line — the filter can change while paused and
-                    // must still be able to reveal them — but only the ones the
-                    // active filter admits are "new lines" to the user, so only
-                    // those count toward the banner.
-                    if (accepts(compiled, e)) matchedWhilePaused++
-                    pending.add(e)
-                    continue
-                }
-                val uiEntry = UiLogEntry(seq++, e)
-                all.add(uiEntry)
-                if (accepts(compiled, e)) {
-                    visible.add(uiEntry)
-                    appended.add(uiEntry)
-                }
-            }
-            // Paused entries are bounded too: without this, pausing during a
-            // log storm grows `pending` without limit.
-            var pendingTrimmed = false
-            if (pending.size > bufferCap) {
-                pending.subList(0, pending.size - bufferCap).clear()
-                pendingTrimmed = true
-            }
-            if (pausedNow) {
-                // Written under the lock, like every other recount of `pending`,
-                // so a resume or refilter cannot interleave and count this batch
-                // twice. Trimming deleted an unknown number of matching lines,
-                // so the running total is no longer trustworthy — recount then.
-                val recount = if (pendingTrimmed) {
-                    pending.count { accepts(compiled, it) }
-                } else {
-                    -1
-                }
-                _ui.update {
-                    when {
-                        !it.paused -> it
-                        recount >= 0 -> it.copy(pausedIncoming = recount)
-                        else -> it.copy(pausedIncoming = it.pausedIncoming + matchedWhilePaused)
-                    }
-                }
-            }
-            if (pausedNow) return@withLock
-            val dropped = trimCountLocked()
-            val (dropOld, dropNew) = prefixDrop(sizeBefore, appended.size, dropped)
-            if (dropNew > 0) appended.subList(0, dropNew).clear()
-            val filtered = all.isNotEmpty() && visible.isEmpty()
-            val listChanged = dropOld > 0 || appended.isNotEmpty()
-            if (!listChanged && filtered == _ui.value.filteredOut) return@withLock
-            edits.trySend(ListPublish.Append(dropOld, ArrayList(appended), filtered))
-            published = true
-        }
-        // Keep hit indices fresh while the search bar is open — the stream
-        // keeps appending, so a one-shot scan goes stale within seconds.
-        if (published) refreshSearchHitsThrottled()
-    }
-
-    /** How many visible rows [evictOverflow] removed. Call with [listMutex] held. */
-    private fun trimCountLocked(): Int {
-        val before = visible.size
-        evictOverflow(all, visible, bufferCap)
-        return before - visible.size
-    }
-
-    /** Call with [listMutex] held. Queued ahead of any later edit. */
-    private fun enqueueReplaceLocked() {
-        edits.trySend(
-            ListPublish.Replace(
-                items = ArrayList(visible),
-                filteredOut = all.isNotEmpty() && visible.isEmpty(),
-            ),
-        )
+        // Keep hit ids fresh while the search bar is open — the stream keeps
+        // appending, so a one-shot scan goes stale within seconds.
+        if (pipeline.append(batch, ::currentRules)) refreshSearchHitsThrottled()
     }
 
     /** Main thread. [filteredOut] is written only when it changes. */
-    private fun applyEdit(edit: ListPublish) {
+    private fun applyEdit(edit: ListEdit) {
         when (edit) {
-            is ListPublish.Replace -> {
+            is ListEdit.Replace -> {
                 entries.clear()
                 if (edit.items.isNotEmpty()) entries.addAll(edit.items)
             }
-            is ListPublish.Append -> {
+            is ListEdit.Append -> {
                 val drop = edit.dropPrefix.coerceAtMost(entries.size)
                 if (drop > 0) entries.subList(0, drop).clear()
                 if (edit.items.isNotEmpty()) entries.addAll(edit.items)
@@ -383,11 +277,15 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    private fun currentCompiled(): CompiledFilter =
-        CompiledFilter(_ui.value.filter, resolveUid(_ui.value.filter.packageName))
-
-    private fun accepts(quick: CompiledFilter, entry: LogcatEntry): Boolean =
-        quick.matches(entry) && enabledStack.matches(entry)
+    /**
+     * The newest rules, compiled once they are inside the pipeline lock. A
+     * rebuild must apply the rules current at the moment it runs, not the ones
+     * that were current when it was scheduled.
+     */
+    private fun currentRules(): FilterRules {
+        val filter = _ui.value.filter
+        return FilterRules(filter, enabledStack, resolveUid(filter.packageName))
+    }
 
     // ---------------- user actions ----------------
 
@@ -402,28 +300,15 @@ class StreamViewModel @Inject constructor(
     }
 
     fun setPaused(paused: Boolean) {
-        // Pausing starts a fresh count; resuming surfaces the backlog and
-        // clears it (below).
+        // Flip the flag synchronously; the pipeline reads it under its lock,
+        // so a batch drained right after the tap cannot slip past the pause.
         _ui.update { it.copy(paused = paused, pausedIncoming = 0) }
-        if (!paused) {
+        if (paused) {
+            pipeline.pause()
+        } else {
+            pipeline.markRunning()
             viewModelScope.launch(Dispatchers.Default) {
-                val flushed = listMutex.withLock {
-                    // Paused again before this ran, or a drain already
-                    // published the backlog: nothing to flush. Leaving `pending`
-                    // alone keeps it for the next resume.
-                    if (_ui.value.paused || pending.isEmpty()) return@withLock false
-                    val compiled = currentCompiled()
-                    for (e in pending) {
-                        val uiEntry = UiLogEntry(seq++, e)
-                        all.add(uiEntry)
-                        if (accepts(compiled, e)) visible.add(uiEntry)
-                    }
-                    pending.clear()
-                    trimCountLocked()
-                    enqueueReplaceLocked()
-                    true
-                }
-                if (flushed) refreshSearchHits()
+                if (pipeline.flushPending(::currentRules)) refreshSearchHits()
             }
         }
     }
@@ -434,13 +319,8 @@ class StreamViewModel @Inject constructor(
             // `staged` holds in-flight emissions between the collector and the
             // next frame flush — without it a clear would let those lines return.
             stagedMutex.withLock { staged.clear() }
-            listMutex.withLock {
-                all.clear()
-                visible.clear()
-                pending.clear()
-                enqueueReplaceLocked()
-                _ui.update { it.copy(pausedIncoming = 0, searchHits = emptyList(), searchHitIndex = -1) }
-            }
+            pipeline.clear()
+            _ui.update { it.copy(searchHits = emptyList(), searchHitIndex = -1) }
         }
     }
 
@@ -450,7 +330,7 @@ class StreamViewModel @Inject constructor(
      * 20k-entry scan per batch would be pure waste.
      */
     suspend fun appGroups(): List<io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup> {
-        val entries = listMutex.withLock { all.map { it.entry } + pending }
+        val entries = pipeline.allEntries()
         val launchable = installedApps.load().mapTo(HashSet()) { it.packageName }
         val pm = context.packageManager
         return withContext(Dispatchers.Default) {
@@ -475,17 +355,7 @@ class StreamViewModel @Inject constructor(
     fun clearApps(uids: Set<Int?>) {
         viewModelScope.launch(Dispatchers.Default) {
             stagedMutex.withLock { staged.removeAll { it.uid in uids } }
-            listMutex.withLock {
-                all.removeAll { it.entry.uid in uids }
-                visible.removeAll { it.entry.uid in uids }
-                pending.removeAll { it.uid in uids }
-                if (_ui.value.paused) {
-                    val compiled = currentCompiled()
-                    val matches = pending.count { accepts(compiled, it) }
-                    _ui.update { if (it.paused) it.copy(pausedIncoming = matches) else it }
-                }
-                enqueueReplaceLocked()
-            }
+            pipeline.removeUids(uids, ::currentRules)
             refreshSearchHits()
         }
     }
@@ -496,17 +366,7 @@ class StreamViewModel @Inject constructor(
      */
     fun saveToSession(uids: Set<Int?>? = null, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
-            val entries = withContext(Dispatchers.Default) {
-                listMutex.withLock {
-                    // Include `pending` — paused lines are still part of the stream
-                    // the user sees (they surface on resume) and belong in a
-                    // "save everything" snapshot. `staged` is a <120ms window and
-                    // is intentionally left out.
-                    (all.filter { uids == null || it.entry.uid in uids }.map { it.entry } +
-                        pending.filter { uids == null || it.uid in uids })
-                        .sortedBy { it.seq }
-                }
-            }
+            val entries = withContext(Dispatchers.Default) { pipeline.entriesForSave(uids) }
             onResult(publishSnapshot(entries))
         }
     }
@@ -654,21 +514,7 @@ class StreamViewModel @Inject constructor(
     }
 
     private suspend fun recomputeHits(query: String, resetIndex: Boolean = false) {
-        val hits = if (query.isBlank()) {
-            emptyList()
-        } else {
-            listMutex.withLock {
-                visible.mapNotNull { uiEntry ->
-                    val e = uiEntry.entry
-                    val ignore = searchIgnoreCase
-                    if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) {
-                        uiEntry.seq
-                    } else {
-                        null
-                    }
-                }
-            }
-        }
+        val hits = pipeline.hits(query, searchIgnoreCase)
         _ui.update {
             // The scan ran off the main thread; the user may have edited the
             // query or closed search meanwhile. Hits for any other query would
@@ -685,7 +531,7 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    /** Re-indexes hits after [visible] was rebuilt; hit indices point into it. */
+    /** Re-indexes hits after the visible list was rebuilt. */
     private suspend fun refreshSearchHits() {
         val s = _ui.value
         if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
@@ -696,8 +542,8 @@ class StreamViewModel @Inject constructor(
     /**
      * Re-indexes hits after an append, trailing by [HITS_REFRESH_MS]. A full
      * scan per batch would run up to 60 times a second over the whole visible
-     * list while searching a busy stream, competing with the drain for
-     * [listMutex]; one debounced scan per window keeps the count accurate and
+     * list while searching a busy stream, competing with the drain for the
+     * pipeline lock; one debounced scan per window keeps the count accurate and
      * still covers the last batch of a burst.
      */
     private fun refreshSearchHitsThrottled() {
@@ -720,25 +566,12 @@ class StreamViewModel @Inject constructor(
     }
 
     private suspend fun refilter() {
-        listMutex.withLock {
-            // Compiled under the lock: every filter or stack change launches its
-            // own refilter, and they can reach the lock out of order. Reading the
-            // rules here means the last one to run always applies the newest
-            // rules, so the list never settles on a filter the bar no longer shows.
-            val compiled = currentCompiled()
-            val stack = enabledStack
-            visible = all.filterTo(ArrayList()) { accepts(compiled, it.entry) }
-            enqueueReplaceLocked()
-            // The banner counts lines that match the *active* filter, so a filter
-            // change while paused has to re-count what is waiting.
-            val pendingMatches = if (_ui.value.paused) pending.count { accepts(compiled, it) } else -1
-            _ui.update {
-                it.copy(
-                    regexInvalid = compiled.regexInvalid || stack.regexInvalid,
-                    pausedIncoming = if (pendingMatches >= 0 && it.paused) pendingMatches else it.pausedIncoming,
-                )
-            }
-        }
+        // The rules are compiled inside the pipeline lock: every filter or
+        // stack change launches its own refilter, and they can reach the lock
+        // out of order. Reading them there means the last one to run always
+        // applies the newest rules, so the list never settles on a filter the
+        // bar no longer shows.
+        pipeline.refilter(::currentRules)
         refreshSearchHits()
     }
 
@@ -765,54 +598,6 @@ class StreamViewModel @Inject constructor(
         engine.releaseClient()
         super.onCleared()
     }
-
-}
-
-private sealed interface ListPublish {
-    val filteredOut: Boolean
-
-    data class Replace(
-        val items: List<UiLogEntry>,
-        override val filteredOut: Boolean,
-    ) : ListPublish
-
-    data class Append(
-        val dropPrefix: Int,
-        val items: List<UiLogEntry>,
-        override val filteredOut: Boolean,
-    ) : ListPublish
-}
-
-/**
- * Split a prefix eviction across the rows that were already on screen and
- * the ones just appended. [dropped] is how many visible rows the trim
- * removed, counted from the front.
- */
-internal fun prefixDrop(sizeBefore: Int, appended: Int, dropped: Int): Pair<Int, Int> {
-    val dropOld = minOf(dropped.coerceAtLeast(0), sizeBefore.coerceAtLeast(0))
-    val dropNew = (dropped - dropOld).coerceAtLeast(0).coerceAtMost(appended.coerceAtLeast(0))
-    return dropOld to dropNew
-}
-
-/**
- * Drops the oldest `all.size - cap` entries. `visible` is a seq-ordered
- * subsequence of `all`, so evicted entries form a prefix of it — O(overflow)
- * instead of a per-entry indexOfFirst scan.
- */
-internal fun evictOverflow(
-    all: MutableList<UiLogEntry>,
-    visible: MutableList<UiLogEntry>,
-    cap: Int,
-) {
-    val overflow = all.size - cap
-    if (overflow <= 0) return
-    val lastEvictedSeq = all[overflow - 1].seq
-    // subList().clear() is a single arraycopy — removeAt(0) in a loop is
-    // O(n·overflow) and stalls the drain under sustained streams.
-    all.subList(0, overflow).clear()
-    var drop = 0
-    while (drop < visible.size && visible[drop].seq <= lastEvictedSeq) drop++
-    if (drop > 0) visible.subList(0, drop).clear()
 }
 
 /**
