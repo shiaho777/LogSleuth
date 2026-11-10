@@ -76,7 +76,7 @@ class LogListPipelineTest {
         harness.pipeline.snapshot(entries, { rules() })
 
         assertEquals(entries.map { it.timestampMillis }, harness.stamps())
-        assertEquals(harness.shown.map { it.seq }, harness.shown.map { it.seq }.sorted())
+        assertEquals(listOf(0L, 1L, 2L, 3L), harness.shown.map { it.seq })
     }
 
     @Test
