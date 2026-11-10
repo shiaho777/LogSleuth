@@ -37,9 +37,12 @@ watch each hold a client, and the process lives while at least one does.
 ## The stream
 
 `StreamViewModel` consumes the flow in **per-frame batches**: emissions are
-collected and flushed on a 16 ms frame, not one by one. The list is a
-`SnapshotStateList` that is appended to and has its prefix dropped when the
-ring buffer evicts rows — it never copies itself.
+collected and flushed on a 16 ms frame, not one by one. The three lists behind
+the stream (everything received, what the filter admits, and the paused
+backlog) live in `ui/stream/LogListPipeline.kt`: it owns trimming and the
+pause/resume ordering, and emits list edits that the ViewModel mirrors onto
+the `SnapshotStateList` on the main thread. The list is appended to and has its
+prefix dropped when the ring buffer evicts rows — it never copies itself.
 
 The pure side of the stream lives in `core/`:
 
@@ -51,6 +54,7 @@ The pure side of the stream lives in `core/`:
 | `CrashDetector` | `core/detect/` | The crash / native crash / ANR state machine |
 | `SessionExporter` / `ImportCore` | `core/export/`, `core/importer/` | Text and zip export, and the import path |
 | `ScrollRailMath` | `ui/stream/` | The rail's geometry — pure, so the drag mapping is testable |
+| `LogListPipeline` | `ui/stream/` | Ring-buffer trimming and the paused backlog — pure, serialized by its own lock |
 
 ## The UI
 

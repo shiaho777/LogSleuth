@@ -59,6 +59,12 @@ Mental model:
 - `ui/stream/StreamScreen.kt` owns state and gestures; the pure chrome
   (top bars, banners, FABs, selection bar, saved sheet) lives in
   `StreamChrome.kt`. New presentational pieces go there.
+- `ui/stream/LogListPipeline.kt` owns the three lists behind the live stream
+  (everything received, what the filter admits, and the paused backlog),
+  including trimming and pause/resume ordering. It is pure Kotlin and
+  serialized by its own lock; `StreamViewModel` feeds it engine batches and
+  mirrors the emitted edits onto the Compose list on the main thread. List
+  semantics belong there, with tests — not in the ViewModel.
 - `ui/stream/LogScrollRail.kt` is the right-edge rail: a severity
   fingerprint of the whole buffer, a draggable viewport thumb, and the
   `Line N of M` readout. Its geometry is pure (`ScrollRailMath`) and unit
