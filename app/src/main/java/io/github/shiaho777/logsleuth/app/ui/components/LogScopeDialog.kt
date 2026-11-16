@@ -47,7 +47,6 @@ import androidx.core.graphics.drawable.toBitmap
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
-import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -334,14 +333,14 @@ private fun MetricsPane(group: AppLogGroup, modifier: Modifier = Modifier) {
             Text(
                 stringResource(R.string.scope_errors, group.errors),
                 style = MaterialTheme.typography.labelMedium,
-                color = LevelColors.E,
+                color = levelColor(LogLevel.E),
             )
         }
         if (group.warns > 0) {
             Text(
                 stringResource(R.string.scope_warns, group.warns),
                 style = MaterialTheme.typography.labelMedium,
-                color = LevelColors.W,
+                color = levelColor(LogLevel.W),
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -376,12 +375,5 @@ private fun LevelBar(group: AppLogGroup) {
     }
 }
 
-private fun levelColorOf(level: LogLevel): Color = when (level) {
-    LogLevel.V -> LevelColors.V
-    LogLevel.D -> LevelColors.D
-    LogLevel.I -> LevelColors.I
-    LogLevel.W -> LevelColors.W
-    LogLevel.E -> LevelColors.E
-    LogLevel.F -> LevelColors.F
-    LogLevel.A -> LevelColors.A
-}
+@Composable
+private fun levelColorOf(level: LogLevel): Color = levelColor(level)

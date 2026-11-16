@@ -193,6 +193,7 @@ fun SessionDetailScreen(
                                 items(
                                     count = ui.entries.size,
                                     key = { index -> ui.entries[index].seq },
+                                    contentType = { "log" },
                                 ) { index ->
                                     LogRow(
                                         entry = ui.entries[index].entry,
