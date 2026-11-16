@@ -48,17 +48,11 @@ object UidNames {
      * `MM-dd HH:mm:ss.SSS` in the default timezone — the stamp `logcat -T`
      * accepts alongside `-v threadtime`, used for display.
      */
-    fun formatThreadTime(millis: Long): String {
-        val cal = Calendar.getInstance().apply { timeInMillis = millis }
-        return "%02d-%02d %02d:%02d:%02d.%03d".format(
-            cal.get(Calendar.MONTH) + 1,
-            cal.get(Calendar.DAY_OF_MONTH),
-            cal.get(Calendar.HOUR_OF_DAY),
-            cal.get(Calendar.MINUTE),
-            cal.get(Calendar.SECOND),
-            cal.get(Calendar.MILLISECOND),
-        )
-    }
+    fun formatThreadTime(millis: Long): String =
+        DateTimePatterns.format(millis, THREAD_TIME_PATTERN, THREAD_TIME_PATTERN)
+
+    /** Same fields the hand-rolled Calendar formatting used to print. */
+    private const val THREAD_TIME_PATTERN = "MM-dd HH:mm:ss.SSS"
 
     /**
      * `yyyy-MM-dd HH:mm:ss.SSS` — the stamp a reconnect passes to `logcat -T`.

@@ -46,7 +46,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
-import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
+import io.github.shiaho777.logsleuth.app.ui.theme.LevelPalette
+import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
 import java.text.NumberFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
@@ -152,6 +153,8 @@ internal fun LogScrollRail(
         if (railHeight <= 0f) 0 else (railHeight / BandStep.toPx()).toInt().coerceIn(1, 400)
     }
     val buckets = rememberLevelBuckets(entries, bucketCount)
+    // Read in composition: the Canvas draw scope below is not composable.
+    val levelPalette = LocalLevelColors.current
 
     // Keep the pill readable for a moment after the finger lifts — a tap
     // that jumps the list should still show where it landed.
@@ -286,7 +289,7 @@ internal fun LogScrollRail(
                         val priority = buckets[i]
                         if (priority > 0) {
                             drawRect(
-                                color = colorForPriority(priority).copy(alpha = 0.5f),
+                                color = colorForPriority(priority, levelPalette).copy(alpha = 0.5f),
                                 topLeft = Offset(stripX, top.toFloat()),
                                 size = Size(strip, (bottom - top).toFloat()),
                             )
@@ -445,14 +448,14 @@ private fun viewportProgress(listState: LazyListState): Float {
     return (scrolled / travel).coerceIn(0f, 1f)
 }
 
-private fun colorForPriority(priority: Int): Color = when {
+private fun colorForPriority(priority: Int, palette: LevelPalette): Color = when {
     // ASSERT shares the platform priority of FATAL, so it reads as fatal.
-    priority >= LogLevel.F.priority -> LevelColors.F
-    priority == LogLevel.E.priority -> LevelColors.E
-    priority == LogLevel.W.priority -> LevelColors.W
-    priority == LogLevel.I.priority -> LevelColors.I
-    priority == LogLevel.D.priority -> LevelColors.D
-    else -> LevelColors.V
+    priority >= LogLevel.F.priority -> palette.F
+    priority == LogLevel.E.priority -> palette.E
+    priority == LogLevel.W.priority -> palette.W
+    priority == LogLevel.I.priority -> palette.I
+    priority == LogLevel.D.priority -> palette.D
+    else -> palette.V
 }
 
 /**

@@ -844,6 +844,9 @@ private fun LogList(
         items(
             count = entries.size,
             key = { index -> entries[index].seq },
+            // Every row is the same composable family; telling the lazy list
+            // lets a recycled slot be reused without re-inflating structure.
+            contentType = { "log" },
         ) { index ->
             val uiEntry = entries[index]
             // No per-row placement or fade. The viewport pins to the newest

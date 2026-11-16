@@ -83,7 +83,7 @@ import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
-import io.github.shiaho777.logsleuth.app.ui.theme.LevelColors
+import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
 
 /**
  * Presentational chrome around the live list: top bars, status banners, the
@@ -172,12 +172,13 @@ internal fun EngineStatusChip(
     adbHeld: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val levels = LocalLevelColors.current
     val (label, color) = when {
-        adbHeld -> stringResource(R.string.engine_adb_waiting) to LevelColors.W
-        state == LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to LevelColors.I
-        state == LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to LevelColors.W
-        state == LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to LevelColors.V
-        else -> stringResource(R.string.engine_error) to LevelColors.E
+        adbHeld -> stringResource(R.string.engine_adb_waiting) to levels.W
+        state == LogcatEngine.State.RUNNING -> stringResource(R.string.engine_streaming) to levels.I
+        state == LogcatEngine.State.STARTING -> stringResource(R.string.engine_connecting) to levels.W
+        state == LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to levels.V
+        else -> stringResource(R.string.engine_error) to levels.E
     }
     val dotAlpha by if (state == LogcatEngine.State.STARTING) {
         rememberInfiniteTransition(label = "engine").animateFloat(
