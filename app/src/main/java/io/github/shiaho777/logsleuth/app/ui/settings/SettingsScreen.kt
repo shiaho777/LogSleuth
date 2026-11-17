@@ -89,6 +89,8 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            SettingsSectionHeader(stringResource(R.string.settings_section_access))
+
             // Access + About share one row — each card wraps its own content,
             // so without weights they'd both hug the left edge.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -183,6 +185,8 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsSectionHeader(stringResource(R.string.settings_section_stream))
+
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -220,6 +224,8 @@ fun SettingsScreen(
                     onCheckedChange = viewModel::setLiveOnlyOnStart,
                 )
             }
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_recording))
 
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -275,6 +281,8 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_crashes))
 
             Card {
                 Column {
@@ -558,8 +566,7 @@ fun SettingsScreen(
                     )
                     var scaleValue by remember(s.logTextScale) { mutableStateOf(s.logTextScale) }
                     Text(
-                        stringResource(R.string.settings_log_text_size) +
-                            " · ${(scaleValue * 100).toInt()}%",
+                        "${(scaleValue * 100).toInt()}%",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -575,6 +582,8 @@ fun SettingsScreen(
             // Reset sits above the community and repository cards: the last
             // things on the screen are the way out, not the way in.
             ResetSettingsCard(onReset = viewModel::resetToDefaults)
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_updates))
 
             CommunityCard(
                 onJoinGroup = {
@@ -603,6 +612,18 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/** Group title: extra space above opens a new section, tight space below
+ *  keeps the title attached to its cards. */
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+    )
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.ui.crashes
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,18 +14,23 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -104,12 +110,39 @@ fun AppCrashesScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(crashes, key = { it.id }) { crash ->
-                    CrashCard(
-                        crash = crash,
-                        onDelete = { viewModel.requestDelete(crash) },
-                        onOpen = { onOpenCrash(crash.id) },
-                        modifier = Modifier.animateItem(),
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart },
                     )
+                    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                        LaunchedEffect(crash.id) {
+                            viewModel.requestDelete(crash)
+                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                        }
+                    }
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(end = 20.dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        CrashCard(
+                            crash = crash,
+                            onOpen = { onOpenCrash(crash.id) },
+                        )
+                    }
                 }
             }
         }

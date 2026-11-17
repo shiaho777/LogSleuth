@@ -95,6 +95,11 @@
 
     <!-- 设置 -->
     <string name="settings_title">设置</string>
+    <string name="settings_section_access">日志来源</string>
+    <string name="settings_section_stream">日志流与显示</string>
+    <string name="settings_section_recording">录制与控制</string>
+    <string name="settings_section_crashes">崩溃与守护</string>
+    <string name="settings_section_updates">更新与社区</string>
     <string name="settings_access">日志访问权限</string>
     <string name="settings_access_shizuku">已通过 Shizuku 连接</string>
     <string name="settings_access_adb">已通过 ADB 授权(READ_LOGS)</string>
