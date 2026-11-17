@@ -95,6 +95,11 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <string name="settings_section_access">Log source</string>
+    <string name="settings_section_stream">Stream &amp; display</string>
+    <string name="settings_section_recording">Recording &amp; controls</string>
+    <string name="settings_section_crashes">Crashes &amp; watch</string>
+    <string name="settings_section_updates">Updates &amp; community</string>
     <string name="settings_access">Log access</string>
     <string name="settings_access_shizuku">Connected via Shizuku</string>
     <string name="settings_access_adb">Granted via ADB (READ_LOGS)</string>

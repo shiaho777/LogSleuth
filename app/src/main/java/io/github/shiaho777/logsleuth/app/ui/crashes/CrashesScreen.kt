@@ -2,6 +2,7 @@ package io.github.shiaho777.logsleuth.app.ui.crashes
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,8 +39,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,8 +63,11 @@ import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashGroup
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSort
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
+import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
+import io.github.shiaho777.logsleuth.app.ui.components.levelColor
+import io.github.shiaho777.logsleuth.app.ui.components.onColorFor
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,12 +150,26 @@ fun CrashesScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(groups, key = { it.packageName ?: "" }) { group ->
-                        CrashGroupCard(
-                            group = group,
-                            onOpen = { onOpenPackage(group.packageName) },
-                            onDelete = { viewModel.requestDeletePackage(group.packageName) },
-                            modifier = Modifier.animateItem(),
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { it == SwipeToDismissBoxValue.EndToStart },
                         )
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                            LaunchedEffect(group.packageName) {
+                                viewModel.requestDeletePackage(group.packageName)
+                                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                            }
+                        }
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = { SwipeDeleteBackground() },
+                            modifier = Modifier.animateItem(),
+                        ) {
+                            CrashGroupCard(
+                                group = group,
+                                onOpen = { onOpenPackage(group.packageName) },
+                            )
+                        }
                     }
                 }
             }
@@ -181,7 +203,6 @@ private fun SortItem(
 private fun CrashGroupCard(
     group: CrashGroup,
     onOpen: () -> Unit,
-    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cache = LocalAppIconCache.current
@@ -252,21 +273,48 @@ private fun CrashGroupCard(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
+    }
+}
+
+/** Red delete hint revealed behind a swiped row — same pattern as Sessions. */
+@Composable
+private fun SwipeDeleteBackground() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(end = 20.dp),
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Icon(
+            Icons.Default.Delete,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+/** Small colored chip naming the crash type; the card surface stays neutral
+ *  so severity reads from the badge, not from a wall of tinted cards. */
+@Composable
+private fun CrashTypeBadge(label: String, tint: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(tint)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = onColorFor(tint),
+        )
     }
 }
 
 @Composable
 fun CrashCard(
     crash: CrashEventEntity,
-    onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onOpen: () -> Unit,
 ) {
@@ -276,6 +324,11 @@ fun CrashCard(
         "ANR" -> stringResource(R.string.crash_type_anr)
         else -> stringResource(R.string.crash_type_java)
     }
+    val severity = when (crash.type) {
+        "NATIVE" -> levelColor(LogLevel.F)
+        "ANR" -> levelColor(LogLevel.W)
+        else -> levelColor(LogLevel.E)
+    }
     val title = crash.appName?.takeIf { it.isNotBlank() }
         ?: crash.packageName
         ?: stringResource(R.string.unknown_app)
@@ -284,7 +337,7 @@ fun CrashCard(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
     ) {
         Row(
@@ -293,13 +346,13 @@ fun CrashCard(
         ) {
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.errorContainer,
+                color = severity.copy(alpha = 0.15f),
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     if (isAnr) Icons.Default.HourglassTop else Icons.Default.BugReport,
                     contentDescription = crash.type,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = severity,
                     modifier = Modifier.padding(10.dp),
                 )
             }
@@ -318,22 +371,17 @@ fun CrashCard(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    typeLabel + " · " + DateUtils.getRelativeTimeSpanString(
-                        crash.time,
-                        System.currentTimeMillis(),
-                        DateUtils.MINUTE_IN_MILLIS,
-                    ).toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-            if (onDelete != null) {
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.delete),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CrashTypeBadge(typeLabel, severity)
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        DateUtils.getRelativeTimeSpanString(
+                            crash.time,
+                            System.currentTimeMillis(),
+                            DateUtils.MINUTE_IN_MILLIS,
+                        ).toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
                     )
                 }
             }

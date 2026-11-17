@@ -77,6 +77,7 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 import io.github.shiaho777.logsleuth.app.core.logcat.VisibleColumns
+import io.github.shiaho777.logsleuth.app.core.logcat.abbreviateTag
 import io.github.shiaho777.logsleuth.app.core.logcat.formatLogTime
 import io.github.shiaho777.logsleuth.app.core.text.matchRanges
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
@@ -196,8 +197,11 @@ fun LogRow(
 
     val highlightStyle = highlightStyle(isError)
     val ignoreCase = !prefs.searchCaseSensitive
-    val tagText = remember(entry.tag, highlight, highlightStyle, ignoreCase) {
-        highlighted(entry.tag, highlight, highlightStyle, ignoreCase)
+    // The list shows the abbreviated tag; the detail keeps the full one.
+    // Highlight ranges are computed on the same string that is drawn.
+    val displayTag = remember(entry.tag) { abbreviateTag(entry.tag) }
+    val tagText = remember(displayTag, highlight, highlightStyle, ignoreCase) {
+        highlighted(displayTag, highlight, highlightStyle, ignoreCase)
     }
     val messageText = remember(entry.message, highlight, highlightStyle, ignoreCase) {
         highlighted(entry.message, highlight, highlightStyle, ignoreCase)
@@ -206,7 +210,7 @@ fun LogRow(
     val rowBg = when {
         isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
         isCurrentHit -> MaterialTheme.colorScheme.tertiaryContainer
-        isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
+        isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.10f)
         else -> Color.Transparent
     }
 
@@ -236,13 +240,19 @@ fun LogRow(
             .padding(vertical = 2.dp),
     ) {
         // Level color strip — the fastest scanning cue in a dense log list.
+        // Thin, and muted below Warn so verbose/debug noise recedes while
+        // warnings and errors keep full saturation.
         Box(
             modifier = Modifier
-                .padding(start = 5.dp, end = 7.dp)
-                .width(3.dp)
-                .height(30.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(levelTint)
+                .padding(start = 6.dp, end = 6.dp)
+                .width(2.dp)
+                .height(24.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(
+                    levelTint.copy(
+                        alpha = if (entry.level.priority >= LogLevel.W.priority) 1f else 0.55f,
+                    ),
+                )
                 .align(Alignment.CenterVertically),
         )
 
@@ -286,7 +296,7 @@ fun LogRow(
                     Text(
                         text = timeText,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
                     )
                 }
                 if (prefs.showUid) {
@@ -294,7 +304,7 @@ fun LogRow(
                     Text(
                         text = uidLabel,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                         modifier = Modifier.padding(start = MetaGap),
                     )
                 }
@@ -307,7 +317,7 @@ fun LogRow(
                     Text(
                         text = ids,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                         modifier = Modifier.padding(horizontal = MetaGap),
                     )
                 }
@@ -315,8 +325,8 @@ fun LogRow(
                     Text(
                         text = tagText,
                         style = logMetaStyle(scale),
-                        color = levelTint.copy(alpha = 0.95f),
-                        fontWeight = FontWeight.SemiBold,
+                        color = levelTint.copy(alpha = 0.8f),
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -327,7 +337,7 @@ fun LogRow(
                 Icon(
                     Icons.Default.Info,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .size(13.dp)
@@ -585,8 +595,8 @@ private fun logMetaStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy
 @Composable
 private fun logMessageStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
     fontFamily = FontFamily.Monospace,
-    fontSize = 11.5.sp * scale,
-    lineHeight = 15.sp * scale,
+    fontSize = 12.sp * scale,
+    lineHeight = 16.sp * scale,
 )
 
 @Composable

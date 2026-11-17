@@ -211,7 +211,6 @@ fun SessionDetailScreen(
                         items(ui.crashes.size, key = { ui.crashes[it].id }) { i ->
                             CrashCard(
                                 ui.crashes[i],
-                                onDelete = null,
                                 onOpen = { onOpenCrash(ui.crashes[i].id) },
                                 modifier = Modifier.animateItem(),
                             )
