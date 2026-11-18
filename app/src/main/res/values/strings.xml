@@ -59,7 +59,10 @@
     <string name="filter_expand">More filter fields</string>
     <string name="filter_levels">Log levels</string>
     <string name="filter_levels_all">All levels</string>
-    <string name="filter_empty_fields">Empty fields are ignored when matching.</string>
+    <string name="filter_empty_fields">Empty fields are ignored when matching. In the Tag field, (empty) selects lines with no tag.</string>
+    <string name="filter_regex_invalid">Invalid regular expression</string>
+    <string name="filter_query_multi_hint">Separate words with spaces — a line must contain all of them.</string>
+    <string name="filter_tag_empty_hint">Type (empty) to match only lines with no tag.</string>
     <string name="filter_level_on">Selected</string>
     <string name="filter_exclude">Exclude</string>
     <string name="filter_regex">Regular expressions</string>
@@ -161,6 +164,7 @@
     <string name="notif_recording_limit_title">Recording stopped</string>
     <string name="notif_recording_limit_text">Size limit reached (%1$d MB)</string>
     <string name="notif_recording_timeout_text">Time limit reached (%1$d h)</string>
+    <string name="notif_recording_write_error_text">Couldn\'t write the log file (storage full?). Recording stopped.</string>
     <string name="notif_action_stop">Stop</string>
     <string name="notif_action_bookmark">Bookmark</string>
     <string name="notif_crash_title">Crash: %1$s</string>
@@ -200,6 +204,8 @@
     <string name="copy_message">Copy message</string>
     <string name="copy_raw">Copy raw line</string>
     <string name="copied">Copied</string>
+    <string name="copy_too_large_saved">Too much text for the clipboard — saved as a session instead</string>
+    <string name="copy_truncated">Copied the first part — the text is too large for the clipboard</string>
     <string name="selected_count">%1$d selected</string>
     <string name="a11y_extend_selection">Extend selection</string>
 

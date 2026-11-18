@@ -40,6 +40,22 @@ The editor is also reachable from **Filters** in the filter bar, where you can
 pick a package and toggle an allowed level set. Empty fields are ignored when
 matching, so a rule with only a package set matches every line of that app.
 
+## Keywords, empty tags and regular expressions
+
+- **Multiple keywords:** in plain (non-regex) mode, words separated by spaces
+  are AND-ed — `timeout retry` keeps only lines that contain *both* words,
+  each matched against the tag or the message. A single word keeps the usual
+  substring behavior. The exclude field works the same way: a line is dropped
+  only when it carries every exclude word.
+- **Empty tags:** some apps log with an empty tag on purpose. Type `(empty)`
+  in the Tag field to match only lines with no tag; a blank field still means
+  "no constraint".
+- **Regular expressions:** with the regex switch on, the include, tag and
+  exclude fields are compiled as patterns (ignore-case). An invalid pattern
+  is flagged inline and cannot be saved from the editor; a rule that somehow
+  carries one is parked — it matches nothing and never silently lets the
+  whole stream through, while the other rules keep working.
+
 ## Search
 
 The magnifier in the top bar switches the bar into a search field:

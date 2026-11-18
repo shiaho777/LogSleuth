@@ -14,6 +14,7 @@ import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearch
 import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchHit
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
+import io.github.shiaho777.logsleuth.app.core.text.ClipboardGuard
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventEntity
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
@@ -41,6 +42,8 @@ data class CrashDetailsUi(
     val includeDevice: Boolean = true,
     val separateChannels: Boolean = true,
     val ignored: Boolean = false,
+    /** Global log text scale — the crash page honors the same setting. */
+    val textScale: Float = 1f,
 )
 
 @HiltViewModel
@@ -92,6 +95,7 @@ class CrashDetailsViewModel @Inject constructor(
             includeDevice = settings.includeDeviceInfoInZip,
             separateChannels = settings.separateCrashChannels,
             ignored = pkg != null && pkg in settings.crashBlacklist,
+            textScale = settings.logTextScale,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CrashDetailsUi())
 
@@ -158,7 +162,14 @@ class CrashDetailsViewModel @Inject constructor(
     fun copyStack() {
         val text = ui.value.crash?.snippet ?: return
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash", text))
+        // The clipboard is a ~1 MiB Binder transaction; a huge stack must
+        // not crash the app. Share still exports the full text as a file.
+        val safe = if (ClipboardGuard.fits(text)) {
+            text
+        } else {
+            text.take(ClipboardGuard.MAX_CLIPBOARD_CHARS)
+        }
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash", safe))
     }
 
     fun openAppInfo() {

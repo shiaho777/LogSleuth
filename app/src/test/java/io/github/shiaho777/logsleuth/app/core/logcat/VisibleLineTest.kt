@@ -98,6 +98,34 @@ class VisibleLineTest {
     }
 
     @Test
+    fun `package name rides along with the app label`() {
+        val columns = VisibleColumns(
+            showDate = false,
+            showTime = false,
+            showUid = false,
+            showPid = false,
+            showTid = false,
+            showPackage = true,
+            showTag = false,
+        )
+        val both = formatVisible(entry(), columns, appLabel = "Maps", packageName = "com.example.maps")
+        assertTrue(both.startsWith("Maps (com.example.maps) "))
+        // No duplication when the label already is the package name.
+        val same = formatVisible(entry(), columns, appLabel = "com.example.maps", packageName = "com.example.maps")
+        assertTrue(same.startsWith("com.example.maps "))
+        assertFalse(same.contains("("))
+        // Package column off: neither label nor package leaks into the text.
+        val off = formatVisible(
+            entry(),
+            columns.copy(showPackage = false),
+            appLabel = "Maps",
+            packageName = "com.example.maps",
+        )
+        assertFalse(off.contains("Maps"))
+        assertFalse(off.contains("com.example.maps"))
+    }
+
+    @Test
     fun `datetime and epoch copy the same time the row draws`() {
         val e = entry()
         val patternTime = DateTimePatterns.format(

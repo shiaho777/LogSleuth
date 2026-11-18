@@ -63,4 +63,26 @@ class FilterStackTest {
         ) { null }
         assertTrue(stack.matches(entry()))
     }
+
+    @Test
+    fun `a broken include rule is parked without dragging healthy rules down`() {
+        val stack = FilterStack.compile(
+            listOf(
+                LogFilter(enabled = true, including = true, query = "[broken", useRegex = true),
+                LogFilter(enabled = true, including = true, tagQuery = "Alpha"),
+            ),
+        ) { null }
+        assertTrue(stack.regexInvalid)
+        assertTrue(stack.matches(entry(tag = "Alpha")))
+        assertFalse(stack.matches(entry(tag = "Gamma")))
+    }
+
+    @Test
+    fun `a broken exclude rule is parked and flagged`() {
+        val stack = FilterStack.compile(
+            listOf(LogFilter(enabled = true, including = false, query = "[broken", useRegex = true)),
+        ) { null }
+        assertTrue(stack.regexInvalid)
+        assertTrue(stack.matches(entry()))
+    }
 }
