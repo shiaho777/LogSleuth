@@ -18,6 +18,9 @@ enum class AccessKind {
     /** Via the ADB-granted READ_LOGS permission. */
     READ_LOGS,
 
+    /** Via wireless ADB to a second device (shell uid on that device). */
+    REMOTE_ADB,
+
     /** No usable grant yet. */
     NONE,
 }
@@ -27,6 +30,7 @@ data class AccessState(
     val shizukuStatus: ShizukuStatus,
     val readLogsGranted: Boolean,
     val rootReady: Boolean = false,
+    val remoteReady: Boolean = false,
 ) {
     val granted: Boolean get() = kind != AccessKind.NONE
 }
@@ -43,6 +47,7 @@ class AccessChecker(
     fun currentState(
         preference: String = AccessPolicy.AUTO,
         rootReady: Boolean = false,
+        remoteReady: Boolean = false,
     ): AccessState {
         // Grants toggled inside the Shizuku app raise no callback, so the
         // cached status would go stale — re-ping on every access check.
@@ -54,7 +59,8 @@ class AccessChecker(
             shizukuReady = shizuku == ShizukuStatus.READY,
             rootReady = rootReady,
             readLogs = readLogs,
+            remoteReady = remoteReady,
         )
-        return AccessState(kind, shizuku, readLogs, rootReady)
+        return AccessState(kind, shizuku, readLogs, rootReady, remoteReady)
     }
 }

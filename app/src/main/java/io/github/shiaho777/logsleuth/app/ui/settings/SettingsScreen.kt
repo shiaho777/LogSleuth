@@ -108,6 +108,7 @@ fun SettingsScreen(
                             AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
                             AccessKind.ROOT -> stringResource(R.string.settings_access_root)
                             AccessKind.READ_LOGS -> stringResource(R.string.settings_access_adb)
+                            AccessKind.REMOTE_ADB -> stringResource(R.string.settings_access_remote)
                             AccessKind.NONE -> stringResource(R.string.no_access_title)
                         }
                         Text(
@@ -163,6 +164,7 @@ fun SettingsScreen(
                         AccessPolicy.SHIZUKU to R.string.access_mode_shizuku,
                         AccessPolicy.ROOT to R.string.access_mode_root,
                         AccessPolicy.ADB to R.string.access_mode_adb,
+                        AccessPolicy.REMOTE to R.string.access_mode_remote,
                     ).forEach { (value, labelRes) ->
                         SettingsChoiceRow(
                             title = stringResource(labelRes),
@@ -185,6 +187,13 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            RemoteAdbCard(
+                host = s.remoteAdbHost,
+                port = s.remoteAdbPort,
+                onSave = viewModel::setRemoteAdb,
+                viewModel = viewModel,
+            )
 
             SettingsSectionHeader(stringResource(R.string.settings_section_stream))
 

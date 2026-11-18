@@ -64,3 +64,4 @@ LogSleuth 位于前台时有效，退到后台流就断了。细节见
 - [过滤与规则](/zh/guide/filters) —— 在很 busy 的流里收窄范围
 - [录制与崩溃](/zh/guide/recording-and-crashes) —— 会话、侦测与导出
 - [自动化广播](/zh/guide/automation) —— 把匹配的日志送进 Tasker/MacroDroid
+- [远程设备](/zh/guide/remote-device) —— 通过无线 ADB 读取第二台设备

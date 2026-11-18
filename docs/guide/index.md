@@ -70,3 +70,4 @@ Skip it if you like — **Settings → Feature tour** replays it.
 - [Filters & rules](/guide/filters) — narrowing a busy stream
 - [Recording & crashes](/guide/recording-and-crashes) — sessions and detection
 - [Automation broadcasts](/guide/automation) — log matches into Tasker/MacroDroid
+- [Remote device](/guide/remote-device) — read a second device over wireless ADB

@@ -75,6 +75,7 @@ Requires Android 8.0 (API 26) or newer.
 - [Filters & rules](/guide/filters) — levels, queries, rule stacks, presets
 - [Recording & crashes](/guide/recording-and-crashes) — sessions, detection, export
 - [Automation broadcasts](/guide/automation) — log matches into Tasker/MacroDroid
+- [Remote device](/guide/remote-device) — read a second device over wireless ADB
 - [Developer docs](/developer/) — architecture, recipes and the release runbook
 
 </div>

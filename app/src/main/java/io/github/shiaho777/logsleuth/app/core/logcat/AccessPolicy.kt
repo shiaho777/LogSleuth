@@ -13,24 +13,31 @@ object AccessPolicy {
     const val SHIZUKU = "shizuku"
     const val ROOT = "root"
     const val ADB = "adb"
+    const val REMOTE = "remote"
 
     fun choose(
         preference: String,
         shizukuReady: Boolean,
         rootReady: Boolean,
         readLogs: Boolean,
+        remoteReady: Boolean = false,
     ): AccessKind {
+        val local = listOf(AccessKind.SHIZUKU, AccessKind.ROOT, AccessKind.READ_LOGS)
         val order = when (preference) {
             SHIZUKU -> listOf(AccessKind.SHIZUKU, AccessKind.ROOT, AccessKind.READ_LOGS)
             ROOT -> listOf(AccessKind.ROOT, AccessKind.SHIZUKU, AccessKind.READ_LOGS)
             ADB -> listOf(AccessKind.READ_LOGS, AccessKind.SHIZUKU, AccessKind.ROOT)
-            else -> listOf(AccessKind.SHIZUKU, AccessKind.ROOT, AccessKind.READ_LOGS)
+            // Remote first while it is connected; local paths stay as the
+            // fallback so a dropped remote link cannot blank the stream.
+            REMOTE -> listOf(AccessKind.REMOTE_ADB) + local
+            else -> local
         }
         return order.firstOrNull { kind ->
             when (kind) {
                 AccessKind.SHIZUKU -> shizukuReady
                 AccessKind.ROOT -> rootReady
                 AccessKind.READ_LOGS -> readLogs
+                AccessKind.REMOTE_ADB -> remoteReady
                 AccessKind.NONE -> false
             }
         } ?: AccessKind.NONE

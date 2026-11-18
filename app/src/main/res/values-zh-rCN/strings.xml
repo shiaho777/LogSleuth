@@ -472,4 +472,20 @@
     <string name="notif_automation_title">自动化运行中</string>
     <string name="notif_automation_text">正在把匹配的日志行广播给你的自动化应用</string>
 
+    <!-- Remote device over wireless ADB -->
+    <string name="access_mode_remote">远程设备（无线 ADB）</string>
+    <string name="settings_access_remote">通过无线 ADB 读取远程设备</string>
+    <string name="remote_title">远程设备</string>
+    <string name="remote_desc">通过无线 ADB 读取第二台设备（电视、备用手机）的日志。先在那台设备上开启无线调试，再在这里填入它的地址。</string>
+    <string name="remote_host">主机 / IP</string>
+    <string name="remote_port">端口</string>
+    <string name="remote_test">测试连接</string>
+    <string name="remote_connecting">连接中…</string>
+    <string name="remote_disconnect">断开</string>
+    <string name="remote_status_idle">未连接</string>
+    <string name="remote_status_connecting">连接中——请留意远程设备屏幕上的允许调试弹窗</string>
+    <string name="remote_status_ready">已连接——在上方选择"远程设备"即可读取它的日志</string>
+    <string name="remote_status_failed">失败：%1$s</string>
+    <string name="remote_allow_hint">远程设备可能弹出"允许 USB 调试吗？"对话框——请在那台设备上点允许（勾选"一律允许"下次就不再弹）。Android 11+ 的配对码方式可先用电脑执行一次 adb pair，或把本应用的密钥加入该设备的信任列表。</string>
+
 </resources>
