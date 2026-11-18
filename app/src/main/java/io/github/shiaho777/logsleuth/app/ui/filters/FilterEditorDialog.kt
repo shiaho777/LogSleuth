@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
+import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.ui.components.AppPickerDialog
@@ -51,6 +52,12 @@ fun FilterEditorDialog(
     }
     var showAppPicker by remember { mutableStateOf(false) }
     val selectedLevels = draft.effectiveLevels
+    // A broken pattern must not reach the database: the matcher fails
+    // closed on it, so a saved rule would silently match nothing.
+    val queryRegexBad = draft.useRegex && CompiledFilter.isInvalidRegex(draft.query)
+    val tagRegexBad = draft.useRegex && CompiledFilter.isInvalidRegex(draft.tagQuery)
+    val excludeRegexBad = draft.useRegex && CompiledFilter.isInvalidRegex(draft.excludeQuery)
+    val regexBad = queryRegexBad || tagRegexBad || excludeRegexBad
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -114,6 +121,12 @@ fun FilterEditorDialog(
                     onValueChange = { draft = draft.copy(query = it) },
                     label = { Text(stringResource(R.string.filter_query)) },
                     singleLine = true,
+                    isError = queryRegexBad,
+                    supportingText = if (queryRegexBad) {
+                        { Text(stringResource(R.string.filter_regex_invalid)) }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -121,6 +134,14 @@ fun FilterEditorDialog(
                     onValueChange = { draft = draft.copy(tagQuery = it) },
                     label = { Text(stringResource(R.string.filter_tag)) },
                     singleLine = true,
+                    isError = tagRegexBad,
+                    supportingText = if (tagRegexBad) {
+                        { Text(stringResource(R.string.filter_regex_invalid)) }
+                    } else if (!draft.useRegex) {
+                        { Text(stringResource(R.string.filter_tag_empty_hint)) }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -128,6 +149,12 @@ fun FilterEditorDialog(
                     onValueChange = { draft = draft.copy(excludeQuery = it) },
                     label = { Text(stringResource(R.string.filter_exclude)) },
                     singleLine = true,
+                    isError = excludeRegexBad,
+                    supportingText = if (excludeRegexBad) {
+                        { Text(stringResource(R.string.filter_regex_invalid)) }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -203,7 +230,7 @@ fun FilterEditorDialog(
         },
         confirmButton = {
             TextButton(
-                enabled = draft.name.isNotBlank(),
+                enabled = draft.name.isNotBlank() && !regexBad,
                 onClick = {
                     onSave(
                         draft.copy(

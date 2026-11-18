@@ -340,7 +340,7 @@ fun CrashDetailsScreen(
                 ranges = ui.searchRanges,
                 currentHit = currentHit?.takeIf { it.section == CrashSearchSection.SNIPPET },
                 wrap = ui.wrap,
-                fontSize = 12.sp,
+                fontSize = 12.sp * ui.textScale,
             )
             if (!ui.contextText.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
@@ -355,7 +355,7 @@ fun CrashDetailsScreen(
                     ranges = ui.contextSearchRanges,
                     currentHit = currentHit?.takeIf { it.section == CrashSearchSection.CONTEXT },
                     wrap = ui.wrap,
-                    fontSize = 11.sp,
+                    fontSize = 11.sp * ui.textScale,
                 )
             }
         }

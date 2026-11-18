@@ -113,10 +113,70 @@ class LogFilterTest {
     }
 
     @Test
-    fun `invalid regex fails open`() {
+    fun `invalid regex fails closed`() {
         val f = CompiledFilter(LogFilter(query = "[broken", useRegex = true))
         assertTrue(f.regexInvalid)
-        assertTrue(f.matches(entry(message = "anything")))
+        assertFalse(f.matches(entry(message = "anything")))
+    }
+
+    @Test
+    fun `invalid exclude regex does not silently pass everything`() {
+        val f = CompiledFilter(LogFilter(excludeQuery = "[broken", useRegex = true))
+        assertTrue(f.regexInvalid)
+        assertFalse(f.matches(entry(message = "anything")))
+    }
+
+    @Test
+    fun `invalid tag regex fails closed`() {
+        val f = CompiledFilter(LogFilter(tagQuery = "[broken", useRegex = true))
+        assertTrue(f.regexInvalid)
+        assertFalse(f.matches(entry(tag = "anything")))
+    }
+
+    @Test
+    fun `regex validity helper accepts blank and rejects broken patterns`() {
+        assertFalse(CompiledFilter.isInvalidRegex(""))
+        assertFalse(CompiledFilter.isInvalidRegex("  "))
+        assertFalse(CompiledFilter.isInvalidRegex("""code=\d+"""))
+        assertTrue(CompiledFilter.isInvalidRegex("[broken"))
+    }
+
+    @Test
+    fun `multi-word query requires every word`() {
+        val f = CompiledFilter(LogFilter(query = "timeout retry"))
+        assertTrue(f.matches(entry(message = "retry after timeout")))
+        assertTrue(f.matches(entry(tag = "RetryManager", message = "timeout")))
+        assertFalse(f.matches(entry(message = "timeout only")))
+        assertFalse(f.matches(entry(message = "retry only")))
+    }
+
+    @Test
+    fun `single-word query keeps substring behavior`() {
+        val f = CompiledFilter(LogFilter(query = "network"))
+        assertTrue(f.matches(entry(message = "the network is down")))
+    }
+
+    @Test
+    fun `multi-word exclude drops only lines carrying every word`() {
+        val f = CompiledFilter(LogFilter(excludeQuery = "spam bot"))
+        assertFalse(f.matches(entry(message = "spam from bot")))
+        assertTrue(f.matches(entry(message = "spam only")))
+        assertTrue(f.matches(entry(message = "bot only")))
+    }
+
+    @Test
+    fun `empty tag token selects only empty-tag lines`() {
+        val f = CompiledFilter(LogFilter(tagQuery = CompiledFilter.EMPTY_TAG_TOKEN))
+        assertTrue(f.matches(entry(tag = "")))
+        assertFalse(f.matches(entry(tag = "MyTag")))
+        assertFalse(f.matches(entry(tag = "(empty)")))
+    }
+
+    @Test
+    fun `blank tag still means no constraint`() {
+        val f = CompiledFilter(LogFilter(tagQuery = ""))
+        assertTrue(f.matches(entry(tag = "")))
+        assertTrue(f.matches(entry(tag = "MyTag")))
     }
 
     @Test

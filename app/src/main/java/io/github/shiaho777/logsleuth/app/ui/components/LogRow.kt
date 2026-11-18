@@ -79,6 +79,7 @@ import io.github.shiaho777.logsleuth.app.core.logcat.UidNames
 import io.github.shiaho777.logsleuth.app.core.logcat.VisibleColumns
 import io.github.shiaho777.logsleuth.app.core.logcat.abbreviateTag
 import io.github.shiaho777.logsleuth.app.core.logcat.formatLogTime
+import io.github.shiaho777.logsleuth.app.core.text.ClipboardGuard
 import io.github.shiaho777.logsleuth.app.core.text.matchRanges
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
@@ -186,8 +187,7 @@ fun LogRow(
 
     fun copyRaw() {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        clipboard.setText(AnnotatedString(entry.raw))
-        notifyCopied(snackbar, scope, context, copiedMessage)
+        copyGuarded(entry.raw, clipboard, snackbar, scope, context, copiedMessage)
     }
 
     val detailLabel = stringResource(R.string.entry_detail)
@@ -398,6 +398,33 @@ private fun notifyCopied(
 }
 
 /**
+ * Clipboard writes are Binder transactions (~1 MiB process-wide). A glued
+ * fatal block can exceed that; copy the head and say it was truncated
+ * instead of crashing with TransactionTooLargeException.
+ */
+private fun copyGuarded(
+    text: String,
+    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    snackbar: SnackbarHostState?,
+    scope: CoroutineScope,
+    context: android.content.Context,
+    copiedMessage: String,
+) {
+    if (ClipboardGuard.fits(text)) {
+        clipboard.setText(AnnotatedString(text))
+        notifyCopied(snackbar, scope, context, copiedMessage)
+    } else {
+        clipboard.setText(AnnotatedString(text.take(ClipboardGuard.MAX_CLIPBOARD_CHARS)))
+        notifyCopied(
+            snackbar,
+            scope,
+            context,
+            context.getString(R.string.copy_truncated),
+        )
+    }
+}
+
+/**
  * Wide-screen detail: a docked pane on the right instead of a sheet, so the
  * stream stays visible beside it. A dialog window gives the pane the same
  * outside-tap/back dismissal the sheet has on phones.
@@ -516,9 +543,11 @@ private fun EntryDetailContent(
             )
         }
         Spacer(Modifier.height(8.dp))
+        val detailPackage = LocalAppIconCache.current?.packageFor(entry.uid)
         Text(
             text = "${entry.displayTime}  ·  pid ${entry.pid}  ·  tid ${entry.tid}" +
-                (entry.uid?.let { "  ·  uid $it" } ?: ""),
+                (entry.uid?.let { "  ·  uid $it" } ?: "") +
+                (detailPackage?.let { "  ·  $it" } ?: ""),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.outline,
         )
@@ -541,9 +570,8 @@ private fun EntryDetailContent(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = {
-                clipboard.setText(AnnotatedString(entry.message))
+                copyGuarded(entry.message, clipboard, snackbar, scope, context, copiedMessage)
                 onDismiss()
-                notifyCopied(snackbar, scope, context, copiedMessage)
             }) {
                 Icon(
                     Icons.Default.ContentCopy,
@@ -554,9 +582,8 @@ private fun EntryDetailContent(
                 Text(stringResource(R.string.copy_message))
             }
             OutlinedButton(onClick = {
-                clipboard.setText(AnnotatedString(entry.raw))
+                copyGuarded(entry.raw, clipboard, snackbar, scope, context, copiedMessage)
                 onDismiss()
-                notifyCopied(snackbar, scope, context, copiedMessage)
             }) {
                 Icon(
                     Icons.Default.ContentCopy,

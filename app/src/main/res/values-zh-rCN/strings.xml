@@ -59,7 +59,10 @@
     <string name="filter_expand">更多过滤条件</string>
     <string name="filter_levels">日志级别</string>
     <string name="filter_levels_all">全部级别</string>
-    <string name="filter_empty_fields">空字段在匹配时会被忽略。</string>
+    <string name="filter_empty_fields">空字段在匹配时会被忽略。在 Tag 字段输入 (empty) 可专门筛选没有 Tag 的日志。</string>
+    <string name="filter_regex_invalid">正则表达式无效</string>
+    <string name="filter_query_multi_hint">用空格分隔多个关键词——日志行需同时包含它们。</string>
+    <string name="filter_tag_empty_hint">输入 (empty) 可只匹配没有 Tag 的日志。</string>
     <string name="filter_level_on">已选</string>
     <string name="filter_exclude">排除</string>
     <string name="filter_regex">使用正则表达式</string>
@@ -161,6 +164,7 @@
     <string name="notif_recording_limit_title">录制已停止</string>
     <string name="notif_recording_limit_text">已达到大小上限(%1$d MB)</string>
     <string name="notif_recording_timeout_text">已达到时长上限(%1$d 小时)</string>
+    <string name="notif_recording_write_error_text">无法写入日志文件(存储空间已满?)，录制已停止。</string>
     <string name="notif_action_stop">停止</string>
     <string name="notif_action_bookmark">书签</string>
     <string name="notif_crash_title">崩溃:%1$s</string>
@@ -200,6 +204,8 @@
     <string name="copy_message">复制消息</string>
     <string name="copy_raw">复制原始行</string>
     <string name="copied">已复制</string>
+    <string name="copy_too_large_saved">文本超出剪贴板容量——已改为保存成会话</string>
+    <string name="copy_truncated">已复制开头部分——文本超出剪贴板容量</string>
     <string name="selected_count">已选 %1$d 行</string>
     <string name="a11y_extend_selection">扩展选区</string>
 

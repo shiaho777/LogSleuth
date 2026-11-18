@@ -237,9 +237,9 @@ class LogListPipelineTest {
 
         harness.pipeline.refilter { rules(LogFilter(query = "[", useRegex = true)) }
 
-        // A bad regex fails open, so every row stays visible, and the flag
-        // reaches the caller so the bar can warn.
-        assertEquals(listOf(1L, 2L, 3L), harness.stamps())
+        // A bad regex fails closed: nothing matches, and the flag reaches
+        // the caller so the bar can warn instead of silently passing all.
+        assertEquals(emptyList<Long>(), harness.stamps())
         assertEquals(true, harness.regexInvalid)
     }
 

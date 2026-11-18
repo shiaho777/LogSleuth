@@ -214,12 +214,37 @@ fun FilterBar(
                         value = filter.query,
                         onValueChange = { onFilterChange(filter.copy(query = it)) },
                         label = stringResource(R.string.filter_query),
-                        isError = regexInvalid,
+                        isError = filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.query),
+                        supportingText = if (filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.query)
+                        ) {
+                            stringResource(R.string.filter_regex_invalid)
+                        } else if (!filter.useRegex) {
+                            stringResource(R.string.filter_query_multi_hint)
+                        } else {
+                            null
+                        },
                     )
                     FilterTextField(
                         value = filter.tagQuery,
                         onValueChange = { onFilterChange(filter.copy(tagQuery = it)) },
                         label = stringResource(R.string.filter_tag),
+                        isError = filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.tagQuery),
+                        supportingText = if (filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.tagQuery)
+                        ) {
+                            stringResource(R.string.filter_regex_invalid)
+                        } else if (!filter.useRegex) {
+                            stringResource(R.string.filter_tag_empty_hint)
+                        } else {
+                            null
+                        },
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(
@@ -236,7 +261,28 @@ fun FilterBar(
                         value = filter.excludeQuery,
                         onValueChange = { onFilterChange(filter.copy(excludeQuery = it)) },
                         label = stringResource(R.string.filter_exclude),
+                        isError = filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.excludeQuery),
+                        supportingText = if (filter.useRegex &&
+                            io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
+                                .isInvalidRegex(filter.excludeQuery)
+                        ) {
+                            stringResource(R.string.filter_regex_invalid)
+                        } else {
+                            null
+                        },
                     )
+                    // A saved rule with a broken pattern is parked by the
+                    // stack; say so here instead of letting the user wonder
+                    // why the rule "does nothing".
+                    if (regexInvalid) {
+                        Text(
+                            stringResource(R.string.filter_regex_invalid),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(
                             checked = filter.useRegex,
@@ -350,12 +396,14 @@ private fun FilterTextField(
     onValueChange: (String) -> Unit,
     label: String,
     isError: Boolean = false,
+    supportingText: String? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         isError = isError,
+        supportingText = supportingText?.let { { Text(it) } },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodySmall,
         modifier = Modifier.fillMaxWidth(),

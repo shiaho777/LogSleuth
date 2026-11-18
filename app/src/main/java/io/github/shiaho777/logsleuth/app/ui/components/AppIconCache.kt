@@ -25,9 +25,11 @@ class AppIconCache(context: Context, private val scope: CoroutineScope) {
     private val pm = context.packageManager
     private val icons = mutableStateMapOf<Int, ImageBitmap?>()
     private val labels = mutableStateMapOf<Int, String?>()
+    private val packages = mutableStateMapOf<Int, String?>()
     private val packageIcons = mutableStateMapOf<String, ImageBitmap?>()
     private val pending = ConcurrentHashMap.newKeySet<Int>()
     private val pendingLabels = ConcurrentHashMap.newKeySet<Int>()
+    private val pendingUidPackages = ConcurrentHashMap.newKeySet<Int>()
     private val pendingPackages = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var launchable: Set<String>? = null
 
@@ -74,6 +76,22 @@ class AppIconCache(context: Context, private val scope: CoroutineScope) {
             }
         }
         return labels[uid]
+    }
+
+    /**
+     * Package name for [uid], resolved like [labelFor] (launchable package
+     * preferred). Copy and the entry detail use it so shared text carries
+     * the package identity, not just the uid column.
+     */
+    fun packageFor(uid: Int?): String? {
+        if (uid == null) return null
+        if (uid !in packages && pendingUidPackages.add(uid)) {
+            scope.launch {
+                val pkg = withContext(Dispatchers.IO) { pickPackage(uid) }
+                packages[uid] = pkg
+            }
+        }
+        return packages[uid]
     }
 
     private fun resolve(uid: Int): ImageBitmap? {

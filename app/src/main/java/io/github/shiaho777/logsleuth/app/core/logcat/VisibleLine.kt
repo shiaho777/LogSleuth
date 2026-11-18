@@ -36,11 +36,16 @@ fun formatLogTime(
     )
 }
 
-/** Formats one entry the way the live row draws it. */
+/**
+ * Formats one entry the way the live row draws it. [packageName] is appended
+ * after [appLabel] in parentheses when the package column is on, so copied
+ * text carries the identity a raw threadtime line lacks (it only has uid).
+ */
 fun formatVisible(
     entry: LogcatEntry,
     columns: VisibleColumns,
     appLabel: String? = null,
+    packageName: String? = null,
 ): String = buildString {
     if (columns.showDate) {
         append(
@@ -80,6 +85,11 @@ fun formatVisible(
     }
     if (columns.showPackage && !appLabel.isNullOrBlank()) {
         append(appLabel)
+        if (!packageName.isNullOrBlank() && packageName != appLabel) {
+            append(" (")
+            append(packageName)
+            append(')')
+        }
         append(' ')
     }
     append(entry.level.letter)

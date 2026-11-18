@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.formatVisible
+import io.github.shiaho777.logsleuth.app.core.text.ClipboardGuard
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
@@ -164,6 +165,7 @@ fun StreamScreen(
 
     val clipboard = LocalClipboardManager.current
     val copiedMsg = stringResource(R.string.copied)
+    val copyTooLargeSavedMsg = stringResource(R.string.copy_too_large_saved)
     val saveFailedMsg = stringResource(R.string.save_failed)
     val filterSavedMsg = stringResource(R.string.filter_saved_from_line)
     LaunchedEffect(ui.filterNotice) {
@@ -447,6 +449,20 @@ fun StreamScreen(
                         scope.launch { snackbar.showSnackbar(copiedMsg) }
                     }
                 },
+                onCopyTooLarge = { selected ->
+                    // The clipboard is a ~1 MiB Binder transaction; a
+                    // full-buffer select-all would crash the app. Keep the
+                    // lines as a session instead.
+                    selAnchor = -1L
+                    selEnd = -1L
+                    viewModel.saveSelection(selected) { result ->
+                        scope.launch {
+                            snackbar.showSnackbar(
+                                if (result.isSuccess) copyTooLargeSavedMsg else saveFailedMsg,
+                            )
+                        }
+                    }
+                },
                 onMakeFilter = { filterDraft = viewModel.draftFilterFromLine(it) },
                 onOpenSetup = { onNavigate(Routes.SETUP) },
                 onDisableRules = viewModel::disableEnabledRules,
@@ -634,6 +650,7 @@ private fun StreamListPane(
     onExtendedCopy: (String) -> Unit,
     onSaveSelection: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
     onCopy: (String) -> Unit,
+    onCopyTooLarge: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
     onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit,
     onOpenSetup: () -> Unit,
     onDisableRules: () -> Unit,
@@ -758,6 +775,7 @@ private fun StreamListPane(
                             it.entry,
                             rowPrefs.visibleColumns(),
                             appLabel = iconCache?.labelFor(it.entry.uid),
+                            packageName = iconCache?.packageFor(it.entry.uid),
                         )
                     },
                 )
@@ -768,15 +786,16 @@ private fun StreamListPane(
                 )
             },
             onCopy = {
-                onCopy(
-                    entries.filter { it.seq in selLo..selHi }.joinToString("\n") {
-                        formatVisible(
-                            it.entry,
-                            rowPrefs.visibleColumns(),
-                            appLabel = iconCache?.labelFor(it.entry.uid),
-                        )
-                    },
-                )
+                val selected = entries.filter { it.seq in selLo..selHi }
+                val text = selected.joinToString("\n") {
+                    formatVisible(
+                        it.entry,
+                        rowPrefs.visibleColumns(),
+                        appLabel = iconCache?.labelFor(it.entry.uid),
+                        packageName = iconCache?.packageFor(it.entry.uid),
+                    )
+                }
+                if (ClipboardGuard.fits(text)) onCopy(text) else onCopyTooLarge(selected.map { it.entry })
             },
             onClear = onClearSelection,
             modifier = Modifier

@@ -150,11 +150,11 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
 
     private val queryRegex = rule.takeIf { it.useRegex && it.query.isNotBlank() }
         ?.let { runCatching { Regex(it.query, RegexOption.IGNORE_CASE) }.getOrNull() }
-    private val queryPlain = rule.takeIf { !it.useRegex }?.query?.trim().orEmpty()
+    private val queryTerms = plainTerms(rule.takeIf { !it.useRegex }?.query)
 
     private val excludeRegex = rule.takeIf { it.useRegex && it.excludeQuery.isNotBlank() }
         ?.let { runCatching { Regex(it.excludeQuery, RegexOption.IGNORE_CASE) }.getOrNull() }
-    private val excludePlain = rule.takeIf { !it.useRegex }?.excludeQuery?.trim().orEmpty()
+    private val excludeTerms = plainTerms(rule.takeIf { !it.useRegex }?.excludeQuery)
 
     private val tagRegex = rule.takeIf { it.useRegex && it.tagQuery.isNotBlank() }
         ?.let { runCatching { Regex(it.tagQuery, RegexOption.IGNORE_CASE) }.getOrNull() }
@@ -165,13 +165,18 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
     private val uidExact: Int? = rule.uid.trim().takeIf { it.isNotEmpty() }?.let { UidNames.resolve(it) }
     private val uidUnresolvable = rule.uid.isNotBlank() && uidExact == null
 
-    /** True when [rule]'s regex strings are invalid (we fail open, matching everything). */
+    /** True when [rule]'s regex strings are invalid (the rule matches nothing). */
     val regexInvalid: Boolean =
         (rule.useRegex && rule.query.isNotBlank() && queryRegex == null) ||
             (rule.useRegex && rule.excludeQuery.isNotBlank() && excludeRegex == null) ||
             (rule.useRegex && rule.tagQuery.isNotBlank() && tagRegex == null)
 
     fun matches(entry: LogcatEntry): Boolean {
+        // Fail closed: a broken pattern admits nothing. Failing open used to
+        // silently disable the whole rule — an exclude stopped excluding and
+        // an include let the entire stream through, which reads as "filters
+        // randomly stopped working". The UI flags the field instead.
+        if (regexInvalid) return false
         if (entry.level !in levels) return false
 
         if (requiredUid != null) {
@@ -184,6 +189,8 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
 
         if (tagRegex != null) {
             if (!tagRegex.containsMatchIn(entry.tag)) return false
+        } else if (tagPlain == EMPTY_TAG_TOKEN) {
+            if (entry.tag.isNotEmpty()) return false
         } else if (tagPlain.isNotEmpty()) {
             val tagHit = if (tagExact) {
                 entry.tag.equals(tagPlain, ignoreCase = true)
@@ -197,26 +204,55 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
             if (!queryRegex.containsMatchIn(entry.tag) && !queryRegex.containsMatchIn(entry.message)) {
                 return false
             }
-        } else if (queryPlain.isNotEmpty()) {
-            val hit = entry.tag.contains(queryPlain, ignoreCase = true) ||
-                entry.message.contains(queryPlain, ignoreCase = true)
-            if (!hit) return false
+        } else if (queryTerms.isNotEmpty() && !matchesAllTerms(queryTerms, entry)) {
+            return false
         }
 
         if (excludeRegex != null) {
             if (excludeRegex.containsMatchIn(entry.tag) || excludeRegex.containsMatchIn(entry.message)) {
                 return false
             }
-        } else if (excludePlain.isNotEmpty()) {
-            val hit = entry.tag.contains(excludePlain, ignoreCase = true) ||
-                entry.message.contains(excludePlain, ignoreCase = true)
-            if (hit) return false
+        } else if (excludeTerms.isNotEmpty() && matchesAllTerms(excludeTerms, entry)) {
+            return false
         }
 
         return true
     }
 
+    /** Every term must hit the tag or the message (AND across terms). */
+    private fun matchesAllTerms(terms: List<String>, entry: LogcatEntry): Boolean =
+        terms.all { term ->
+            entry.tag.contains(term, ignoreCase = true) ||
+                entry.message.contains(term, ignoreCase = true)
+        }
+
     companion object {
         private const val NO_UID = -1
+
+        /**
+         * Tag-field sentinel selecting lines whose tag is empty — some
+         * apps log with `Log.d("", …)` on purpose, and a blank field
+         * cannot express "only those" (blank means "no constraint").
+         */
+        const val EMPTY_TAG_TOKEN = "(empty)"
+
+        /**
+         * Plain-text matcher terms: whitespace-separated words are AND-ed,
+         * so `timeout retry` keeps only lines carrying both. A single word
+         * keeps the old substring behavior, spaces inside it included.
+         */
+        private fun plainTerms(raw: String?): List<String> {
+            val trimmed = raw?.trim().orEmpty()
+            if (trimmed.isEmpty()) return emptyList()
+            return if (trimmed.any { it.isWhitespace() }) {
+                trimmed.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            } else {
+                listOf(trimmed)
+            }
+        }
+
+        /** True when [pattern] is not a valid regex; blank counts as valid. */
+        fun isInvalidRegex(pattern: String): Boolean =
+            pattern.isNotBlank() && runCatching { Regex(pattern) }.isFailure
     }
 }

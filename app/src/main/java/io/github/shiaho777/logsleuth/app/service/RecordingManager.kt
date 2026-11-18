@@ -183,18 +183,24 @@ class RecordingManager @Inject constructor(
                         snapshotSeq = snap.maxSeq
                         // Include recent history as context before start.
                         val matched = snap.entries.filter { compiled.matches(it) && activeStack.matches(it) }
-                        writeMutex.withLock {
-                            matched.forEach {
-                                w.appendLine(it.raw)
-                                bytesWritten += it.raw.toByteArray(Charsets.UTF_8).size + 1
+                        val backfillOk = runCatching {
+                            writeMutex.withLock {
+                                matched.forEach {
+                                    w.appendLine(it.raw)
+                                    bytesWritten += it.raw.toByteArray(Charsets.UTF_8).size + 1
+                                }
+                                if (matched.isNotEmpty()) {
+                                    // '#'-prefixed: skipped on replay, visible in exports.
+                                    w.appendLine(
+                                        "# ===== recording started; the ${matched.size} lines above are buffered context =====",
+                                    )
+                                }
+                                w.flush()
                             }
-                            if (matched.isNotEmpty()) {
-                                // '#'-prefixed: skipped on replay, visible in exports.
-                                w.appendLine(
-                                    "# ===== recording started; the ${matched.size} lines above are buffered context =====",
-                                )
-                            }
-                            w.flush()
+                        }.isSuccess
+                        if (!backfillOk) {
+                            stopForWriteError()
+                            return@onSubscription
                         }
                         count = matched.size.toLong()
                         finalLines = count
@@ -206,12 +212,18 @@ class RecordingManager @Inject constructor(
                         if (entry.seq <= snapshotSeq) return@collect
                         if (_state.value.paused) return@collect
                         if (compiled.matches(entry) && activeStack.matches(entry)) {
-                            writeMutex.withLock {
-                                w.appendLine(entry.raw)
-                                bytesWritten += entry.raw.toByteArray(Charsets.UTF_8).size + 1
-                                count++
-                                finalLines = count
-                                if (count % FLUSH_BATCH == 0L) w.flush()
+                            val writeOk = runCatching {
+                                writeMutex.withLock {
+                                    w.appendLine(entry.raw)
+                                    bytesWritten += entry.raw.toByteArray(Charsets.UTF_8).size + 1
+                                    count++
+                                    finalLines = count
+                                    if (count % FLUSH_BATCH == 0L) w.flush()
+                                }
+                            }.isSuccess
+                            if (!writeOk) {
+                                stopForWriteError()
+                                return@collect
                             }
                             if (count % STATE_BATCH == 0L) {
                                 _state.update { it.copy(lineCount = count) }
@@ -289,9 +301,28 @@ class RecordingManager @Inject constructor(
 
     suspend fun addBookmark() {
         engine.addBookmark()
-        writeMutex.withLock {
-            writer?.appendLine("===== BOOKMARK ${java.time.Instant.now()} =====")
-            writer?.flush()
+        val writeOk = runCatching {
+            writeMutex.withLock {
+                writer?.appendLine("===== BOOKMARK ${java.time.Instant.now()} =====")
+                writer?.flush()
+            }
+        }.isSuccess
+        if (!writeOk) stopForWriteError()
+    }
+
+    /**
+     * The session file refused a write (disk full, storage revoked). Without
+     * this the collector coroutine died silently: the UI kept saying
+     * "recording" while the line count froze and nothing reached the file.
+     * Finish the session with what landed on disk and tell the user why it
+     * ended. Same shape as [stopForLimit]: stop runs on its own coroutine
+     * because it joins the collector.
+     */
+    private fun stopForWriteError() {
+        if (!limitTriggered.compareAndSet(false, true)) return
+        val sessionId = _state.value.sessionId ?: return
+        scope.launch {
+            if (stopSession(sessionId)) notificationHelper.notifyRecordingWriteError(sessionId)
         }
     }
 

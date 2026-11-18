@@ -14,9 +14,9 @@ import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 class FilterStack(
     private val including: List<CompiledFilter>,
     private val excluding: List<CompiledFilter>,
+    /** A compiled rule was parked for a broken pattern; the UI flags it. */
+    val regexInvalid: Boolean = false,
 ) {
-    val regexInvalid: Boolean =
-        including.any { it.regexInvalid } || excluding.any { it.regexInvalid }
 
     fun matches(entry: LogcatEntry): Boolean {
         if (excluding.any { it.matches(entry) }) return false
@@ -32,9 +32,16 @@ class FilterStack(
             resolveUid: (String?) -> Int?,
         ): FilterStack {
             val active = rules.filter { it.enabled && it.hasConstraint }
+            val compiled = active.map { it to it.compile(resolveUid) }
+            // A rule with a broken pattern is parked, not applied: it can
+            // neither include nor exclude anything, and it must not drag
+            // the healthy rules in its group down with it. The UI still
+            // surfaces [regexInvalid] so the user can fix the pattern.
+            val usable = compiled.filterNot { it.second.regexInvalid }
             return FilterStack(
-                including = active.filter { it.including }.map { it.compile(resolveUid) },
-                excluding = active.filter { !it.including }.map { it.compile(resolveUid) },
+                including = usable.filter { it.first.including }.map { it.second },
+                excluding = usable.filterNot { it.first.including }.map { it.second },
+                regexInvalid = usable.size != compiled.size,
             )
         }
 
