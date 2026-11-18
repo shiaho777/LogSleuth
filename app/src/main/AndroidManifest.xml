@@ -102,6 +102,15 @@
                 android:value="crash_and_anr_monitoring" />
         </service>
 
+        <service
+            android:name=".service.AutomationService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="log_match_automation_broadcasts" />
+        </service>
+
         <receiver
             android:name=".service.BootReceiver"
             android:exported="true">

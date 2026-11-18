@@ -15,6 +15,7 @@ import io.github.shiaho777.logsleuth.app.core.update.ReleaseInfo
 import io.github.shiaho777.logsleuth.app.core.update.UpdateManager
 import io.github.shiaho777.logsleuth.app.data.prefs.Settings
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
+import io.github.shiaho777.logsleuth.app.service.AutomationService
 import io.github.shiaho777.logsleuth.app.service.BubbleService
 import io.github.shiaho777.logsleuth.app.service.CrashWatchService
 import javax.inject.Inject
@@ -146,6 +147,17 @@ class SettingsViewModel @Inject constructor(
 
     fun unignorePackage(packageName: String) = viewModelScope.launch {
         settingsRepository.unignorePackage(packageName)
+    }
+
+    fun setAutomationEnabled(value: Boolean) = viewModelScope.launch {
+        settingsRepository.setAutomationEnabled(value)
+        if (value) {
+            // Toggled from a visible screen — the one context where the
+            // foreground start cannot be refused as "background".
+            runCatching { AutomationService.start(context) }
+        } else {
+            context.stopService(Intent(context, AutomationService::class.java))
+        }
     }
 
     /** Puts every preference back to its default. */

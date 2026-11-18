@@ -51,9 +51,9 @@ data class FilterEntity(
 
 @Entity(tableName = "crash_events")
 data class CrashEventEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @PrimaryKey(autoGenerate = true) override val id: Long = 0,
     val sessionId: Long? = null,
-    val time: Long,
+    override val time: Long,
     val pid: Int,
     val packageName: String? = null,
     val type: String, // CRASH | ANR | NATIVE
@@ -65,6 +65,21 @@ data class CrashEventEntity(
     val versionCode: Long? = null,
     /** File of surrounding log lines. Null when the buffer had nothing to keep. */
     val contextPath: String? = null,
+) : io.github.shiaho777.logsleuth.app.core.crashes.CrashRetention.Row
+
+@Entity(tableName = "automation_rules")
+data class AutomationRuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val enabled: Boolean = true,
+    val packageName: String? = null,
+    val query: String = "",
+    val useRegex: Boolean = false,
+    val tagQuery: String = "",
+    val targetPackage: String,
+    val action: String,
+    val cooldownSeconds: Int = 0,
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(tableName = "bookmarks")

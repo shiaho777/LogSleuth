@@ -35,14 +35,22 @@ data class CrashSignal(
  *   app re-logs `ANR in` while unresponsive — same-package signals within
  *   [anrDedupeWindowMs] are deduplicated.
  *
- * Feed every entry via [onEntry]; it returns a completed [CrashSignal] or null.
- * Call [flush] when the stream stops to emit a still-open crash block.
+ * Blocks are tracked **per process**: two apps crashing at the same moment
+ * interleave their stack lines in logcat, and a single-slot detector used to
+ * cut the first crash short when the second one's FATAL line arrived. Each
+ * open block only consumes its own pid's continuation lines; unrelated lines
+ * pass through to the other blocks and to ANR detection.
+ *
+ * Feed every entry via [onEntry]; it returns a completed [CrashSignal] or
+ * null. Call [flush] when the stream stops, then [drain] until it returns
+ * null, to emit every still-open block.
  */
 class CrashDetector(
     private val maxBlockLines: Int = 100,
     private val anrDedupeWindowMs: Long = 60_000,
     private val nativeNameWaitMs: Long = 8_000,
     private val nativeDedupeWindowMs: Long = 60_000,
+    private val maxOpenBlocks: Int = 8,
 ) {
 
     private val processRegex = Regex("""Process:\s*([\w.]+)\s*,\s*PID:""")
@@ -64,102 +72,148 @@ class CrashDetector(
 
     private data class NativeSeen(val pid: Int, val firstLine: String, val timeMillis: Long)
 
-    private var collectingPid: Int? = null
-    private var collectingTag: String? = null
+    /** One in-progress crash block, keyed by the emitting logcat pid. */
+    private class Block(val key: Int, val entry: LogcatEntry, maxBlockLines: Int) {
+        val native = isNativeStart(entry)
+        val tag = entry.tag
+        val minPriority = if (native) LogLevel.V.priority else LogLevel.E.priority
+        val type = if (native) CrashType.NATIVE else CrashType.CRASH
+        val text = StringBuilder(entry.raw).append('\n')
+        var lines = 1
+        var firstLine = entry.message.take(200)
+        var startTime = entry.timestampMillis
+        var packageName: String? = null
+        val pid: Int
 
-    /** Minimum level a continuation line needs — E for Java fatals, any
-     * level for native dumps (crash_dump writes them at I/D). */
-    private var blockMinPriority = LogLevel.E.priority
-    private val block = StringBuilder()
-    private var blockLines = 0
-    private var blockType = CrashType.CRASH
-    private var firstLine = ""
-    private var packageName: String? = null
-    private var startTime = 0L
-    private var pid = -1
+        init {
+            if (native) {
+                // `... in tid N (thread), pid M (comm)`. `comm` is
+                // /proc/self/comm (the main thread), which apps rename to
+                // "main". The logcat pid column on this libc line is the
+                // crashed process; crash_dump's own pid only shows up on
+                // the later DEBUG tombstone.
+                val m = FATAL_PID.find(entry.message)
+                pid = m?.groupValues?.get(1)?.toIntOrNull() ?: entry.pid
+                packageName = m?.groupValues?.get(2)?.let(::packageFromComm)
+            } else {
+                pid = entry.pid
+            }
+        }
+
+        val awaitingName: Boolean get() = native && packageName == null
+
+        fun accepts(entry: LogcatEntry, maxLines: Int): Boolean =
+            entry.tag == tag &&
+                entry.level.priority >= minPriority &&
+                lines < maxLines
+
+        fun append(entry: LogcatEntry) {
+            text.appendLine(entry.raw)
+            lines++
+            if (packageName == null) {
+                packageName = PROCESS_NAME.find(entry.message)?.groupValues?.get(1)
+            }
+        }
+
+        fun signal(): CrashSignal = CrashSignal(
+            type = type,
+            pid = pid,
+            packageName = packageName,
+            firstLine = firstLine,
+            snippet = text.toString().trimEnd(),
+            timeMillis = startTime,
+        )
+    }
+
+    /** Open blocks in arrival order; the first is the "primary" one whose
+     * completion [onEntry] reports, mirroring the old single-slot contract. */
+    private val blocks = LinkedHashMap<Int, Block>()
 
     fun onEntry(entry: LogcatEntry): CrashSignal? {
         // Tombstone header (crash_dump, different pid/tag) names the process.
         // It arrives after unrelated log lines, so it is not a continuation.
-        if (nativeAwaitingName()) {
-            tombstonePackage(entry)?.let { found ->
-                packageName = found
-                block.appendLine(entry.raw)
-                return finishBlock()
-            }
+        for (block in blocks.values.toList()) {
+            if (!block.awaitingName) continue
+            val found = tombstonePackage(block, entry) ?: continue
+            block.packageName = found
+            block.text.appendLine(entry.raw)
+            return close(block)
         }
 
-        // A fresh crash line always starts a new block; flush any open one
-        // first (the previous process died, this is a different crash).
-        val newBlock = isFatalStart(entry) || isNativeStart(entry)
-        if (newBlock) {
+        // A fresh crash line starts a block for its own process. Another
+        // process crashing at the same time must not cut this one short —
+        // its stack lines keep arriving interleaved. A second fatal from
+        // the *same* process, though, means the previous crash is over.
+        if (isFatalStart(entry) || isNativeStart(entry)) {
             if (isNativeStart(entry) && isDuplicateNativeLine(entry)) return null
-            val flushed = if (collectingPid != null) finishBlock() else null
-            startBlock(entry)
+            val samePid = blocks.remove(entry.pid)
+            // A new crash ends an open *native* block of another process
+            // (its dump is over once something else dies loudly), but Java
+            // blocks keep receiving their interleaved stack lines — two
+            // apps crashing at once must both keep their full stacks.
+            val nativeOther = blocks.values.firstOrNull { it.type == CrashType.NATIVE }
+            val flushed = samePid?.let { close(it) } ?: nativeOther?.let { close(it) }
+            if (blocks.size >= maxOpenBlocks) {
+                // A wedged stream must not grow blocks without bound; the
+                // oldest one is the least likely to still receive lines.
+                close(blocks.values.first())
+            }
+            blocks[entry.pid] = Block(entry.pid, entry, maxBlockLines)
             return flushed
         }
 
-        val pidBeingCollected = collectingPid
-        if (pidBeingCollected != null) {
-            val stillInBlock = entry.pid == pidBeingCollected &&
-                entry.tag == collectingTag &&
-                entry.level.priority >= blockMinPriority &&
-                blockLines < maxBlockLines
-            if (stillInBlock) {
-                block.appendLine(entry.raw)
-                blockLines++
-                if (packageName == null) {
-                    packageName = processRegex.find(entry.message)?.groupValues?.get(1)
-                        ?: tombstonePackage(entry)
-                }
+        val block = blocks[entry.pid]
+        if (block != null) {
+            if (block.accepts(entry, maxBlockLines)) {
+                block.append(entry)
+                tombstonePackage(block, entry)?.let { block.packageName = it }
                 return null
             }
             // App comm is "main"; keep the block open until the tombstone
             // names the package, without dropping ANRs that pass in between.
-            if (nativeAwaitingName() && entry.timestampMillis - startTime <= nativeNameWaitMs) {
+            if (block.awaitingName && entry.timestampMillis - block.startTime <= nativeNameWaitMs) {
                 return detectStart(entry)
             }
-            val done = finishBlock()
+            val done = close(block)
             // The current line may itself be an ANR; handle it too.
+            return done ?: detectStart(entry)
+        }
+        // Unrelated line while blocks are open. A native block still waiting
+        // for its tombstone tolerates the traffic inside the wait window
+        // (the tombstone comes from crash_dump's own pid); every other open
+        // block ends here, exactly as the single-slot detector did.
+        val waiting = blocks.values.firstOrNull {
+            it.awaitingName && entry.timestampMillis - it.startTime <= nativeNameWaitMs
+        }
+        if (waiting != null) return detectStart(entry)
+        val oldest = blocks.values.firstOrNull()
+        if (oldest != null) {
+            val done = close(oldest)
             return done ?: detectStart(entry)
         }
         return detectStart(entry)
     }
 
-    fun flush(): CrashSignal? = if (collectingPid != null) finishBlock() else null
+    /** Emits the oldest still-open block, or null when none remain. */
+    fun flush(): CrashSignal? {
+        val block = blocks.values.firstOrNull() ?: return null
+        return close(block)
+    }
 
-    private fun isFatalStart(entry: LogcatEntry): Boolean =
-        entry.tag == "AndroidRuntime" &&
-            entry.level.priority >= LogLevel.E.priority &&
-            entry.message.startsWith("FATAL EXCEPTION")
+    /** Repeated [flush] until null — callers that need every open block. */
+    fun drain(): List<CrashSignal> {
+        val out = ArrayList<CrashSignal>()
+        while (true) out += flush() ?: break
+        return out
+    }
 
-    private fun isNativeStart(entry: LogcatEntry): Boolean =
-        (entry.tag == "DEBUG" || entry.tag == "libc") &&
-            entry.message.startsWith("Fatal signal")
-
-    private fun startBlock(entry: LogcatEntry) {
-        val native = isNativeStart(entry)
-        collectingPid = entry.pid
-        collectingTag = entry.tag
-        blockMinPriority = if (native) LogLevel.V.priority else LogLevel.E.priority
-        blockType = if (native) CrashType.NATIVE else CrashType.CRASH
-        block.clear()
-        block.appendLine(entry.raw)
-        blockLines = 1
-        firstLine = entry.message.take(200)
-        startTime = entry.timestampMillis
-        if (native) {
-            // `... in tid N (thread), pid M (comm)`. `comm` is /proc/self/comm
-            // (the main thread), which apps rename to "main". The logcat pid
-            // column on this libc line is the crashed process; crash_dump's
-            // own pid only shows up on the later DEBUG tombstone.
-            val m = fatalPidRegex.find(entry.message)
-            pid = m?.groupValues?.get(1)?.toIntOrNull() ?: entry.pid
-            packageName = m?.groupValues?.get(2)?.let(::packageFromComm)
-        } else {
-            pid = entry.pid
-            packageName = null
+    private fun close(block: Block): CrashSignal {
+        blocks.remove(block.key)
+        val signal = block.signal()
+        if (signal.type == CrashType.NATIVE) {
+            rememberNative(signal.pid, signal.firstLine, signal.timeMillis)
         }
+        return signal
     }
 
     private fun detectStart(entry: LogcatEntry): CrashSignal? {
@@ -207,28 +261,16 @@ class CrashDetector(
         )
     }
 
-    /** `/proc/self/comm` is not a package when the main thread is named `main`. */
-    private fun packageFromComm(comm: String): String? {
-        val name = comm.trim()
-        if (name.isEmpty() || name == "main" || name == "<unknown>" || name == "<name unknown>") {
-            return null
-        }
-        return name
-    }
-
     /** `pid: N, tid: N, name: thread  >>> com.pkg <<<` from crash_dump. */
-    private fun tombstonePackage(entry: LogcatEntry): String? {
+    private fun tombstonePackage(block: Block, entry: LogcatEntry): String? {
         if (entry.tag != "DEBUG" && entry.tag != "libc") return null
         val match = tombstoneRegex.find(entry.message) ?: return null
         val linePid = match.groupValues[1].toIntOrNull() ?: return null
-        if (linePid != pid && linePid != collectingPid) return null
+        if (linePid != block.pid && linePid != block.key) return null
         val name = match.groupValues[2].trim()
         if (name.isEmpty() || name == "UNKNOWN" || name == "main") return null
         return name
     }
-
-    private fun nativeAwaitingName(): Boolean =
-        collectingPid != null && blockType == CrashType.NATIVE && packageName == null
 
     private fun isDuplicateNativeLine(entry: LogcatEntry): Boolean {
         val parsed = fatalPidRegex.find(entry.message)
@@ -237,8 +279,9 @@ class CrashDetector(
     }
 
     private fun isDuplicateNative(nativePid: Int, line: String, timeMillis: Long): Boolean {
-        if (collectingPid != null && blockType == CrashType.NATIVE &&
-            pid == nativePid && firstLine == line
+        if (blocks.values.any {
+                it.type == CrashType.NATIVE && it.pid == nativePid && it.firstLine == line
+            }
         ) {
             return true
         }
@@ -256,22 +299,26 @@ class CrashDetector(
         recentNative.addLast(NativeSeen(nativePid, line, timeMillis))
     }
 
-    private fun finishBlock(): CrashSignal {
-        val signal = CrashSignal(
-            type = blockType,
-            pid = pid,
-            packageName = packageName,
-            firstLine = firstLine,
-            snippet = block.toString().trimEnd(),
-            timeMillis = startTime,
-        )
-        if (signal.type == CrashType.NATIVE) {
-            rememberNative(signal.pid, signal.firstLine, signal.timeMillis)
+    private companion object {
+        val PROCESS_NAME = Regex("""Process:\s*([\w.]+)\s*,\s*PID:""")
+        val FATAL_PID = Regex("""pid\s+(\d+)\s+\(([^)]+)\)""")
+
+        fun isFatalStart(entry: LogcatEntry): Boolean =
+            entry.tag == "AndroidRuntime" &&
+                entry.level.priority >= LogLevel.E.priority &&
+                entry.message.startsWith("FATAL EXCEPTION")
+
+        fun isNativeStart(entry: LogcatEntry): Boolean =
+            (entry.tag == "DEBUG" || entry.tag == "libc") &&
+                entry.message.startsWith("Fatal signal")
+
+        /** `/proc/self/comm` is not a package when the main thread is named `main`. */
+        fun packageFromComm(comm: String): String? {
+            val name = comm.trim()
+            if (name.isEmpty() || name == "main" || name == "<unknown>" || name == "<name unknown>") {
+                return null
+            }
+            return name
         }
-        collectingPid = null
-        collectingTag = null
-        block.clear()
-        blockLines = 0
-        return signal
     }
 }

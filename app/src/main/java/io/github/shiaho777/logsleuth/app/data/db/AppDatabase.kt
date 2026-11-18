@@ -11,8 +11,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FilterEntity::class,
         CrashEventEntity::class,
         BookmarkEntity::class,
+        AutomationRuleEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun filterDao(): FilterDao
     abstract fun crashEventDao(): CrashEventDao
     abstract fun bookmarkDao(): BookmarkDao
+    abstract fun automationRuleDao(): AutomationRuleDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -52,6 +54,25 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "ALTER TABLE filters ADD COLUMN tagExact INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS automation_rules (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "name TEXT NOT NULL, " +
+                        "enabled INTEGER NOT NULL, " +
+                        "packageName TEXT, " +
+                        "query TEXT NOT NULL, " +
+                        "useRegex INTEGER NOT NULL, " +
+                        "tagQuery TEXT NOT NULL, " +
+                        "targetPackage TEXT NOT NULL, " +
+                        "action TEXT NOT NULL, " +
+                        "cooldownSeconds INTEGER NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)",
                 )
             }
         }

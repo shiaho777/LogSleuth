@@ -19,11 +19,13 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_RECORDING = "recording"
         const val CHANNEL_CRASHES = "crashes"
         const val CHANNEL_WATCH = "crash_watch"
+        const val CHANNEL_AUTOMATION = "automation"
         const val ID_RECORDING = 1001
         const val ID_RECORDING_LIMIT = 1002
         const val ID_RECORDING_TIMEOUT = 1003
         const val ID_WATCH = 1004
         const val ID_RECORDING_WRITE_ERROR = 1005
+        const val ID_AUTOMATION = 1006
         const val ID_CRASH_BASE = 2000
         private const val NOTIFICATION_BODY = 1_500
         private const val COPY_BODY = 6_000
@@ -50,6 +52,13 @@ class NotificationHelper(private val context: Context) {
             NotificationChannel(
                 CHANNEL_WATCH,
                 context.getString(R.string.notif_channel_watch),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_AUTOMATION,
+                context.getString(R.string.notif_channel_automation),
                 NotificationManager.IMPORTANCE_LOW,
             ),
         )
@@ -128,6 +137,31 @@ class NotificationHelper(private val context: Context) {
             .build()
     }
 
+    /** Low-priority notice while automation broadcasts are being dispatched. */
+    fun automationNotification(): Notification {
+        val stopIntent = PendingIntent.getService(
+            context,
+            11,
+            Intent(context, AutomationService::class.java)
+                .setAction(AutomationService.ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val openIntent = PendingIntent.getActivity(
+            context,
+            12,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return NotificationCompat.Builder(context, CHANNEL_AUTOMATION)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_automation_title))
+            .setContentText(context.getString(R.string.notif_automation_text))
+            .setContentIntent(openIntent)
+            .setOngoing(true)
+            .addAction(0, context.getString(R.string.notif_action_stop), stopIntent)
+            .build()
+    }
+
     /**
      * [eventId] is the Room row id when the crash was stored. Zero means
      * the user asked to be told without keeping a row, so the tap opens
@@ -141,15 +175,19 @@ class NotificationHelper(private val context: Context) {
         eventId: Long,
         appLabel: String?,
         separateChannels: Boolean,
+        mergedCount: Int = 1,
     ) {
         val label = appLabel?.takeIf { it.isNotBlank() }
             ?: signal.packageName
             ?: context.getString(R.string.unknown_app)
-        val title = when (signal.type) {
+        val baseTitle = when (signal.type) {
             CrashType.CRASH -> context.getString(R.string.notif_crash_title, label)
             CrashType.NATIVE -> context.getString(R.string.notif_native_title, label)
             CrashType.ANR -> context.getString(R.string.notif_anr_title, label)
         }
+        // A crash loop is merged into one updating notification; the count
+        // says how many crashes happened since the previous announcement.
+        val title = if (mergedCount > 1) "$baseTitle ×$mergedCount" else baseTitle
         val channel = channelId(signal.type.name, signal.packageName, separateChannels)
         ensureChannel(channel, signal.type, label, separateChannels)
         val open = if (eventId > 0) {
@@ -157,16 +195,22 @@ class NotificationHelper(private val context: Context) {
         } else {
             MainActivity.crashesIntent(context)
         }
+        // Stable per app + type: a merged loop updates the same notification
+        // instead of stacking a new one per crash.
+        val slot = Math.floorMod(
+            (signal.type.name + "|" + signal.packageName.orEmpty()).hashCode(),
+            1_000_000,
+        )
         val openIntent = PendingIntent.getActivity(
             context,
-            (eventId % 1_000_000).toInt() + 20,
+            slot + 20,
             open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val body = signal.snippet.take(NOTIFICATION_BODY)
         val copy = PendingIntent.getBroadcast(
             context,
-            (eventId % 1_000_000).toInt() + 40,
+            slot + 40,
             Intent(context, CopyCrashReceiver::class.java)
                 .putExtra(Intent.EXTRA_TEXT, signal.snippet.take(COPY_BODY)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -180,12 +224,7 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(true)
             .addAction(0, context.getString(R.string.copy), copy)
             .build()
-        val id = if (eventId > 0) {
-            ID_CRASH_BASE + (eventId % 1_000_000).toInt()
-        } else {
-            ID_CRASH_BASE + (signal.timeMillis % 1_000_000).toInt()
-        }
-        manager.notify(id, notification)
+        manager.notify(ID_CRASH_BASE + slot, notification)
     }
 
     /** Opens the system page for this crash's channel, creating it first. */

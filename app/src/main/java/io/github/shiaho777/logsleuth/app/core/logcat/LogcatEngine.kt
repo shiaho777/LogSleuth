@@ -193,6 +193,9 @@ class LogcatEngine @Inject constructor(
         scope.launch {
             rootManager.status.collect { refreshAccess() }
         }
+        // A previous process (or a crash loop before retention existed) may
+        // have left more history than the caps allow.
+        scope.launch { runCatching { crashRecorder.prune() } }
     }
 
     private fun currentAccess(): AccessState = accessChecker.currentState(
@@ -345,7 +348,9 @@ class LogcatEngine @Inject constructor(
             } finally {
                 if (generation == streamGeneration) {
                     assembler.flush()?.let { dispatch(it, crashDetector) }
-                    crashDetector.flush()?.let { onCrash(it) }
+                    // Interleaved crashes leave several blocks open; emit
+                    // every one, not just the oldest.
+                    crashDetector.drain().forEach { onCrash(it) }
                 }
                 // Check ownership under the lock: a restart between an
                 // unlocked check and this write would orphan its new stream.

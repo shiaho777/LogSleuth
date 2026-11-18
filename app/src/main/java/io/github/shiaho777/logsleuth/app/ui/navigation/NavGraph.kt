@@ -43,6 +43,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.automation.AutomationScreen
 import io.github.shiaho777.logsleuth.app.ui.crashes.AppCrashesScreen
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashDetailsScreen
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashesScreen
@@ -68,6 +69,7 @@ object Routes {
     const val APP_CRASHES = "crashes/pkg/{packageName}?event={eventId}"
     const val CRASH_DETAIL = "crash/{eventId}"
     const val FILTERS = "filters"
+    const val AUTOMATION = "automation"
     const val SETTINGS = "settings"
 
     /** Route token for a crash whose package logcat never named. */
@@ -257,10 +259,14 @@ fun LogSleuthNavHost(
                     composable(Routes.FILTERS) {
                         FiltersScreen(onBack = { navController.popBackStack() })
                     }
+                    composable(Routes.AUTOMATION) {
+                        AutomationScreen(onBack = { navController.popBackStack() })
+                    }
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
                             onBack = { navController.popBackStack() },
                             onOpenSetup = { navController.navigate(Routes.SETUP) },
+                            onOpenAutomation = { navController.navigate(Routes.AUTOMATION) },
                             onOpenGuide = {
                                 navController.navigate(Routes.STREAM) {
                                     popUpTo(navController.graph.findStartDestination().id) {

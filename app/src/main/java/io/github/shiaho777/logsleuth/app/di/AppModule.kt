@@ -11,6 +11,7 @@ import io.github.shiaho777.logsleuth.app.core.logcat.AccessChecker
 import io.github.shiaho777.logsleuth.app.core.root.RootManager
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.db.AppDatabase
+import io.github.shiaho777.logsleuth.app.data.db.AutomationRuleDao
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
 import io.github.shiaho777.logsleuth.app.data.db.FilterDao
@@ -31,6 +32,7 @@ object AppModule {
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
             )
             .build()
 
@@ -38,6 +40,7 @@ object AppModule {
     @Provides fun provideFilterDao(db: AppDatabase): FilterDao = db.filterDao()
     @Provides fun provideCrashEventDao(db: AppDatabase): CrashEventDao = db.crashEventDao()
     @Provides fun provideBookmarkDao(db: AppDatabase): BookmarkDao = db.bookmarkDao()
+    @Provides fun provideAutomationRuleDao(db: AppDatabase): AutomationRuleDao = db.automationRuleDao()
 
     @Provides
     @Singleton

@@ -7,6 +7,7 @@ import dagger.hilt.android.HiltAndroidApp
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
+import io.github.shiaho777.logsleuth.app.service.AutomationService
 import io.github.shiaho777.logsleuth.app.service.BubbleService
 import io.github.shiaho777.logsleuth.app.service.CrashWatchService
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
@@ -38,6 +39,18 @@ class LogSleuthApp : Application() {
         recordingManager.reconcileInterruptedSessions()
         restoreBubble()
         restoreWatch()
+        restoreAutomation()
+    }
+
+    /** Brings automation dispatch back after a process restart while the
+     *  user still wants it. A refused background start stops the service
+     *  cleanly; the next foreground launch or boot retries. */
+    private fun restoreAutomation() {
+        scope.launch {
+            val settings = settingsRepository.settings.first()
+            if (!settings.automationEnabled) return@launch
+            runCatching { AutomationService.start(this@LogSleuthApp) }
+        }
     }
 
     /** Brings the crash watch back after the process is recreated while the

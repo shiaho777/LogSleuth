@@ -85,6 +85,8 @@ data class Settings(
     val openCrashesOnStartup: Boolean = false,
     val includeDeviceInfoInZip: Boolean = true,
     val includeAppInfoInZip: Boolean = true,
+    /** Master switch for log-match broadcasts to automation apps. */
+    val automationEnabled: Boolean = false,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -136,6 +138,7 @@ class SettingsRepository(private val context: Context) {
         val SEPARATE_CRASH_CHANNELS = booleanPreferencesKey("separate_crash_channels")
         val LOGS_EXPANDED = booleanPreferencesKey("logs_expanded")
         val SEARCH_CASE_SENSITIVE = booleanPreferencesKey("search_case_sensitive")
+        val AUTOMATION_ENABLED = booleanPreferencesKey("automation_enabled")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -187,6 +190,7 @@ class SettingsRepository(private val context: Context) {
             openCrashesOnStartup = p[Keys.OPEN_CRASHES_ON_STARTUP] ?: false,
             includeDeviceInfoInZip = p[Keys.INCLUDE_DEVICE_ZIP] ?: true,
             includeAppInfoInZip = p[Keys.INCLUDE_APP_ZIP] ?: true,
+            automationEnabled = p[Keys.AUTOMATION_ENABLED] ?: false,
         )
     }
 
@@ -367,6 +371,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setIncludeAppInfoInZip(value: Boolean) =
         context.dataStore.edit { it[Keys.INCLUDE_APP_ZIP] = value }
+
+    suspend fun setAutomationEnabled(value: Boolean) =
+        context.dataStore.edit { it[Keys.AUTOMATION_ENABLED] = value }
 
     suspend fun setAccessPreference(value: String) {
         val allowed = setOf(

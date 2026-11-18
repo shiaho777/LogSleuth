@@ -450,4 +450,26 @@
     <string name="restart_logging">Restart logging</string>
     <string name="more">More</string>
 
+    <!-- Automation broadcasts -->
+    <string name="settings_section_automation">Automation</string>
+    <string name="settings_automation">Broadcast log matches</string>
+    <string name="settings_automation_desc">Send matching log lines to an automation app you choose (Tasker, MacroDroid…). Runs in the background while on.</string>
+    <string name="settings_automation_manage">Manage automation rules</string>
+    <string name="automation_title">Automation rules</string>
+    <string name="automation_intro">When a log line matches a rule, LogSleuth broadcasts it to the target app you picked — nothing is sent anywhere else. In Tasker, create a profile with an Intent Received event for the rule\'s action; extras include message, tag, level, package, pid, tid, uid, time and raw.</string>
+    <string name="automation_empty">No rules yet. Add one to broadcast matching log lines to Tasker, MacroDroid or another automation app.</string>
+    <string name="automation_add">Add rule</string>
+    <string name="automation_edit">Edit rule</string>
+    <string name="automation_unnamed">Unnamed rule</string>
+    <string name="automation_name">Rule name</string>
+    <string name="automation_source_any">Source app: any</string>
+    <string name="automation_target_pick">Pick target app (required)</string>
+    <string name="automation_target_hint">The broadcast goes only to this app. Pick your automation app (e.g. Tasker or MacroDroid).</string>
+    <string name="automation_action">Broadcast action</string>
+    <string name="automation_cooldown">Cooldown (seconds)</string>
+    <string name="automation_cooldown_hint">Minimum gap between two broadcasts of this rule; 0 = no limit.</string>
+    <string name="notif_channel_automation">Automation</string>
+    <string name="notif_automation_title">Automation active</string>
+    <string name="notif_automation_text">Broadcasting matching log lines to your automation app</string>
+
 </resources>

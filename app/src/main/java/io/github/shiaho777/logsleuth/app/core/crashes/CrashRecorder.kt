@@ -47,6 +47,10 @@ class CrashRecorder @Inject constructor(
     private val recentNotifyKeys = ArrayDeque<String>()
     private val recentNotifySet = HashSet<String>()
 
+    /** A crash-looping app must not flood the shade: announcements for the
+     * same app + type are merged inside a short window (records unaffected). */
+    private val throttle = CrashNotifyThrottle()
+
     /** True when this crash's app was explicitly muted by the user. */
     fun ignores(packageName: String?): Boolean =
         packageName != null && packageName in blacklist
@@ -103,17 +107,41 @@ class CrashRecorder @Inject constructor(
                 if (path != null) crashEventDao.setContextPath(eventId, path)
                 if (notify) {
                     rememberNotified(key)
-                    notificationHelper.notifyCrash(
-                        signal,
-                        eventId,
-                        identity?.label,
-                        separateChannels,
-                    )
+                    announce(signal, eventId, identity?.label)
                 }
+                prune()
             } else if (notify && !rememberNotified(key)) {
                 val label = signal.packageName?.let { installedApps.identity(it)?.label }
-                notificationHelper.notifyCrash(signal, 0L, label, separateChannels)
+                announce(signal, 0L, label)
             }
+        }
+    }
+
+    /** Posts the crash notification unless the throttle is merging a loop. */
+    private fun announce(signal: CrashSignal, eventId: Long, label: String?) {
+        val decision = throttle.onCrash(
+            key = "${signal.type.name}|${signal.packageName.orEmpty()}",
+            timeMillis = signal.timeMillis,
+        )
+        if (!decision.notify) return
+        notificationHelper.notifyCrash(signal, eventId, label, separateChannels, decision.count)
+    }
+
+    /**
+     * Caps the crash history (count + age) and sweeps orphaned context files.
+     * Runs after every stored crash — a looping device is exactly when this
+     * matters — and once at startup for whatever a previous process left.
+     */
+    suspend fun prune(now: Long = System.currentTimeMillis()) {
+        writeMutex.withLock {
+            val rows = crashEventDao.all()
+            val doomed = CrashRetention.selectForDeletion(rows, now)
+            if (doomed.isNotEmpty()) {
+                crashEventDao.contextPathsForIds(doomed).forEach { contextStore.delete(it) }
+                crashEventDao.deleteByIds(doomed)
+            }
+            val keep = crashEventDao.all().mapNotNull { it.contextPath }.toSet()
+            withContext(Dispatchers.IO) { contextStore.pruneOrphans(keep) }
         }
     }
 

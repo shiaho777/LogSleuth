@@ -450,4 +450,26 @@
     <string name="restart_logging">重新读取日志</string>
     <string name="more">更多</string>
 
+    <!-- Automation broadcasts -->
+    <string name="settings_section_automation">自动化</string>
+    <string name="settings_automation">广播匹配的日志</string>
+    <string name="settings_automation_desc">把匹配的日志行发送到你选定的自动化应用（Tasker、MacroDroid 等）。开启后在后台运行。</string>
+    <string name="settings_automation_manage">管理自动化规则</string>
+    <string name="automation_title">自动化规则</string>
+    <string name="automation_intro">日志行匹配规则时，LogSleuth 会把它广播给你选定的目标应用——不会发给其他任何应用。在 Tasker 中新建配置，事件选"收到 Intent"，动作填规则的动作名；附带参数包括 message、tag、level、package、pid、tid、uid、time 和 raw。</string>
+    <string name="automation_empty">还没有规则。添加一条，把匹配的日志行广播给 Tasker、MacroDroid 或其他自动化应用。</string>
+    <string name="automation_add">添加规则</string>
+    <string name="automation_edit">编辑规则</string>
+    <string name="automation_unnamed">未命名规则</string>
+    <string name="automation_name">规则名称</string>
+    <string name="automation_source_any">来源应用：任意</string>
+    <string name="automation_target_pick">选择目标应用（必选）</string>
+    <string name="automation_target_hint">广播只发给这个应用。请选择你的自动化应用（如 Tasker 或 MacroDroid）。</string>
+    <string name="automation_action">广播动作</string>
+    <string name="automation_cooldown">冷却时间（秒）</string>
+    <string name="automation_cooldown_hint">同一规则两次广播的最小间隔；0 表示不限制。</string>
+    <string name="notif_channel_automation">自动化</string>
+    <string name="notif_automation_title">自动化运行中</string>
+    <string name="notif_automation_text">正在把匹配的日志行广播给你的自动化应用</string>
+
 </resources>

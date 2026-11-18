@@ -46,6 +46,15 @@ Back closes the search before it leaves the page.
 **Ignore an app** if its crashes are noise: the crash detail screen can ignore
 the package that crashed, and the same screen can undo it.
 
+**Crash loops don't flood the shade.** When the same app keeps crashing,
+notifications for it are merged into one updating notification with a count
+(`×N`) instead of a new one per crash. Every crash is still recorded.
+
+**History is capped.** At most 500 crash events are kept, and nothing older
+than 30 days; their surrounding-log files are cleaned up with them. Two apps
+crashing at the same instant are recorded as two separate events, each with
+its own full stack.
+
 **Share it as text.** GitHub, Telegram and mail want `text/plain`, so the share
 action sends that. A very large stack goes out as a `text/plain` file through
 the system share sheet instead, and **Save** offers a `.txt` next to the zip.

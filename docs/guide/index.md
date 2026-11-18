@@ -69,3 +69,4 @@ Skip it if you like — **Settings → Feature tour** replays it.
 - [Log access](/guide/log-access) — what each path can and cannot do
 - [Filters & rules](/guide/filters) — narrowing a busy stream
 - [Recording & crashes](/guide/recording-and-crashes) — sessions and detection
+- [Automation broadcasts](/guide/automation) — log matches into Tasker/MacroDroid

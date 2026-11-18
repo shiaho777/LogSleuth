@@ -74,6 +74,7 @@ Requires Android 8.0 (API 26) or newer.
 - [Log access](/guide/log-access) — Shizuku, root and the ADB grant, compared
 - [Filters & rules](/guide/filters) — levels, queries, rule stacks, presets
 - [Recording & crashes](/guide/recording-and-crashes) — sessions, detection, export
+- [Automation broadcasts](/guide/automation) — log matches into Tasker/MacroDroid
 - [Developer docs](/developer/) — architecture, recipes and the release runbook
 
 </div>

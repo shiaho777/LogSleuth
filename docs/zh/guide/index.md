@@ -63,3 +63,4 @@ LogSleuth 位于前台时有效，退到后台流就断了。细节见
 - [日志权限](/zh/guide/log-access) —— 每条路径能做什么、不能做什么
 - [过滤与规则](/zh/guide/filters) —— 在很 busy 的流里收窄范围
 - [录制与崩溃](/zh/guide/recording-and-crashes) —— 会话、侦测与导出
+- [自动化广播](/zh/guide/automation) —— 把匹配的日志送进 Tasker/MacroDroid
