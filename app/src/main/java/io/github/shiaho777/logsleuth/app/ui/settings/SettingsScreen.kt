@@ -64,6 +64,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit,
     onOpenGuide: () -> Unit,
+    onOpenAutomation: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -351,6 +352,27 @@ fun SettingsScreen(
                             }
                         },
                     )
+                }
+            }
+
+            SettingsSectionHeader(stringResource(R.string.settings_section_automation))
+
+            Card {
+                Column {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_automation),
+                        subtitle = stringResource(R.string.settings_automation_desc),
+                        checked = s.automationEnabled,
+                        onCheckedChange = viewModel::setAutomationEnabled,
+                    )
+                    TextButton(
+                        onClick = onOpenAutomation,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                    ) {
+                        Text(stringResource(R.string.settings_automation_manage))
+                    }
                 }
             }
 

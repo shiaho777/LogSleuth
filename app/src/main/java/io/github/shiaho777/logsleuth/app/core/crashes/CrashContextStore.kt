@@ -31,4 +31,18 @@ class CrashContextStore @Inject constructor(
         if (path.isNullOrBlank()) return
         runCatching { File(path).delete() }
     }
+
+    /**
+     * Removes context files no stored event points at anymore — retention
+     * deletes and old process deaths can orphan them. [keepPaths] are the
+     * paths still referenced by crash_events.
+     */
+    fun pruneOrphans(keepPaths: Set<String>) {
+        val files = dir.listFiles() ?: return
+        for (file in files) {
+            if (file.isFile && file.absolutePath !in keepPaths) {
+                runCatching { file.delete() }
+            }
+        }
+    }
 }

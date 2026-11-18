@@ -30,6 +30,9 @@ class BootReceiver : BroadcastReceiver() {
                 ) {
                     runCatching { CrashWatchService.start(appContext) }
                 }
+                if (settings.automationEnabled) {
+                    runCatching { AutomationService.start(appContext) }
+                }
             } finally {
                 pending.finish()
             }

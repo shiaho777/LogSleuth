@@ -99,6 +99,25 @@ interface CrashEventDao {
 
     @Query("DELETE FROM crash_events WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
+
+    /** Retention pass over every stored event (bounded by the retention caps). */
+    @Query("SELECT * FROM crash_events")
+    suspend fun all(): List<CrashEventEntity>
+}
+
+@Dao
+interface AutomationRuleDao {
+    @Query("SELECT * FROM automation_rules ORDER BY createdAt ASC")
+    fun observeAll(): Flow<List<AutomationRuleEntity>>
+
+    @Insert
+    suspend fun insert(entity: AutomationRuleEntity): Long
+
+    @Update
+    suspend fun update(entity: AutomationRuleEntity)
+
+    @Delete
+    suspend fun delete(entity: AutomationRuleEntity)
 }
 
 @Dao

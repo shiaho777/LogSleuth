@@ -345,4 +345,47 @@ class CrashDetectorTest {
         val second = d.flush()
         assertNotNull(second)
     }
+
+    @Test
+    fun `interleaved crashes from two processes both keep their full stacks`() {
+        val d = CrashDetector()
+        // Two apps die at the same moment; logcat interleaves their blocks.
+        assertNull(d.onEntry(entry(pid = 100, message = "FATAL EXCEPTION: main")))
+        assertNull(d.onEntry(entry(pid = 200, message = "FATAL EXCEPTION: main")))
+        assertNull(d.onEntry(entry(pid = 100, message = "Process: com.example.a, PID: 100")))
+        assertNull(d.onEntry(entry(pid = 200, message = "Process: com.example.b, PID: 200")))
+        assertNull(d.onEntry(entry(pid = 100, message = "java.lang.IllegalStateException: a")))
+        assertNull(d.onEntry(entry(pid = 200, message = "java.lang.NullPointerException: b")))
+
+        val drained = d.drain()
+        assertEquals(2, drained.size)
+        val a = drained.first { it.packageName == "com.example.a" }
+        val b = drained.first { it.packageName == "com.example.b" }
+        assertEquals(100, a.pid)
+        assertEquals(200, b.pid)
+        assertTrue(a.snippet.contains("IllegalStateException"))
+        assertTrue(!a.snippet.contains("NullPointerException"))
+        assertTrue(b.snippet.contains("NullPointerException"))
+        assertTrue(!b.snippet.contains("IllegalStateException"))
+        assertEquals(3, a.snippet.lines().size)
+        assertEquals(3, b.snippet.lines().size)
+        assertNull(d.flush())
+    }
+
+    @Test
+    fun `a second process crashing does not truncate the first block`() {
+        val d = CrashDetector()
+        d.onEntry(entry(pid = 100, message = "FATAL EXCEPTION: main"))
+        d.onEntry(entry(pid = 100, message = "Process: com.example.a, PID: 100"))
+        // The other process's FATAL line used to flush the first block early.
+        assertNull(d.onEntry(entry(pid = 200, message = "FATAL EXCEPTION: main")))
+        assertNull(d.onEntry(entry(pid = 100, message = "\tat com.example.a.Main.run(Main.kt:9)")))
+        val closed = d.onEntry(entry(pid = 100, tag = "Other", message = "done"))
+        assertNotNull(closed)
+        assertEquals("com.example.a", closed!!.packageName)
+        assertTrue(closed.snippet.contains("Main.kt:9"))
+        val second = d.flush()
+        assertNotNull(second)
+        assertEquals(200, second!!.pid)
+    }
 }
