@@ -31,7 +31,18 @@ class SettingsViewModel @Inject constructor(
     private val engine: LogcatEngine,
     private val rootManager: RootManager,
     private val updateManager: UpdateManager,
+    private val remoteAdbManager: io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager,
 ) : ViewModel() {
+
+    val remoteState = remoteAdbManager.state
+
+    fun setRemoteAdb(host: String, port: Int) = viewModelScope.launch {
+        settingsRepository.setRemoteAdb(host, port)
+    }
+
+    fun testRemoteConnection() = remoteAdbManager.testConnection()
+
+    fun disconnectRemote() = remoteAdbManager.disconnect()
 
     val settings: StateFlow<Settings?> = settingsRepository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

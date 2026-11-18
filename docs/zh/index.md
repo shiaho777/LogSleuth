@@ -73,6 +73,7 @@ features:
 - [过滤与规则](/zh/guide/filters) —— 级别、查询、规则栈
 - [录制与崩溃](/zh/guide/recording-and-crashes) —— 会话、侦测、导出
 - [自动化广播](/zh/guide/automation) —— 把匹配的日志送进 Tasker/MacroDroid
+- [远程设备](/zh/guide/remote-device) —— 通过无线 ADB 读取第二台设备
 - [开发者文档](/developer/) —— 架构、改动配方与发版手册
 
 </div>

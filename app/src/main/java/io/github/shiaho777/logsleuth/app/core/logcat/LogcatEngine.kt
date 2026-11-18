@@ -54,6 +54,7 @@ class LogcatEngine @Inject constructor(
     private val accessChecker: AccessChecker,
     private val crashRecorder: CrashRecorder,
     private val bookmarkDao: BookmarkDao,
+    private val remoteAdbManager: io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager,
     settingsRepository: SettingsRepository,
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
@@ -193,6 +194,9 @@ class LogcatEngine @Inject constructor(
         scope.launch {
             rootManager.status.collect { refreshAccess() }
         }
+        scope.launch {
+            remoteAdbManager.state.collect { refreshAccess() }
+        }
         // A previous process (or a crash loop before retention existed) may
         // have left more history than the caps allow.
         scope.launch { runCatching { crashRecorder.prune() } }
@@ -201,6 +205,7 @@ class LogcatEngine @Inject constructor(
     private fun currentAccess(): AccessState = accessChecker.currentState(
         preference = accessPreference,
         rootReady = rootManager.status.value == RootStatus.READY,
+        remoteReady = remoteAdbManager.ready,
     )
 
     @Synchronized
@@ -296,6 +301,7 @@ class LogcatEngine @Inject constructor(
             AccessKind.SHIZUKU -> ShizukuLogcatSource(shizukuManager)
             AccessKind.ROOT -> RootLogcatSource()
             AccessKind.READ_LOGS -> LocalLogcatSource()
+            AccessKind.REMOTE_ADB -> remoteAdbManager.source() ?: return
             AccessKind.NONE -> return
         }
 
@@ -314,6 +320,9 @@ class LogcatEngine @Inject constructor(
                     if (generation != streamGeneration) return@collect
                     if (_state.compareAndSet(State.STARTING, State.RUNNING)) {
                         backoffMs = 1_000L
+                        if (_access.value.kind == AccessKind.REMOTE_ADB) {
+                            remoteAdbManager.markReady()
+                        }
                     }
                     for (entry in assembler.onLine(line)) {
                         dispatch(entry, crashDetector)
@@ -335,6 +344,17 @@ class LogcatEngine @Inject constructor(
                     rootManager.markDenied()
                     synchronized(this@LogcatEngine) {
                         if (generation == streamGeneration) refreshAccess()
+                    }
+                } else if (_access.value.kind == AccessKind.REMOTE_ADB) {
+                    // The remote link died: mark it failed so the policy
+                    // falls back to a local path instead of retrying a dead
+                    // socket forever. Reconnect from Settings when ready.
+                    remoteAdbManager.markFailed(e.message)
+                    synchronized(this@LogcatEngine) {
+                        if (generation == streamGeneration) {
+                            _lastError.value = e.message ?: e.javaClass.simpleName
+                            refreshAccess()
+                        }
                     }
                 } else {
                     synchronized(this@LogcatEngine) {

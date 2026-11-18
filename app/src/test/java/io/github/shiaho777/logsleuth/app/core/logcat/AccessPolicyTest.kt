@@ -76,4 +76,40 @@ class AccessPolicyTest {
             AccessPolicy.choose("shizuku", shizukuReady = false, rootReady = true, readLogs = true),
         )
     }
+
+    @Test
+    fun `remote preference wins while the link is ready`() {
+        assertEquals(
+            AccessKind.REMOTE_ADB,
+            AccessPolicy.choose(
+                "remote", shizukuReady = true, rootReady = true, readLogs = true, remoteReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `remote preference falls back to local paths when the link is down`() {
+        assertEquals(
+            AccessKind.SHIZUKU,
+            AccessPolicy.choose(
+                "remote", shizukuReady = true, rootReady = true, readLogs = true, remoteReady = false,
+            ),
+        )
+        assertEquals(
+            AccessKind.NONE,
+            AccessPolicy.choose(
+                "remote", shizukuReady = false, rootReady = false, readLogs = false, remoteReady = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `auto never picks the remote path on its own`() {
+        assertEquals(
+            AccessKind.SHIZUKU,
+            AccessPolicy.choose(
+                "auto", shizukuReady = true, rootReady = true, readLogs = true, remoteReady = true,
+            ),
+        )
+    }
 }

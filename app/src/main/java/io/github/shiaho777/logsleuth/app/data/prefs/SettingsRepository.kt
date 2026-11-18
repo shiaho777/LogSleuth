@@ -87,6 +87,9 @@ data class Settings(
     val includeAppInfoInZip: Boolean = true,
     /** Master switch for log-match broadcasts to automation apps. */
     val automationEnabled: Boolean = false,
+    /** Wireless-ADB host of the second device; blank = not configured. */
+    val remoteAdbHost: String = "",
+    val remoteAdbPort: Int = 5555,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -139,6 +142,8 @@ class SettingsRepository(private val context: Context) {
         val LOGS_EXPANDED = booleanPreferencesKey("logs_expanded")
         val SEARCH_CASE_SENSITIVE = booleanPreferencesKey("search_case_sensitive")
         val AUTOMATION_ENABLED = booleanPreferencesKey("automation_enabled")
+        val REMOTE_ADB_HOST = stringPreferencesKey("remote_adb_host")
+        val REMOTE_ADB_PORT = intPreferencesKey("remote_adb_port")
     }
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
@@ -191,6 +196,8 @@ class SettingsRepository(private val context: Context) {
             includeDeviceInfoInZip = p[Keys.INCLUDE_DEVICE_ZIP] ?: true,
             includeAppInfoInZip = p[Keys.INCLUDE_APP_ZIP] ?: true,
             automationEnabled = p[Keys.AUTOMATION_ENABLED] ?: false,
+            remoteAdbHost = p[Keys.REMOTE_ADB_HOST] ?: "",
+            remoteAdbPort = p[Keys.REMOTE_ADB_PORT] ?: 5555,
         )
     }
 
@@ -375,12 +382,20 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAutomationEnabled(value: Boolean) =
         context.dataStore.edit { it[Keys.AUTOMATION_ENABLED] = value }
 
+    suspend fun setRemoteAdb(host: String, port: Int) {
+        context.dataStore.edit {
+            it[Keys.REMOTE_ADB_HOST] = host.trim()
+            it[Keys.REMOTE_ADB_PORT] = port.coerceIn(1, 65535)
+        }
+    }
+
     suspend fun setAccessPreference(value: String) {
         val allowed = setOf(
             AccessPolicy.AUTO,
             AccessPolicy.SHIZUKU,
             AccessPolicy.ROOT,
             AccessPolicy.ADB,
+            AccessPolicy.REMOTE,
         )
         context.dataStore.edit {
             it[Keys.ACCESS_PREFERENCE] = if (value in allowed) value else AccessPolicy.AUTO

@@ -129,4 +129,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+
+    // Two-device remote-ADB verification (src/androidTest); skipped unless
+    // a remote_host argument is passed to the runner.
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation(libs.junit)
 }
