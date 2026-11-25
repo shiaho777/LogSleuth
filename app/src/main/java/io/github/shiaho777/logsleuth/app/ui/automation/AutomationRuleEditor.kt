@@ -31,7 +31,8 @@ import io.github.shiaho777.logsleuth.app.ui.components.AppPickerDialog
 @Composable
 internal fun AutomationRuleEditor(
     initial: AutomationRule?,
-    apps: List<AppChoice>,
+    sourceApps: List<AppChoice>,
+    targetApps: List<AppChoice>,
     onSave: (AutomationRule) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -100,7 +101,7 @@ internal fun AutomationRuleEditor(
                 ) {
                     Text(
                         draft.packageName?.let { pkg ->
-                            apps.firstOrNull { it.packageName == pkg }?.label ?: pkg
+                            sourceApps.firstOrNull { it.packageName == pkg }?.label ?: pkg
                         } ?: stringResource(R.string.automation_source_any),
                     )
                 }
@@ -112,7 +113,7 @@ internal fun AutomationRuleEditor(
                         if (draft.targetPackage.isBlank()) {
                             stringResource(R.string.automation_target_pick)
                         } else {
-                            apps.firstOrNull { it.packageName == draft.targetPackage }?.label
+                            targetApps.firstOrNull { it.packageName == draft.targetPackage }?.label
                                 ?: draft.targetPackage
                         },
                     )
@@ -155,7 +156,7 @@ internal fun AutomationRuleEditor(
 
     if (showSourcePicker) {
         AppPickerDialog(
-            apps = apps,
+            apps = sourceApps,
             current = draft.packageName,
             onSelect = { pkg ->
                 draft = draft.copy(packageName = pkg)
@@ -166,7 +167,7 @@ internal fun AutomationRuleEditor(
     }
     if (showTargetPicker) {
         AppPickerDialog(
-            apps = apps,
+            apps = targetApps,
             current = draft.targetPackage.takeIf { it.isNotBlank() },
             onSelect = { pkg ->
                 // "All apps" makes no sense for a broadcast target.

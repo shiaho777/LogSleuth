@@ -35,6 +35,7 @@ Create a profile: **Event → Intent Received**, action = the rule's action
 | `tag`, `message`, `raw` | The log line (text capped at 8000 chars) |
 | `pid`, `tid`, `uid` | Process/thread/user ids (`uid` = -1 when unknown) |
 | `time` | Log timestamp, epoch millis |
+| `remote_endpoint` | Capture address for remote logs |
 
 Example: a rule with query `FATAL EXCEPTION` targeting Tasker, plus a
 Tasker profile that flashes an alert and saves `%message` to a file, gives

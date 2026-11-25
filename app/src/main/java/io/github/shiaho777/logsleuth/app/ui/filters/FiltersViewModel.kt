@@ -7,6 +7,7 @@ import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.filter.FilterExchange
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.FilterDao
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
 import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
@@ -15,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -23,6 +26,7 @@ import kotlinx.coroutines.launch
 class FiltersViewModel @Inject constructor(
     private val filterDao: FilterDao,
     private val installedApps: InstalledApps,
+    private val engine: LogcatEngine,
 ) : ViewModel() {
 
     private val _apps = MutableStateFlow<List<AppChoice>>(emptyList())
@@ -33,7 +37,11 @@ class FiltersViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
-        viewModelScope.launch { _apps.value = installedApps.load() }
+        viewModelScope.launch {
+            engine.access.map { it.remoteEndpoint }.distinctUntilChanged().collectLatest { endpoint ->
+                _apps.value = installedApps.loadForCapture(endpoint?.let(engine::remotePackages))
+            }
+        }
     }
 
     fun save(filter: LogFilter) {

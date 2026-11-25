@@ -168,6 +168,8 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 输入搜索词、弹出范围选择器。可跳过,也可随时从 设置 → 关于 → "重播使用
 引导"再看一遍。
 
+[远程设备指南](docs/zh/guide/remote-device.md) 介绍如何通过传统 TCP ADB 读取第二台设备的日志。
+
 ## 日常用法
 
 - **"用户反馈某 App 老崩溃"** → 报告页 → 选中该应用 → 开始录制 → 把手机
@@ -183,12 +185,26 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 
 ## 集成 SDK
 
-把模块加进你的项目(目前为源码模块;Maven 构件计划随公开版本发布):
+如果 GitHub Release 附有 `logsleuth-sdk-<version>-maven.zip`，在工程中
+添加公开 Maven 仓库，并把依赖版本设为该 Release 的版本。
 
 ```kotlin
-// app/build.gradle.kts
-implementation(project(":sdk"))
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            url = uri("https://shiaho777.github.io/LogSleuth/maven/")
+            content { includeModule("io.github.shiaho777.logsleuth", "logsleuth-sdk") }
+        }
+    }
+}
 ```
+
+```kotlin
+implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:<version>")
+```
+
+也可以解压 Maven ZIP，将 `maven { url = uri(...) }` 指向解压后的目录。
+从源码集成时仍可用 `implementation(project(":sdk"))`。
 
 ```kotlin
 class MyApp : Application() {

@@ -49,6 +49,9 @@ class InstalledApps @Inject constructor(
         }
     }
 
+    suspend fun loadForCapture(remotePackages: Map<Int, String>?): List<AppChoice> =
+        remotePackages?.values?.distinct()?.sorted()?.map { AppChoice(it, it) } ?: load()
+
     /** Null when the package is already gone. */
     fun identity(packageName: String): AppIdentity? = runCatching {
         val pm = context.packageManager

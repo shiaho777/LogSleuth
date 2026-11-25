@@ -111,9 +111,9 @@ class RecordService : Service() {
                 }
             }
 
-            ACTION_PAUSE -> recordingManager.pause()
+            ACTION_PAUSE -> scope.launch { recordingManager.pause() }
 
-            ACTION_RESUME -> recordingManager.resume()
+            ACTION_RESUME -> scope.launch { recordingManager.resume() }
 
             ACTION_BOOKMARK -> {
                 scope.launch { recordingManager.addBookmark() }

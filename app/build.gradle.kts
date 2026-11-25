@@ -8,6 +8,19 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+val protectedSigning = listOf(
+    "LOGSLEUTH_SIGNING_STORE_FILE",
+    "LOGSLEUTH_SIGNING_STORE_PASSWORD",
+    "LOGSLEUTH_SIGNING_KEY_ALIAS",
+    "LOGSLEUTH_SIGNING_KEY_PASSWORD",
+).associateWith { providers.environmentVariable(it).orNull }
+val useProtectedSigning = protectedSigning.values.any { it != null }
+if (useProtectedSigning) {
+    require(protectedSigning.values.all { !it.isNullOrBlank() }) {
+        "All LogSleuth release signing environment variables are required"
+    }
+}
+
 android {
     namespace = "io.github.shiaho777.logsleuth.app"
     compileSdk = 36
@@ -24,19 +37,23 @@ android {
 
     signingConfigs {
         create("release") {
-            val props = Properties()
-            val propsFile = rootProject.file("keystore.properties")
-            if (propsFile.exists()) propsFile.inputStream().use { props.load(it) }
-            val store = props.getProperty("storeFile")
-            if (!store.isNullOrBlank()) {
-                storeFile = file(store)
+            if (useProtectedSigning) {
+                storeFile = file(protectedSigning.getValue("LOGSLEUTH_SIGNING_STORE_FILE")!!)
+                storePassword = protectedSigning.getValue("LOGSLEUTH_SIGNING_STORE_PASSWORD")
+                keyAlias = protectedSigning.getValue("LOGSLEUTH_SIGNING_KEY_ALIAS")
+                keyPassword = protectedSigning.getValue("LOGSLEUTH_SIGNING_KEY_PASSWORD")
+            } else if (providers.environmentVariable("GITHUB_ACTIONS").orNull != "true") {
+                val props = Properties()
+                val propsFile = rootProject.file("keystore.properties")
+                if (propsFile.isFile) propsFile.inputStream().use { props.load(it) }
+                props.getProperty("storeFile")?.takeIf { it.isNotBlank() }?.let { storeFile = file(it) }
                 storePassword = props.getProperty("storePassword")
                 keyAlias = props.getProperty("keyAlias")
                 keyPassword = props.getProperty("keyPassword")
-                enableV1Signing = false
-                enableV2Signing = true
-                enableV3Signing = true
             }
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 

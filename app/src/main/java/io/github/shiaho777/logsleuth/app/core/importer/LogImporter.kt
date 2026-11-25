@@ -3,6 +3,7 @@ package io.github.shiaho777.logsleuth.app.core.importer
 import android.content.Context
 import android.net.Uri
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatParser
+import io.github.shiaho777.logsleuth.app.core.logcat.SessionLogMetadata
 import io.github.shiaho777.logsleuth.app.core.logcat.ParsedLine
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
@@ -33,6 +34,7 @@ class LogImporter @Inject constructor(
     private class Counter {
         var bytes = 0L
         var entries = 0L
+        val metadata = SessionLogMetadata()
     }
 
     suspend fun import(uri: Uri): Result<Long> = withContext(Dispatchers.IO) {
@@ -62,6 +64,7 @@ class LogImporter @Inject constructor(
                         lineCount = counter.entries,
                         accessKind = "IMPORT",
                         imported = true,
+                        remoteEndpoint = counter.metadata.remoteEndpoint,
                     ),
                 )
             } catch (t: Throwable) {
@@ -84,6 +87,7 @@ class LogImporter @Inject constructor(
     private fun copyCounted(ins: InputStream, file: File, counter: Counter) {
         file.bufferedWriter(Charsets.UTF_8).use { out ->
             ins.bufferedReader(Charsets.UTF_8).forEachLine { line ->
+                counter.metadata.consume(line)
                 counter.bytes += line.toByteArray(Charsets.UTF_8).size + 1
                 require(counter.bytes <= ImportCore.MAX_IMPORT_BYTES) { "Import too large" }
                 if (line.isNotBlank() && line[0] != '#' &&
@@ -162,6 +166,7 @@ class LogImporter @Inject constructor(
                     val part = parts[name]
                         ?: throw java.io.IOException("Missing entry $name")
                     part.bufferedReader(Charsets.UTF_8).forEachLine { line ->
+                        counter.metadata.consume(line)
                         if (line.isNotBlank() && line[0] != '#' &&
                             LogcatParser.parse(line) is ParsedLine.Entry
                         ) {

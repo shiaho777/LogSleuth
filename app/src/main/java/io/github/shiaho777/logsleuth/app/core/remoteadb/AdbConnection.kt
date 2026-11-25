@@ -16,6 +16,7 @@ class AdbConnection(
     private val port: Int,
     private val keys: AdbKeyManager,
     connectTimeoutMs: Int = 8_000,
+    readTimeoutMs: Int = 0,
 ) : AutoCloseable {
 
     private val socket = Socket()
@@ -36,7 +37,7 @@ class AdbConnection(
         socket.tcpNoDelay = true
         // Reads block until data or close; a watchdog on the caller side
         // closes the socket to unblock them.
-        socket.soTimeout = 0
+        socket.soTimeout = readTimeoutMs
         input = BufferedInputStream(socket.inputStream, 64 * 1024)
         output = BufferedOutputStream(socket.outputStream, 64 * 1024)
     }
@@ -74,33 +75,40 @@ class AdbConnection(
      * USB debugging?" dialog on the remote screen; once the user accepts,
      * the same exchange ends in CNXN. Returns when authenticated.
      */
-    fun authenticate(maxRounds: Int = 30) {
-        send(AdbProtocol.cnxn())
-        var sentPublicKey = false
-        var rounds = 0
-        while (true) {
-            val message = readMessage()
-            when (message.command) {
-                AdbProtocol.CNXN -> return
-                AdbProtocol.AUTH -> {
-                    if (message.arg0 != AdbProtocol.AUTH_TOKEN) {
-                        throw AdbException("unexpected AUTH type ${message.arg0}")
+    fun authenticate() {
+        val previousTimeout = socket.soTimeout
+        if (previousTimeout == 0) socket.soTimeout = 30_000
+        try {
+            send(AdbProtocol.cnxn())
+            var signed = false
+            var offeredPublicKey = false
+            while (true) {
+                val message = readMessage()
+                when (message.command) {
+                    AdbProtocol.CNXN -> return
+                    AdbProtocol.AUTH -> {
+                        if (message.arg0 != AdbProtocol.AUTH_TOKEN || message.payload.size != 20) {
+                            throw AdbException("unexpected ADB authentication challenge")
+                        }
+                        when {
+                            !signed -> {
+                                send(AdbProtocol.auth(AdbProtocol.AUTH_SIGNATURE, keys.signToken(message.payload)))
+                                signed = true
+                            }
+                            !offeredPublicKey -> {
+                                val key = keys.publicKeyLine().toByteArray(Charsets.UTF_8) + byteArrayOf(0)
+                                send(AdbProtocol.auth(AdbProtocol.AUTH_RSAPUBLICKEY, key))
+                                offeredPublicKey = true
+                            }
+                            else -> throw AdbException("Remote device did not accept the debugging key")
+                        }
                     }
-                    if (++rounds > maxRounds) {
-                        throw AdbException("authentication not accepted (is the dialog on the remote device answered?)")
-                    }
-                    send(AdbProtocol.auth(AdbProtocol.AUTH_SIGNATURE, keys.signToken(message.payload)))
-                    if (!sentPublicKey) {
-                        // Offer the public key so adbd can remember it after
-                        // the user taps "Always allow".
-                        val line = keys.publicKeyLine() + "\n"
-                        send(AdbProtocol.auth(AdbProtocol.AUTH_RSAPUBLICKEY, line.toByteArray(Charsets.UTF_8)))
-                        sentPublicKey = true
-                    }
+                    AdbProtocol.STLS -> throw AdbException("remote requires TLS; plain TCP pairing is not supported")
+                    else -> throw AdbException("unexpected message 0x${Integer.toHexString(message.command)} during handshake")
                 }
-                AdbProtocol.STLS -> throw AdbException("remote requires TLS; plain TCP pairing is not supported")
-                else -> throw AdbException("unexpected message 0x${Integer.toHexString(message.command)} during handshake")
             }
+        } finally {
+            if (!socket.isClosed) socket.soTimeout = previousTimeout
         }
     }
 

@@ -3,7 +3,7 @@
 ## The whole picture
 
 ```text
-LogcatSource (local / Shizuku / root)
+LogcatSource (local / Shizuku / root / remote ADB)
   → LogcatEngine (singleton, owns THE logcat process)
       SharedFlow<LogcatEntry> ─┬→ StreamViewModel (per-frame batches) → UI list
                                 ├→ RecordingManager → session file + Room row
@@ -27,9 +27,14 @@ watch each hold a client, and the process lives while at least one does.
   until the user switches it on.
 - **Buffers** — the command reads `-b main -b system -b crash -b events`.
   The `uid` column is requested so the client can group lines by app.
-- **Reconnects** — a dead process is restarted with backoff and with `-T`
-  pointing at the last stamp, so a reconnect does not dump the ring buffer
-  again.
+- **Reconnects** — a dead local process restarts with backoff and `-T` at
+  the device's last timestamp. Remote ADB has a separate cursor and UID map
+  for each configured endpoint. When a remote link dies, access selection
+  tries the local paths.
+- **Recording** — each session captures one source. If a consumer falls
+  behind, it can recover entries by sequence from that source's retained
+  history. Any remaining gap is written to the session file and shown in
+  replay.
 - **Android 13+** — a logcat started as an app is declined while the app is in
   the background, and the decline is cached for about a minute. Shizuku and
   root run as the shell user and are not affected.

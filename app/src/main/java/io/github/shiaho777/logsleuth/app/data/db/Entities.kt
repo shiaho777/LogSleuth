@@ -17,6 +17,7 @@ data class SessionEntity(
     val accessKind: String = "",
     val filterPackage: String? = null,
     val imported: Boolean = false,
+    val remoteEndpoint: String? = null,
 )
 
 @Entity(tableName = "filters")
@@ -65,6 +66,7 @@ data class CrashEventEntity(
     val versionCode: Long? = null,
     /** File of surrounding log lines. Null when the buffer had nothing to keep. */
     val contextPath: String? = null,
+    val remoteEndpoint: String? = null,
 ) : io.github.shiaho777.logsleuth.app.core.crashes.CrashRetention.Row
 
 @Entity(tableName = "automation_rules")

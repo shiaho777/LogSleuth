@@ -111,6 +111,9 @@ internal class LogListPipeline(
     /** Rebuilds both lists from the engine snapshot (cold start / warm attach). */
     suspend fun snapshot(entries: List<LogcatEntry>, rules: () -> FilterRules) = mutex.withLock {
         val filters = rules()
+        pending.clear()
+        pausedIncoming = 0
+        onPausedIncoming(0)
         all.clear()
         visible.clear()
         for (e in entries) {

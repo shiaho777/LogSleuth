@@ -35,7 +35,7 @@ README for the URL).
 ## How the main pieces connect
 
 ```text
-LogcatSource (local / Shizuku / root)
+LogcatSource (local / Shizuku / root / remote ADB)
   → LogcatEngine (singleton, owns THE logcat process)
       SharedFlow<LogcatEntry> ─┬→ StreamViewModel (per-frame batches) → UI list
                                 ├→ RecordingManager → session file + Room row
@@ -75,8 +75,10 @@ Mental model:
   root grant change restarts it when that change switches the active path.
   Auto mode tries Shizuku, then root, then the ADB grant, so an existing
   Shizuku setup does not open a root shell.
-- Recordings honor the *full* active filter (level/query/tag/exclude/regex +
-  package) so what gets recorded matches what the user sees.
+- Recordings honor the *full* active filter and stay pinned to the device
+  selected at start. Resolve remote UIDs using remote package data. Recover
+  recording gaps by source sequence from the engine's retained history and
+  persist a marker when entries are unavailable.
 - The SDK runs in a different process entirely — it may only read its host
   app's own logs and must never assume LogSleuth (the viewer) is installed.
 
@@ -119,10 +121,10 @@ Mental model:
 
 ## Workflow
 
-- Do not commit `local.properties` or IDE/cache junk. The release
-  keystore is the exception: `app/release.keystore` and
-  `keystore.properties` stay in git so `assembleRelease` signs without a
-  password prompt. Do not delete or regenerate them.
+- Do not commit `local.properties`, IDE/cache junk, or new signing material.
+  The existing `app/release.keystore` and `keystore.properties` support local
+  builds during migration. Do not delete or regenerate them. GitHub Releases
+  use the protected release environment documented in the release runbook.
 - Do not create commits, push, open PRs, or file Issues unless the user asks to
   deliver / ship / push / open a PR (or equivalent).
 - Version pins at the time of writing: Gradle 8.11.1, AGP 8.9.3, Kotlin 2.2.21,
@@ -132,9 +134,9 @@ Mental model:
 ### Releasing
 
 Tags are the only release trigger — `.github/workflows/release.yml` runs on
-`v*`, re-runs the string gate and unit tests, then `assembleRelease` (signed by
-the committed keystore) and publishes the APK to the GitHub Release the in-app
-updater reads.
+`v*`, re-runs the string gate and unit tests, builds the sample against the
+staged SDK, and publishes the verified APK and SDK Maven archive to GitHub
+Releases. The docs workflow deploys SDK versions to the public Maven repository.
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR, and
    add `docs/releases/vX.Y.Z.md` — the bilingual notes the Release page will

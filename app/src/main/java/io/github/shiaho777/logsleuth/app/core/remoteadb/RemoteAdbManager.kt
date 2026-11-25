@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.shiaho777.logsleuth.app.core.logcat.RemoteAdbLogcatSource
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
+import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,12 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * Owns the remote-device configuration (host:port from Settings) and the
- * key identity, and reports whether a remote stream is usable. The engine
- * reads [ready] when choosing an access path; a successful probe flips it
- * on, a stream failure flips it off so the policy can fall back.
- */
 @Singleton
 class RemoteAdbManager @Inject constructor(
     @ApplicationContext context: Context,
@@ -33,15 +28,17 @@ class RemoteAdbManager @Inject constructor(
         val host: String = "",
         val port: Int = 5555,
         val detail: String? = null,
-    )
+        internal val packages: Map<Int, String> = emptyMap(),
+    ) {
+        internal val endpoint: String
+            get() = if (':' in host && !host.startsWith('[')) "[$host]:$port" else "$host:$port"
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val keys = AdbKeyManager(File(context.filesDir, "remote-adb"))
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
-
-    val ready: Boolean get() = _state.value.status == Status.READY
 
     init {
         scope.launch {
@@ -59,13 +56,8 @@ class RemoteAdbManager @Inject constructor(
         }
     }
 
-    fun keyManager(): AdbKeyManager = keys
-
-    fun source(): RemoteAdbLogcatSource? {
-        val s = _state.value
-        if (s.host.isBlank()) return null
-        return RemoteAdbLogcatSource(s.host, s.port, keys)
-    }
+    fun source(state: State): RemoteAdbLogcatSource =
+        RemoteAdbLogcatSource(state.host, state.port, keys, state.packages)
 
     /**
      * Probes the connection: authenticate and run a trivial shell command.
@@ -78,31 +70,39 @@ class RemoteAdbManager @Inject constructor(
             _state.value = s.copy(status = Status.FAILED, detail = "no host configured")
             return
         }
-        _state.value = s.copy(status = Status.CONNECTING, detail = null)
+        val connecting = s.copy(status = Status.CONNECTING, detail = null)
+        if (s.status == Status.CONNECTING || !_state.compareAndSet(s, connecting)) return
         scope.launch {
             val result = runCatching {
-                AdbConnection(s.host, s.port, keys).use { connection ->
+                AdbConnection(s.host, s.port, keys, readTimeoutMs = 30_000).use { connection ->
                     connection.authenticate()
-                    connection.openShell("echo logsleuth-ok")
-                    val out = StringBuilder()
-                    connection.readShell { out.append(String(it, Charsets.UTF_8)) }
-                    check(out.toString().contains("logsleuth-ok")) { "shell probe returned: $out" }
+                    connection.openShell("pm list packages -U; echo logsleuth-ok")
+                    val out = ByteArrayOutputStream()
+                    connection.readShell { chunk ->
+                        check(out.size() + chunk.size <= MAX_PROBE_BYTES) { "Remote package list is too large" }
+                        out.write(chunk)
+                    }
+                    val text = out.toString(Charsets.UTF_8.name())
+                    check(text.lineSequence().any { it.trim() == "logsleuth-ok" }) { "Remote shell did not finish the probe" }
+                    RemotePackages.parse(text.lineSequence())
                 }
             }
-            _state.value = _state.value.copy(
-                status = if (result.isSuccess) Status.READY else Status.FAILED,
-                detail = result.exceptionOrNull()?.message,
+            _state.compareAndSet(
+                connecting,
+                connecting.copy(
+                    status = if (result.isSuccess) Status.READY else Status.FAILED,
+                    detail = result.exceptionOrNull()?.message,
+                    packages = result.getOrNull().orEmpty(),
+                ),
             )
         }
     }
 
-    /** Called by the engine when the remote stream dies. */
-    fun markFailed(detail: String?) {
-        _state.value = _state.value.copy(status = Status.FAILED, detail = detail)
-    }
-
-    fun markReady() {
-        _state.value = _state.value.copy(status = Status.READY, detail = null)
+    fun markFailed(endpoint: String, detail: String?) {
+        val s = _state.value
+        if (s.endpoint == endpoint && s.status == Status.READY) {
+            _state.compareAndSet(s, s.copy(status = Status.FAILED, detail = detail))
+        }
     }
 
     fun disconnect() {
@@ -118,5 +118,9 @@ class RemoteAdbManager @Inject constructor(
         if (s.host.isNotBlank()) {
             _state.value = s.copy(status = Status.READY, detail = null)
         }
+    }
+
+    private companion object {
+        const val MAX_PROBE_BYTES = 2 * 1024 * 1024
     }
 }

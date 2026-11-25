@@ -7,6 +7,7 @@ import io.github.shiaho777.logsleuth.app.core.crashes.CrashRecorder
 import io.github.shiaho777.logsleuth.app.core.detect.CrashDetector
 import io.github.shiaho777.logsleuth.app.core.detect.CrashSignal
 import io.github.shiaho777.logsleuth.app.core.root.RootManager
+import io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager
 import io.github.shiaho777.logsleuth.app.core.root.RootStatus
 import io.github.shiaho777.logsleuth.app.core.shizuku.ShizukuManager
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
@@ -28,8 +29,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 private const val TAG = "LogcatEngine"
 
@@ -54,7 +53,7 @@ class LogcatEngine @Inject constructor(
     private val accessChecker: AccessChecker,
     private val crashRecorder: CrashRecorder,
     private val bookmarkDao: BookmarkDao,
-    private val remoteAdbManager: io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager,
+    private val remoteAdbManager: RemoteAdbManager,
     settingsRepository: SettingsRepository,
 ) {
     enum class State { STOPPED, STARTING, RUNNING, ERROR }
@@ -97,15 +96,12 @@ class LogcatEngine @Inject constructor(
     private val _crashes = MutableSharedFlow<CrashSignal>(extraBufferCapacity = 16)
     val crashes: SharedFlow<CrashSignal> = _crashes.asSharedFlow()
 
-    /** Recording session that crash events should be linked to (null when idle). */
+    data class ActiveRecording(val id: Long, val remoteEndpoint: String?)
+
     @Volatile
-    var activeSessionId: Long? = null
+    var activeRecording: ActiveRecording? = null
 
-    private val bufferMutex = Mutex()
-
-    /** Guarded by [bufferMutex]. Monotonic across stream restarts. */
-    private var nextSeq = 0L
-    private val buffer = ArrayDeque<LogcatEntry>()
+    private val history = LogHistory()
 
     @Volatile
     private var bufferCap = 20_000
@@ -132,19 +128,6 @@ class LogcatEngine @Inject constructor(
     /** Backoff for stream retries; reset after a successful (re)connection. */
     @Volatile
     private var backoffMs = 1_000L
-
-    /** Crash signals with an earlier log timestamp are backlog, not live. */
-    @Volatile
-    private var acceptCrashesAfter = Long.MAX_VALUE
-
-    /**
-     * Threadtime stamp of the newest line we've dispatched. A reconnect
-     * passes it as `logcat -T` so logd does not dump the ring buffer again.
-     * Null until the first line of this process — a cold start still shows
-     * the backlog.
-     */
-    @Volatile
-    private var resumeSince: String? = null
 
     /** User's preferred grant. `auto` tries Shizuku, then root, then READ_LOGS. */
     @Volatile
@@ -202,11 +185,19 @@ class LogcatEngine @Inject constructor(
         scope.launch { runCatching { crashRecorder.prune() } }
     }
 
-    private fun currentAccess(): AccessState = accessChecker.currentState(
-        preference = accessPreference,
-        rootReady = rootManager.status.value == RootStatus.READY,
-        remoteReady = remoteAdbManager.ready,
-    )
+    private fun currentAccess(
+        remote: RemoteAdbManager.State = remoteAdbManager.state.value,
+    ): AccessState {
+        val access = accessChecker.currentState(
+            preference = accessPreference,
+            rootReady = rootManager.status.value == RootStatus.READY,
+            remoteReady = remote.status == RemoteAdbManager.Status.READY,
+        )
+        return access.copy(
+            remoteEndpoint = remote.endpoint.takeIf { access.kind == AccessKind.REMOTE_ADB },
+            remoteFallback = accessPreference == AccessPolicy.REMOTE && access.kind != AccessKind.REMOTE_ADB,
+        )
+    }
 
     @Synchronized
     fun refreshAccess() {
@@ -215,7 +206,7 @@ class LogcatEngine @Inject constructor(
         if (previous == next) return
         _access.value = next
         if (consumers == 0) return
-        val kindChanged = previous.kind != next.kind
+        val kindChanged = previous.kind != next.kind || previous.remoteEndpoint != next.remoteEndpoint
         val becameGranted = !previous.granted && next.granted
         if (!kindChanged && !becameGranted) return
         if (next.granted) {
@@ -259,15 +250,22 @@ class LogcatEngine @Inject constructor(
     }
 
     /** Recent entries for consumers attaching later (e.g. opening the screen). */
-    suspend fun snapshot(): Snapshot = bufferMutex.withLock {
-        Snapshot(buffer.toList(), nextSeq)
-    }
+    fun snapshot(remoteEndpoint: String? = access.value.remoteEndpoint): Snapshot =
+        history.snapshot(remoteEndpoint)
+
+    fun watermark(remoteEndpoint: String?): Long = history.watermark(remoteEndpoint)
+
+    fun retained(remoteEndpoint: String?, after: Long, through: Long): List<LogcatEntry> =
+        history.retained(remoteEndpoint, after, through)
+
+    fun remotePackages(endpoint: String): Map<Int, String> =
+        remoteAdbManager.state.value.takeIf { it.endpoint == endpoint }?.packages.orEmpty()
 
     /** Inserts a timestamp bookmark; linked to the active recording if any. */
     suspend fun addBookmark(note: String = "") {
         bookmarkDao.insert(
             BookmarkEntity(
-                sessionId = activeSessionId,
+                sessionId = activeRecording?.id,
                 time = System.currentTimeMillis(),
                 note = note,
             ),
@@ -278,7 +276,9 @@ class LogcatEngine @Inject constructor(
         // Set _access directly: refreshAccess()'s restart-on-grant would
         // re-enter startStreamLocked while this monitor is already held and
         // leave a second stream's Job orphaned.
-        _access.value = currentAccess()
+        val remote = remoteAdbManager.state.value
+        val access = currentAccess(remote)
+        _access.value = access
         _lastError.value = null
         if (!_access.value.granted) {
             adbStartDeferred = false
@@ -297,11 +297,11 @@ class LogcatEngine @Inject constructor(
         }
         adbStartDeferred = false
 
-        val source: LogcatSource = when (_access.value.kind) {
+        val source: LogcatSource = when (access.kind) {
             AccessKind.SHIZUKU -> ShizukuLogcatSource(shizukuManager)
             AccessKind.ROOT -> RootLogcatSource()
             AccessKind.READ_LOGS -> LocalLogcatSource()
-            AccessKind.REMOTE_ADB -> remoteAdbManager.source() ?: return
+            AccessKind.REMOTE_ADB -> remoteAdbManager.source(remote)
             AccessKind.NONE -> return
         }
 
@@ -310,22 +310,26 @@ class LogcatEngine @Inject constructor(
         streamJob = scope.launch {
             val assembler = EntryAssembler()
             val crashDetector = CrashDetector()
-            val since = streamSince(resumeSince, liveOnlyOnStart, System.currentTimeMillis())
-            // Set before the first line. A cold start (`since == null`) dumps
-            // every buffer, including hours-old crash-buffer fatals. A
-            // reconnect with `-T` only replays the boundary line.
-            acceptCrashesAfter = System.currentTimeMillis() - CRASH_BACKLOG_GRACE_MS
+            val endpoint = access.remoteEndpoint
+            val packages = (source as? RemoteAdbLogcatSource)?.packages.orEmpty()
+            val since = streamSince(history.stamp(endpoint), liveOnlyOnStart, System.currentTimeMillis())
+            val acceptCrashesAfter = System.currentTimeMillis() - CRASH_BACKLOG_GRACE_MS
+            fun crash(signal: CrashSignal) = onCrash(
+                signal.copy(remoteEndpoint = endpoint),
+                acceptCrashesAfter,
+            )
+            fun publish(entry: LogcatEntry) {
+                val stamped = dispatch(entry, generation, endpoint, packages) ?: return
+                crashDetector.onEntry(stamped)?.let(::crash)
+            }
             try {
                 source.stream(since).collect { line ->
                     if (generation != streamGeneration) return@collect
                     if (_state.compareAndSet(State.STARTING, State.RUNNING)) {
                         backoffMs = 1_000L
-                        if (_access.value.kind == AccessKind.REMOTE_ADB) {
-                            remoteAdbManager.markReady()
-                        }
                     }
                     for (entry in assembler.onLine(line)) {
-                        dispatch(entry, crashDetector)
+                        publish(entry)
                     }
                 }
                 // Clean EOF (shouldn't normally happen for logcat) — treat as
@@ -345,13 +349,14 @@ class LogcatEngine @Inject constructor(
                     synchronized(this@LogcatEngine) {
                         if (generation == streamGeneration) refreshAccess()
                     }
-                } else if (_access.value.kind == AccessKind.REMOTE_ADB) {
-                    // The remote link died: mark it failed so the policy
-                    // falls back to a local path instead of retrying a dead
-                    // socket forever. Reconnect from Settings when ready.
-                    remoteAdbManager.markFailed(e.message)
+                } else if (endpoint != null) {
+                    if (generation == streamGeneration) {
+                        assembler.flush()?.let(::publish)
+                        crashDetector.drain().forEach(::crash)
+                    }
                     synchronized(this@LogcatEngine) {
                         if (generation == streamGeneration) {
+                            remoteAdbManager.markFailed(endpoint, e.message)
                             _lastError.value = e.message ?: e.javaClass.simpleName
                             refreshAccess()
                         }
@@ -367,10 +372,10 @@ class LogcatEngine @Inject constructor(
                 }
             } finally {
                 if (generation == streamGeneration) {
-                    assembler.flush()?.let { dispatch(it, crashDetector) }
+                    assembler.flush()?.let(::publish)
                     // Interleaved crashes leave several blocks open; emit
                     // every one, not just the oldest.
-                    crashDetector.drain().forEach { onCrash(it) }
+                    crashDetector.drain().forEach(::crash)
                 }
                 // Check ownership under the lock: a restart between an
                 // unlocked check and this write would orphan its new stream.
@@ -405,10 +410,6 @@ class LogcatEngine @Inject constructor(
         }
     }
 
-    /**
-     * Kill the live logcat process and open a new one. Keeps [resumeSince]
-     * so the ring is not dumped again. Use when the stream looks wedged.
-     */
     fun restart() = resetBackoffAndRestart()
 
     /**
@@ -439,33 +440,35 @@ class LogcatEngine @Inject constructor(
         _state.value = State.STOPPED
     }
 
-    private suspend fun dispatch(entry: LogcatEntry, crashDetector: CrashDetector) {
-        val stamped = bufferMutex.withLock {
-            val s = entry.copy(seq = ++nextSeq)
-            buffer.addLast(s)
-            while (buffer.size > bufferCap) buffer.removeFirst()
-            s
+    @Synchronized
+    private fun dispatch(
+        entry: LogcatEntry,
+        generation: Int,
+        remoteEndpoint: String?,
+        packages: Map<Int, String>,
+    ): LogcatEntry? {
+        if (generation != streamGeneration) return null
+        val attributed = if (remoteEndpoint == null) entry else {
+            entry.copy(remoteEndpoint = remoteEndpoint, remotePackage = entry.uid?.let(packages::get))
         }
-        resumeSince = UidNames.formatSince(stamped.timestampMillis)
-        _entries.emit(stamped)
-        crashDetector.onEntry(stamped)?.let { onCrash(it) }
+        val stamped = history.append(attributed, bufferCap)
+        _entries.tryEmit(stamped)
+        return stamped
     }
 
-    private fun onCrash(signal: CrashSignal) {
-        val threshold = acceptCrashesAfter
+    private fun onCrash(signal: CrashSignal, threshold: Long) {
+        val sessionId = activeRecording?.takeIf { it.remoteEndpoint == signal.remoteEndpoint }?.id
         scope.launch {
             if (signal.timeMillis < threshold) return@launch
             if (crashRecorder.ignores(signal.packageName)) return@launch
-            // The report wizard listens here. Saving and notifying are
-            // separate choices and must not hide a crash it is waiting for.
             _crashes.tryEmit(signal)
-            crashRecorder.record(signal, activeSessionId) {
-                bufferMutex.withLock { buffer.toList() }
+            crashRecorder.record(signal, sessionId) {
+                history.snapshot(signal.remoteEndpoint).entries
             }
         }
     }
 
-    suspend fun clearBuffer() {
-        bufferMutex.withLock { buffer.clear() }
+    fun clearBuffer(remoteEndpoint: String? = access.value.remoteEndpoint) {
+        history.clear(remoteEndpoint)
     }
 }

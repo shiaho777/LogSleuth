@@ -25,6 +25,7 @@ class NotificationHelper(private val context: Context) {
         const val ID_RECORDING_TIMEOUT = 1003
         const val ID_WATCH = 1004
         const val ID_RECORDING_WRITE_ERROR = 1005
+        const val ID_RECORDING_SOURCE_CHANGED = 1007
         const val ID_AUTOMATION = 1006
         const val ID_CRASH_BASE = 2000
         private const val NOTIFICATION_BODY = 1_500
@@ -323,6 +324,17 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(true)
             .build()
         manager.notify(ID_RECORDING_WRITE_ERROR, notification)
+    }
+
+    fun notifyRecordingSourceChanged(sessionId: Long) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_RECORDING)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notif_recording_limit_title))
+            .setContentText(context.getString(R.string.recording_source_changed))
+            .setContentIntent(sessionIntent(11, sessionId))
+            .setAutoCancel(true)
+            .build()
+        manager.notify(ID_RECORDING_SOURCE_CHANGED, notification)
     }
 
     /** Opens [MainActivity] at the finished session's detail page (or the

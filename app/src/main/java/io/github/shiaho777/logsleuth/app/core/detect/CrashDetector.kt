@@ -12,6 +12,7 @@ data class CrashSignal(
     val firstLine: String,
     val snippet: String,
     val timeMillis: Long,
+    val remoteEndpoint: String? = null,
 )
 
 /**

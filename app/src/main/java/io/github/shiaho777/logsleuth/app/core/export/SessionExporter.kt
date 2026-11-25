@@ -76,7 +76,8 @@ class SessionExporter @Inject constructor(
                         FileInputStream(source).use { it.copyTo(zip) }
                         zip.closeEntry()
                         if (withDevice) {
-                            zip.putText("device.txt", deviceInfo())
+                            val endpoint = session.remoteEndpoint ?: "".takeIf { session.accessKind == "REMOTE_ADB" }
+                            zip.putText("device.txt", deviceInfo(endpoint))
                         }
                         zip.putText("meta.txt", sessionMeta(session))
                     }
@@ -113,7 +114,7 @@ class SessionExporter @Inject constructor(
             val out = File(dir, "crash_${safe}_${crash.id}.zip")
             ZipOutputStream(out.outputStream().buffered()).use { zip ->
                 if (withApp) zip.putText("app.txt", appInfo(crash))
-                if (withDevice) zip.putText("device.txt", deviceInfo())
+                if (withDevice) zip.putText("device.txt", deviceInfo(crash.remoteEndpoint))
                 zip.putText("crash.txt", crashBody(crash))
                 val contextFile = crash.contextPath?.let { File(it) }?.takeIf { it.isFile }
                 if (contextFile != null) {
@@ -214,7 +215,12 @@ class SessionExporter @Inject constructor(
         }
     }
 
-    private fun deviceInfo(): String = buildString {
+    private fun deviceInfo(remoteEndpoint: String?): String = buildString {
+        if (remoteEndpoint != null) {
+            appendLine("source=remote")
+            if (remoteEndpoint.isNotEmpty()) appendLine("remoteEndpoint=$remoteEndpoint")
+            return@buildString
+        }
         appendLine("manufacturer=${android.os.Build.MANUFACTURER}")
         appendLine("brand=${android.os.Build.BRAND}")
         appendLine("model=${android.os.Build.MODEL}")
@@ -234,6 +240,7 @@ class SessionExporter @Inject constructor(
     }
 
     private fun crashBody(crash: CrashEventEntity): String = buildString {
+        crash.remoteEndpoint?.let { appendLine("remoteEndpoint=$it") }
         appendLine("type=${crash.type}")
         appendLine("time=${crash.time}")
         appendLine("pid=${crash.pid}")
@@ -253,6 +260,7 @@ class SessionExporter @Inject constructor(
         appendLine("endedAt=${session.endedAt ?: ""}")
         appendLine("lineCount=${session.lineCount}")
         appendLine("access=${session.accessKind}")
+        session.remoteEndpoint?.let { appendLine("remoteEndpoint=$it") }
         appendLine("filterPackage=${session.filterPackage ?: ""}")
     }
 }

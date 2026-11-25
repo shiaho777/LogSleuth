@@ -50,6 +50,7 @@ import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScop
 import kotlinx.coroutines.launch
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
+import io.github.shiaho777.logsleuth.app.ui.stream.CaptureNotice
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashCard
 import java.text.DateFormat
 import java.util.Date
@@ -143,6 +144,14 @@ fun SessionDetailScreen(
                     },
                 ),
         ) {
+            ui.remoteEndpoint?.let { endpoint ->
+                CaptureNotice(
+                    if (endpoint.isBlank()) stringResource(R.string.log_source_remote_unknown)
+                    else stringResource(R.string.log_source_remote, endpoint),
+                )
+            }
+            if (ui.missedEntries > 0) CaptureNotice(stringResource(R.string.recording_gap_count, ui.missedEntries))
+            if (ui.sourceChanged) CaptureNotice(stringResource(R.string.recording_source_changed))
             SecondaryTabRow(selectedTabIndex = pagerState.currentPage) {
                 listOf(
                     stringResource(R.string.tab_logs, ui.entries.size),

@@ -8,13 +8,18 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs-deploy.yml"
+      - "scripts/stage_sdk_maven.py"
   push:
     branches:
       - main
     paths:
       - "docs/**"
       - ".github/workflows/docs-deploy.yml"
+      - "scripts/stage_sdk_maven.py"
   workflow_dispatch:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: read
@@ -25,6 +30,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -48,6 +54,24 @@ jobs:
       - name: Build site
         working-directory: docs
         run: npm run build
+
+      - name: Stage published SDK versions
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          archives=$(mktemp -d "$RUNNER_TEMP/logsleuth-sdk.XXXXXX")
+          assets=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '
+            .[] | select(.draft == false) | .assets[]
+            | select(.name | test("^logsleuth-sdk-[0-9]+[.][0-9]+[.][0-9]+(-[A-Za-z0-9.-]+)?-maven[.]zip$"))
+            | [(.id | tostring), .name] | @tsv')
+          while IFS=$'	' read -r id name; do
+            [[ -n "$id" ]] || continue
+            gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$id" > "$archives/$name"
+          done <<< "$assets"
+          shopt -s nullglob
+          python3 scripts/stage_sdk_maven.py docs/.vitepress/dist/maven "$archives"/*.zip
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'

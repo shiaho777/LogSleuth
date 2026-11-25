@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.automation.AutomationRule
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.AutomationRuleDao
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
 import io.github.shiaho777.logsleuth.app.data.db.toRule
@@ -14,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -22,10 +25,14 @@ import kotlinx.coroutines.launch
 class AutomationViewModel @Inject constructor(
     private val ruleDao: AutomationRuleDao,
     installedApps: InstalledApps,
+    engine: LogcatEngine,
 ) : ViewModel() {
 
     private val _apps = MutableStateFlow<List<AppChoice>>(emptyList())
     val apps: StateFlow<List<AppChoice>> = _apps.asStateFlow()
+
+    private val _sourceApps = MutableStateFlow<List<AppChoice>>(emptyList())
+    val sourceApps: StateFlow<List<AppChoice>> = _sourceApps.asStateFlow()
 
     val rules: StateFlow<List<AutomationRule>> = ruleDao.observeAll()
         .map { list -> list.map { it.toRule() } }
@@ -33,6 +40,11 @@ class AutomationViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { _apps.value = installedApps.load() }
+        viewModelScope.launch {
+            engine.access.map { it.remoteEndpoint }.distinctUntilChanged().collectLatest { endpoint ->
+                _sourceApps.value = installedApps.loadForCapture(endpoint?.let(engine::remotePackages))
+            }
+        }
     }
 
     fun save(rule: AutomationRule) {

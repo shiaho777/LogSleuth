@@ -3,6 +3,7 @@ package io.github.shiaho777.logsleuth.app
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -10,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -166,8 +168,15 @@ class MainActivity : ComponentActivity() {
         } else if (fromNewIntent && intent.getBooleanExtra(EXTRA_OPEN_CRASHES, false)) {
             pendingRoute = Routes.CRASHES
         }
-        if (intent.action != Intent.ACTION_VIEW) return
-        val uri = intent.data ?: return
+        val uri = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> {
+                val stream = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+                    ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+                stream?.takeIf { intent.type == "application/zip" && it.scheme == "content" }
+            }
+            else -> null
+        } ?: return
         lifecycleScope.launch {
             logImporter.import(uri)
                 .onSuccess { importedSessionId = it }

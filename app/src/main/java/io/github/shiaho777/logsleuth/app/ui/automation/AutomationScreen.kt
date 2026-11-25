@@ -45,6 +45,7 @@ fun AutomationScreen(
 ) {
     val rules by viewModel.rules.collectAsState()
     val apps by viewModel.apps.collectAsState()
+    val sourceApps by viewModel.sourceApps.collectAsState()
     var editing by remember { mutableStateOf<AutomationRule?>(null) }
     var showEditor by remember { mutableStateOf(false) }
 
@@ -148,7 +149,8 @@ fun AutomationScreen(
     if (showEditor) {
         AutomationRuleEditor(
             initial = editing,
-            apps = apps,
+            sourceApps = sourceApps,
+            targetApps = apps,
             onSave = { rule ->
                 viewModel.save(rule)
                 showEditor = false

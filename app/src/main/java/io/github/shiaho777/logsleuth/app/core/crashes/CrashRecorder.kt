@@ -69,7 +69,7 @@ class CrashRecorder @Inject constructor(
         val notify = CrashPolicy.notifies(signal.type, settings)
         if (!store && !notify) return
 
-        val key = "${signal.timeMillis}|${signal.pid}|${signal.type.name}|${signal.firstLine}"
+        val key = "${signal.remoteEndpoint.orEmpty()}|${signal.timeMillis}|${signal.pid}|${signal.type.name}|${signal.firstLine}"
         writeMutex.withLock {
             if (store) {
                 // logcat replays its buffers on every start, so the same fatal
@@ -79,11 +79,13 @@ class CrashRecorder @Inject constructor(
                         pid = signal.pid,
                         type = signal.type.name,
                         firstLine = signal.firstLine,
+                        remoteEndpoint = signal.remoteEndpoint,
                     ) != null
                 ) {
                     return@withLock
                 }
-                val identity = signal.packageName?.let { installedApps.identity(it) }
+                val identity = signal.packageName?.takeIf { signal.remoteEndpoint == null }
+                    ?.let(installedApps::identity)
                 val eventId = crashEventDao.insert(
                     CrashEventEntity(
                         sessionId = sessionId,
@@ -96,6 +98,7 @@ class CrashRecorder @Inject constructor(
                         appName = identity?.label,
                         versionName = identity?.versionName,
                         versionCode = identity?.versionCode,
+                        remoteEndpoint = signal.remoteEndpoint,
                     ),
                 )
                 val text = CrashContext.format(
@@ -109,9 +112,10 @@ class CrashRecorder @Inject constructor(
                     rememberNotified(key)
                     announce(signal, eventId, identity?.label)
                 }
-                prune()
+                pruneLocked(System.currentTimeMillis())
             } else if (notify && !rememberNotified(key)) {
-                val label = signal.packageName?.let { installedApps.identity(it)?.label }
+                val label = signal.packageName?.takeIf { signal.remoteEndpoint == null }
+                    ?.let { installedApps.identity(it)?.label }
                 announce(signal, 0L, label)
             }
         }
@@ -120,7 +124,7 @@ class CrashRecorder @Inject constructor(
     /** Posts the crash notification unless the throttle is merging a loop. */
     private fun announce(signal: CrashSignal, eventId: Long, label: String?) {
         val decision = throttle.onCrash(
-            key = "${signal.type.name}|${signal.packageName.orEmpty()}",
+            key = "${signal.remoteEndpoint.orEmpty()}|${signal.type.name}|${signal.packageName.orEmpty()}",
             timeMillis = signal.timeMillis,
         )
         if (!decision.notify) return
@@ -133,16 +137,18 @@ class CrashRecorder @Inject constructor(
      * matters — and once at startup for whatever a previous process left.
      */
     suspend fun prune(now: Long = System.currentTimeMillis()) {
-        writeMutex.withLock {
-            val rows = crashEventDao.all()
-            val doomed = CrashRetention.selectForDeletion(rows, now)
-            if (doomed.isNotEmpty()) {
-                crashEventDao.contextPathsForIds(doomed).forEach { contextStore.delete(it) }
-                crashEventDao.deleteByIds(doomed)
-            }
-            val keep = crashEventDao.all().mapNotNull { it.contextPath }.toSet()
-            withContext(Dispatchers.IO) { contextStore.pruneOrphans(keep) }
+        writeMutex.withLock { pruneLocked(now) }
+    }
+
+    private suspend fun pruneLocked(now: Long) {
+        val rows = crashEventDao.all()
+        val doomed = CrashRetention.selectForDeletion(rows, now)
+        if (doomed.isNotEmpty()) {
+            crashEventDao.contextPathsForIds(doomed).forEach { contextStore.delete(it) }
+            crashEventDao.deleteByIds(doomed)
         }
+        val keep = crashEventDao.all().mapNotNull { it.contextPath }.toSet()
+        withContext(Dispatchers.IO) { contextStore.pruneOrphans(keep) }
     }
 
     /** True when [key] was already announced. Records it otherwise. */

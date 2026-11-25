@@ -32,6 +32,7 @@ LogSleuth 可以按你定义的规则监视实时日志流，把每一条匹配�
 | `tag`、`message`、`raw` | 日志行内容（文本上限 8000 字符） |
 | `pid`、`tid`、`uid` | 进程/线程/用户 id（`uid` 未知时为 -1） |
 | `time` | 日志时间戳，毫秒 |
+| `remote_endpoint` | 远程日志的采集地址 |
 
 例子：一条包含 `FATAL EXCEPTION`、目标为 Tasker 的规则，配上 Tasker 里
 "弹出提示并把 `%message` 存文件"的配置，就是一个覆盖整机所有应用的崩溃

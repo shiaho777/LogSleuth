@@ -39,7 +39,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":sdk"))
+    val sdkVersion = providers.gradleProperty("logsleuth.sdkVersion").orNull
+    implementation(if (sdkVersion == null) project(":sdk") else "io.github.shiaho777.logsleuth:logsleuth-sdk:$sdkVersion")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

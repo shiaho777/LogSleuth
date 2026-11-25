@@ -488,4 +488,10 @@
     <string name="remote_status_failed">失败：%1$s</string>
     <string name="remote_allow_hint">远程设备可能弹出"允许 USB 调试吗？"对话框——请在那台设备上点允许（勾选"一律允许"下次就不再弹）。Android 11+ 的配对码方式可先用电脑执行一次 adb pair，或把本应用的密钥加入该设备的信任列表。</string>
 
+    <string name="log_source_remote">远程设备：%1$s</string>
+    <string name="log_source_remote_unknown">远程设备（地址未知）</string>
+    <string name="log_source_local_fallback">远程设备不可用 · 正在显示本机日志</string>
+    <string name="log_source_remote_unavailable">远程设备不可用</string>
+    <string name="recording_source_changed">日志来源已切换，录制已结束。</string>
+    <string name="recording_gap_count">缺失日志条数：%1$d</string>
 </resources>

@@ -1,20 +1,24 @@
 package io.github.shiaho777.logsleuth.app.service
 
 import android.content.Context
+import io.github.shiaho777.logsleuth.app.core.apps.InstalledApps
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
-import io.github.shiaho777.logsleuth.app.data.db.FilterDao
-import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
+import io.github.shiaho777.logsleuth.app.core.logcat.AccessKind
 import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.SessionLogMetadata
+import io.github.shiaho777.logsleuth.app.data.db.FilterDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
+import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import java.io.BufferedWriter
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
+import java.io.IOException
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,21 +42,12 @@ data class RecordingState(
     val isRecording: Boolean = false,
     val sessionId: Long? = null,
     val lineCount: Long = 0,
-    /** Lines backfilled from the engine buffer at start (context before live capture). */
     val backfillCount: Long = 0,
     val startedAt: Long = 0L,
-    /** Writer is open but new lines are skipped until [RecordingManager.resume]. */
     val paused: Boolean = false,
+    val missedEntries: Long = 0L,
 )
 
-/**
- * Writes the live stream to a session file. Controlled by [RecordService],
- * the quick-settings tile and the floating bubble.
- *
- * UI state ([state]) is published in batches (every [STATE_BATCH] lines) —
- * at high log volume a per-line StateFlow write is pure waste; the exact
- * final count is persisted on stop via [finalLines].
- */
 @Singleton
 class RecordingManager @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
@@ -62,365 +56,333 @@ class RecordingManager @Inject constructor(
     private val filterDao: FilterDao,
     private val settingsRepository: SettingsRepository,
     private val notificationHelper: NotificationHelper,
+    private val installedApps: InstalledApps,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private enum class StopReason { MANUAL, SIZE, TIME, WRITE_ERROR, DEVICE_CHANGED }
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lifecycleMutex = Mutex()
+    private val writeMutex = Mutex()
     private val _state = MutableStateFlow(RecordingState())
     val state: StateFlow<RecordingState> = _state.asStateFlow()
 
-    /** Exact line count; the published [RecordingState.lineCount] may lag briefly. */
     @Volatile
-    private var finalLines = 0L
+    private var capture: Capture? = null
+    private var jobs = emptyList<Job>()
 
-    private var collectJob: Job? = null
-    private var filtersJob: Job? = null
+    private inner class Capture(
+        val id: Long,
+        val file: File,
+        val writer: BufferedWriter,
+        val endpoint: String?,
+        val maxMb: Int,
+        val maxHours: Int,
+        val filter: CompiledFilter,
+        @Volatile var stack: FilterStack,
+        snapshot: LogcatEngine.Snapshot,
+        headerBytes: Long,
+    ) {
+        val maxBytes = maxMb.toLong() * 1024 * 1024
+        var bytes = headerBytes
+        var lines = 0L
+        var missed = 0L
+        var backfill: List<LogcatEntry>? = snapshot.entries
+        var pendingStop: StopReason? = null
+        private val recordedUids = HashSet<Int>()
+        val sequence = RecordingSequence(
+            start = snapshot.maxSeq,
+            retained = { after, through -> engine.retained(endpoint, after, through) },
+            write = ::writeEntry,
+            gap = ::writeGap,
+        )
 
-    /** Enabled saved rules, refreshed while a recording is open. */
-    @Volatile
-    private var activeStack = FilterStack.PASS
-    private var writer: BufferedWriter? = null
-    private val writeMutex = Mutex()
-
-    /**
-     * Serializes [start], [stop] and [reconcileInterruptedSessions]. Without
-     * it a stop could land while start is half done, or a manual stop and a
-     * limit stop could both release the engine client.
-     */
-    private val lifecycleMutex = Mutex()
-
-    /** Session file byte cap captured at start; 0 = not recording. */
-    @Volatile
-    private var maxBytes = 0L
-
-    @Volatile
-    private var limitMb = 0
-
-    /** Duration cap in hours captured at start; 0 = unlimited. */
-    @Volatile
-    private var limitHours = 0
-
-    /** Set once a cap fires — later emissions must not re-trigger stop/notify. */
-    private val limitTriggered = AtomicBoolean(false)
-
-    /** Timer for the duration cap; null when unlimited. */
-    private var durationJob: Job? = null
-
-    /** Bytes written so far — counted as UTF-8 line bytes, matching the file. */
-    private var bytesWritten = 0L
-
-    suspend fun start(name: String?, filter: LogFilter): Result<Long> = lifecycleMutex.withLock {
-        // Checked outside runCatching: the failure cleanup below tears down the
-        // writer and jobs, which must never hit a recording in progress.
-        if (_state.value.isRecording) {
-            return@withLock Result.failure(IllegalStateException("Already recording"))
+        fun writeLine(text: String) {
+            writer.appendLine(text)
+            bytes += text.toByteArray(Charsets.UTF_8).size + 1
         }
-        runCatching {
-            // Without a log grant the engine streams nothing; a recording
-            // would silently produce a header-only file.
-            check(engine.access.value.granted) { "Log access not granted" }
 
-            val dir = File(context.filesDir, "recordings").apply { mkdirs() }
-            val file = File(dir, "session_${System.currentTimeMillis()}.log")
-            val w = file.bufferedWriter(Charsets.UTF_8, 64 * 1024)
-            writer = w
-
-            val settings = settingsRepository.settings.first()
-            limitMb = settings.recordingMaxMb
-            maxBytes = limitMb.toLong() * 1024 * 1024
-            limitHours = settings.recordingMaxHours
-            bytesWritten = 0L
-            limitTriggered.set(false)
-
-            val header = buildString {
-                appendLine("# LogSleuth session")
-                appendLine("# started: ${java.time.Instant.now()}")
-                appendLine("# device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
-                appendLine("# android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})")
-                appendLine("# access: ${engine.access.value.kind}")
+        fun writeEntry(entry: LogcatEntry): Boolean {
+            if (bytes >= maxBytes) return false
+            if (filter.matches(entry) && stack.matches(entry)) {
+                val uid = entry.uid
+                val pkg = entry.remotePackage
+                if (uid != null && pkg != null && recordedUids.add(uid)) {
+                    writeLine(SessionLogMetadata.packageLine(uid, pkg))
+                }
+                writeLine(entry.raw)
+                lines++
+                if (lines % BATCH == 0L) writer.flush()
             }
-            w.write(header)
-            bytesWritten += header.toByteArray(Charsets.UTF_8).size
-            w.flush()
+            return true
+        }
 
-            val sessionId = sessionDao.insert(
+        private fun writeGap(count: Long): Boolean {
+            if (bytes >= maxBytes) return false
+            writeLine(SessionLogMetadata.gap(count))
+            missed += count
+            return true
+        }
+
+        fun writeBackfill() {
+            val entries = backfill ?: return
+            backfill = null
+            for (entry in entries) if (!writeEntry(entry)) break
+            if (lines > 0 && bytes < maxBytes) {
+                writeLine("# ===== recording started; the $lines lines above are buffered context =====")
+            }
+            writer.flush()
+            _state.update { it.copy(lineCount = lines, backfillCount = lines) }
+        }
+    }
+
+    suspend fun start(name: String?, filter: LogFilter): Result<Long> = withContext(Dispatchers.IO) {
+        lifecycleMutex.withLock {
+            if (capture != null) return@withLock Result.failure(IllegalStateException("Already recording"))
+            runCatching {
+                engine.refreshAccess()
+                val access = engine.access.value
+                check(access.granted) { "Log access not granted" }
+                val endpoint = access.remoteEndpoint
+                val settings = settingsRepository.settings.first()
+                val rules = filterDao.observeAll().first().map { it.toLogFilter() }
+                val stack = FilterStack.compile(rules, installedApps::resolveUid)
+                val compiled = CompiledFilter(filter, installedApps.resolveUid(filter.packageName))
+                val snapshot = engine.snapshot(endpoint)
+                val file = newSessionFile()
+                val (id, writer, headerBytes) = try {
+                    val header = buildString {
+                        appendLine("# LogSleuth session")
+                        appendLine("# started: ${Instant.now()}")
+                        append(deviceHeader(access.kind.name, endpoint))
+                    }
+                    val writer = file.bufferedWriter(Charsets.UTF_8, WRITER_BYTES)
+                    try {
+                        writer.write(header)
+                        writer.flush()
+                        val id = sessionDao.insert(
+                            SessionEntity(
+                                name = name ?: defaultName(),
+                                filePath = file.absolutePath,
+                                startedAt = System.currentTimeMillis(),
+                                accessKind = access.kind.name,
+                                filterPackage = filter.packageName,
+                                remoteEndpoint = endpoint,
+                            ),
+                        )
+                        Triple(id, writer, header.toByteArray(Charsets.UTF_8).size.toLong())
+                    } catch (failure: Throwable) {
+                        runCatching { writer.close() }
+                        throw failure
+                    }
+                } catch (failure: Throwable) {
+                    file.delete()
+                    throw failure
+                }
+                val current = Capture(
+                    id, file, writer, endpoint, settings.recordingMaxMb, settings.recordingMaxHours,
+                    compiled, stack, snapshot, headerBytes,
+                )
+                capture = current
+                engine.activeRecording = LogcatEngine.ActiveRecording(id, endpoint)
+                _state.value = RecordingState(isRecording = true, sessionId = id, startedAt = System.currentTimeMillis())
+                engine.acquireClient()
+                jobs = buildList {
+                    add(scope.launch {
+                        engine.entries.onSubscription {
+                            record(current) {
+                                writeBackfill()
+                                sequence.recoverThrough(engine.watermark(endpoint))
+                            }
+                        }.collect { entry ->
+                            if (entry.remoteEndpoint == endpoint) {
+                                record(current) {
+                                    val before = lines
+                                    sequence.accept(entry)
+                                    if (lines / BATCH != before / BATCH || missed != _state.value.missedEntries) {
+                                        _state.update { it.copy(lineCount = lines, missedEntries = missed) }
+                                    }
+                                }
+                            } else {
+                                stopAfterSourceChange(current)
+                            }
+                        }
+                    })
+                    add(scope.launch {
+                        engine.access.collect { active ->
+                            if (active.remoteEndpoint != endpoint) stopAfterSourceChange(current)
+                        }
+                    })
+                    add(scope.launch {
+                        filterDao.observeAll().collect { rows ->
+                            current.stack = FilterStack.compile(rows.map { it.toLogFilter() }, installedApps::resolveUid)
+                        }
+                    })
+                    if (current.maxHours > 0) add(scope.launch {
+                        delay(current.maxHours * 3_600_000L)
+                        writeMutex.withLock { scheduleStop(current, StopReason.TIME) }
+                    })
+                }
+                id
+            }
+        }
+    }
+
+    private suspend fun record(current: Capture, write: Capture.() -> Unit) {
+        writeMutex.withLock {
+            if (current.pendingStop != null || _state.value.paused) return
+            try {
+                current.write()
+                if (current.bytes >= current.maxBytes) scheduleStop(current, StopReason.SIZE)
+            } catch (_: IOException) {
+                scheduleStop(current, StopReason.WRITE_ERROR)
+            }
+        }
+    }
+
+    private suspend fun stopAfterSourceChange(current: Capture) {
+        writeMutex.withLock { scheduleStop(current, StopReason.DEVICE_CHANGED) }
+    }
+
+    private fun scheduleStop(current: Capture, reason: StopReason) {
+        if (current.pendingStop != null) return
+        current.pendingStop = reason
+        scope.launch { finish(current.id) }
+    }
+
+    suspend fun snapshotToSession(entries: List<LogcatEntry>, name: String? = null): Result<Long> = runCatching {
+        val endpoint = entries.firstOrNull()?.remoteEndpoint
+        check(entries.all { it.remoteEndpoint == endpoint }) { "Snapshot contains logs from different devices" }
+        val activeAccess = engine.access.value.kind
+        val accessKind = when {
+            endpoint != null -> AccessKind.REMOTE_ADB.name
+            activeAccess == AccessKind.REMOTE_ADB -> ""
+            else -> activeAccess.name
+        }
+        val packages = entries.mapNotNull { entry ->
+            entry.uid?.let { uid -> entry.remotePackage?.let { uid to it } }
+        }.toMap()
+        val file = newSessionFile()
+        try {
+            file.bufferedWriter(Charsets.UTF_8, WRITER_BYTES).use { writer ->
+                writer.appendLine("# LogSleuth session (snapshot)")
+                writer.appendLine("# saved: ${Instant.now()}")
+                writer.write(deviceHeader(accessKind, endpoint, packages))
+                entries.forEach { writer.appendLine(it.raw) }
+            }
+            val now = System.currentTimeMillis()
+            sessionDao.insert(
                 SessionEntity(
                     name = name ?: defaultName(),
                     filePath = file.absolutePath,
-                    startedAt = System.currentTimeMillis(),
-                    accessKind = engine.access.value.kind.name,
-                    filterPackage = filter.packageName,
+                    startedAt = entries.firstOrNull()?.timestampMillis ?: now,
+                    endedAt = entries.lastOrNull()?.timestampMillis ?: now,
+                    lineCount = entries.size.toLong(),
+                    accessKind = accessKind,
+                    remoteEndpoint = endpoint,
                 ),
             )
-
-            val compiled = CompiledFilter(filter, resolveUid(filter.packageName))
-            val initialRules = filterDao.observeAll().first().map { it.toLogFilter() }
-            activeStack = FilterStack.compile(initialRules, ::resolveUid)
-            filtersJob = scope.launch {
-                filterDao.observeAll().collect { rows ->
-                    activeStack = FilterStack.compile(rows.map { it.toLogFilter() }, ::resolveUid)
-                }
-            }
-            engine.activeSessionId = sessionId
-
-            // isRecording is published synchronously so stop() and duplicate
-            // start() calls see it before the collector coroutine runs.
-            _state.value = RecordingState(
-                isRecording = true,
-                sessionId = sessionId,
-                startedAt = System.currentTimeMillis(),
-            )
-
-            var count = 0L
-            collectJob = scope.launch {
-                var snapshotSeq = 0L
-                engine.entries
-                    .onSubscription {
-                        // Subscribe first, then snapshot: emissions between
-                        // registration and the snapshot land in both places
-                        // and are deduped by seq; emissions before the
-                        // subscription are recovered from the buffer.
-                        val snap = engine.snapshot()
-                        snapshotSeq = snap.maxSeq
-                        // Include recent history as context before start.
-                        val matched = snap.entries.filter { compiled.matches(it) && activeStack.matches(it) }
-                        val backfillOk = runCatching {
-                            writeMutex.withLock {
-                                matched.forEach {
-                                    w.appendLine(it.raw)
-                                    bytesWritten += it.raw.toByteArray(Charsets.UTF_8).size + 1
-                                }
-                                if (matched.isNotEmpty()) {
-                                    // '#'-prefixed: skipped on replay, visible in exports.
-                                    w.appendLine(
-                                        "# ===== recording started; the ${matched.size} lines above are buffered context =====",
-                                    )
-                                }
-                                w.flush()
-                            }
-                        }.isSuccess
-                        if (!backfillOk) {
-                            stopForWriteError()
-                            return@onSubscription
-                        }
-                        count = matched.size.toLong()
-                        finalLines = count
-                        _state.update { it.copy(lineCount = count, backfillCount = count) }
-                        // A huge engine buffer can already exceed the cap.
-                        if (bytesWritten >= maxBytes) stopForLimit()
-                    }
-                    .collect { entry ->
-                        if (entry.seq <= snapshotSeq) return@collect
-                        if (_state.value.paused) return@collect
-                        if (compiled.matches(entry) && activeStack.matches(entry)) {
-                            val writeOk = runCatching {
-                                writeMutex.withLock {
-                                    w.appendLine(entry.raw)
-                                    bytesWritten += entry.raw.toByteArray(Charsets.UTF_8).size + 1
-                                    count++
-                                    finalLines = count
-                                    if (count % FLUSH_BATCH == 0L) w.flush()
-                                }
-                            }.isSuccess
-                            if (!writeOk) {
-                                stopForWriteError()
-                                return@collect
-                            }
-                            if (count % STATE_BATCH == 0L) {
-                                _state.update { it.copy(lineCount = count) }
-                            }
-                            if (bytesWritten >= maxBytes) stopForLimit()
-                        }
-                    }
-            }
-
-            // Duration cap: 0 disables it; the timer stops the recording and
-            // notifies instead of letting an idle session run forever.
-            if (limitHours > 0) {
-                durationJob = scope.launch {
-                    delay(limitHours.toLong() * 3_600_000L)
-                    stopForTimeout()
-                }
-            }
-
-            engine.acquireClient()
-            sessionId
-        }.onFailure {
-            withContext(NonCancellable) {
-                collectJob?.cancelAndJoin()
-                collectJob = null
-                filtersJob?.cancelAndJoin()
-                filtersJob = null
-                activeStack = FilterStack.PASS
-                durationJob?.cancelAndJoin()
-                durationJob = null
-                engine.activeSessionId = null
-                _state.value = RecordingState()
-                writeMutex.withLock {
-                    runCatching { writer?.close() }
-                    writer = null
-                }
-            }
+        } catch (failure: Throwable) {
+            file.delete()
+            throw failure
         }
     }
 
-    /**
-     * Writes an already-buffered set of entries as a finished session —
-     * "save current view to Sessions" without ever recording live. Uses the
-     * same file format as a recording (comment header + raw lines) so the
-     * replay path reads it identically.
-     */
-    suspend fun snapshotToSession(
-        entries: List<LogcatEntry>,
-        name: String? = null,
-    ): Result<Long> = runCatching {
-        val dir = File(context.filesDir, "recordings").apply { mkdirs() }
-        val file = File(dir, "session_${System.currentTimeMillis()}.log")
-        val header = buildString {
-            appendLine("# LogSleuth session (snapshot)")
-            appendLine("# saved: ${java.time.Instant.now()}")
-            appendLine("# device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
-            appendLine("# android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})")
-            appendLine("# access: ${engine.access.value.kind}")
-        }
-        file.bufferedWriter(Charsets.UTF_8, 64 * 1024).use { w ->
-            w.write(header)
-            for (e in entries) w.appendLine(e.raw)
-        }
-        val now = System.currentTimeMillis()
-        sessionDao.insert(
-            SessionEntity(
-                name = name ?: defaultName(),
-                filePath = file.absolutePath,
-                startedAt = entries.firstOrNull()?.timestampMillis ?: now,
-                endedAt = entries.lastOrNull()?.timestampMillis ?: now,
-                lineCount = entries.size.toLong(),
-                accessKind = engine.access.value.kind.name,
-            ),
-        )
-    }
-
-    suspend fun addBookmark() {
-        engine.addBookmark()
-        val writeOk = runCatching {
+    suspend fun addBookmark() = withContext(Dispatchers.IO) {
+        lifecycleMutex.withLock {
             writeMutex.withLock {
-                writer?.appendLine("===== BOOKMARK ${java.time.Instant.now()} =====")
-                writer?.flush()
+                val current = capture
+                if (current?.pendingStop != null) return@withLock
+                engine.addBookmark()
+                if (current != null) {
+                    try {
+                        current.writeLine("===== BOOKMARK ${Instant.now()} =====")
+                        current.writer.flush()
+                        if (current.bytes >= current.maxBytes) scheduleStop(current, StopReason.SIZE)
+                    } catch (_: IOException) {
+                        scheduleStop(current, StopReason.WRITE_ERROR)
+                    }
+                }
             }
-        }.isSuccess
-        if (!writeOk) stopForWriteError()
-    }
-
-    /**
-     * The session file refused a write (disk full, storage revoked). Without
-     * this the collector coroutine died silently: the UI kept saying
-     * "recording" while the line count froze and nothing reached the file.
-     * Finish the session with what landed on disk and tell the user why it
-     * ended. Same shape as [stopForLimit]: stop runs on its own coroutine
-     * because it joins the collector.
-     */
-    private fun stopForWriteError() {
-        if (!limitTriggered.compareAndSet(false, true)) return
-        val sessionId = _state.value.sessionId ?: return
-        scope.launch {
-            if (stopSession(sessionId)) notificationHelper.notifyRecordingWriteError(sessionId)
         }
     }
 
-    /**
-     * Called from the collector when the session file reaches [maxBytes].
-     * Stops the recording on a separate coroutine (stop joins the collector,
-     * so calling it from inside would wait on itself) and tells the user why
-     * it ended. Only the session that hit the cap is stopped: if the user
-     * already stopped it and started another, the new one is left alone.
-     */
-    private fun stopForLimit() {
-        if (!limitTriggered.compareAndSet(false, true)) return
-        val mb = limitMb
-        val sessionId = _state.value.sessionId ?: return
-        scope.launch {
-            if (stopSession(sessionId)) notificationHelper.notifyRecordingLimit(mb, sessionId)
+    suspend fun pause() = withContext(Dispatchers.IO) {
+        lifecycleMutex.withLock {
+            val current = capture ?: return@withLock
+            if (_state.value.paused) return@withLock
+            record(current) {
+                writeBackfill()
+                sequence.recoverThrough(engine.watermark(endpoint))
+                writer.flush()
+                _state.update { it.copy(paused = true, lineCount = lines, missedEntries = missed) }
+            }
         }
     }
 
-    /** Called by the duration-cap timer. Same shape as [stopForLimit]. */
-    private fun stopForTimeout() {
-        if (!limitTriggered.compareAndSet(false, true)) return
-        val hours = limitHours
-        val sessionId = _state.value.sessionId ?: return
-        scope.launch {
-            if (stopSession(sessionId)) notificationHelper.notifyRecordingTimeout(hours, sessionId)
-        }
-    }
-
-    /** Stops writing without closing the session. Lines during the pause are dropped. */
-    fun pause() {
-        _state.update { if (!it.isRecording || it.paused) it else it.copy(paused = true) }
-    }
-
-    fun resume() {
-        _state.update { if (!it.isRecording || !it.paused) it else it.copy(paused = false) }
-    }
-
-    suspend fun stop() {
-        lifecycleMutex.withLock { withContext(NonCancellable) { stopLocked(expectedSessionId = null) } }
-    }
-
-    /** Stops [sessionId] if it is still the active recording; true when it was. */
-    private suspend fun stopSession(sessionId: Long): Boolean =
-        lifecycleMutex.withLock { withContext(NonCancellable) { stopLocked(sessionId) } }
-
-    /**
-     * Caller holds [lifecycleMutex] and runs non-cancellable, so a stop that
-     * has begun always finishes the session. The collector is joined before
-     * the writer closes: a line still being written must land in the file,
-     * not hit a closed stream.
-     */
-    private suspend fun stopLocked(expectedSessionId: Long?): Boolean {
-        val s = _state.value
-        if (!s.isRecording) return false
-        if (expectedSessionId != null && s.sessionId != expectedSessionId) return false
-        collectJob?.cancelAndJoin()
-        collectJob = null
-        filtersJob?.cancelAndJoin()
-        filtersJob = null
-        activeStack = FilterStack.PASS
-        durationJob?.cancelAndJoin()
-        durationJob = null
-        engine.activeSessionId = null
-        engine.releaseClient()
-        maxBytes = 0L
-
+    suspend fun resume() = lifecycleMutex.withLock {
+        val current = capture ?: return@withLock
         writeMutex.withLock {
-            runCatching {
-                writer?.flush()
-                writer?.close()
+            if (_state.value.paused && current.pendingStop == null) {
+                current.sequence.discardThrough(engine.watermark(current.endpoint))
+                _state.update { it.copy(paused = false) }
             }
-            writer = null
         }
-        s.sessionId?.let { sessionDao.finish(it, System.currentTimeMillis(), finalLines) }
-        _state.value = RecordingState()
-        return true
     }
 
-    /**
-     * Marks sessions orphaned by a process death as finished — the writer
-     * died with the process, so endedAt was never written. Called once at
-     * app start; endedAt falls back to the file's mtime (when recording
-     * actually stopped), and the line count is recomputed with the same
-     * assembler logic used live. Runs under [lifecycleMutex] so a recording
-     * being started at the same moment is never mistaken for an orphan; the
-     * active session is skipped and every other unfinished one is reconciled.
-     */
+    suspend fun stop() = finish()
+
+    private suspend fun finish(expectedId: Long? = null) = lifecycleMutex.withLock {
+        val current = capture ?: return@withLock
+        if (expectedId != null && current.id != expectedId) return@withLock
+        withContext(NonCancellable + Dispatchers.IO) {
+            jobs.forEach { it.cancel() }
+            jobs.forEach { it.join() }
+            jobs = emptyList()
+            engine.activeRecording = null
+            var reason = current.pendingStop ?: StopReason.MANUAL
+            try {
+                writeMutex.withLock {
+                    try {
+                        current.writer.use {
+                            if (reason != StopReason.WRITE_ERROR && reason != StopReason.SIZE) {
+                                current.writeBackfill()
+                                if (!_state.value.paused) {
+                                    current.sequence.recoverThrough(engine.watermark(current.endpoint))
+                                }
+                                if (reason == StopReason.DEVICE_CHANGED) {
+                                    current.writer.appendLine(SessionLogMetadata.SOURCE_CHANGED)
+                                }
+                            }
+                        }
+                    } catch (_: IOException) {
+                        reason = StopReason.WRITE_ERROR
+                    }
+                    capture = null
+                }
+                val lines = if (reason == StopReason.WRITE_ERROR) countEntries(current.file) else current.lines
+                sessionDao.finish(current.id, System.currentTimeMillis(), lines)
+                when (reason) {
+                    StopReason.MANUAL -> Unit
+                    StopReason.SIZE -> notificationHelper.notifyRecordingLimit(current.maxMb, current.id)
+                    StopReason.TIME -> notificationHelper.notifyRecordingTimeout(current.maxHours, current.id)
+                    StopReason.WRITE_ERROR -> notificationHelper.notifyRecordingWriteError(current.id)
+                    StopReason.DEVICE_CHANGED -> notificationHelper.notifyRecordingSourceChanged(current.id)
+                }
+            } finally {
+                engine.releaseClient()
+                _state.value = RecordingState()
+            }
+        }
+    }
+
     fun reconcileInterruptedSessions() {
         scope.launch {
             lifecycleMutex.withLock {
-                val activeId = _state.value.sessionId
-                for (s in sessionDao.unfinished()) {
-                    if (s.id == activeId) continue
-                    val file = File(s.filePath)
-                    val endedAt = file.lastModified()
-                        .takeIf { it > 0L } ?: System.currentTimeMillis()
-                    sessionDao.finish(s.id, endedAt, countEntries(file))
+                for (session in sessionDao.unfinished()) {
+                    if (session.id == capture?.id) continue
+                    val file = File(session.filePath)
+                    val endedAt = file.lastModified().takeIf { it > 0L } ?: System.currentTimeMillis()
+                    sessionDao.finish(session.id, endedAt, countEntries(file))
                 }
             }
         }
@@ -429,17 +391,36 @@ class RecordingManager @Inject constructor(
     private fun countEntries(file: File): Long {
         if (!file.isFile) return 0L
         val assembler = EntryAssembler()
-        var n = 0L
+        var count = 0L
         runCatching {
             file.bufferedReader().useLines { lines ->
                 for (line in lines) {
                     if (line.startsWith("#") || line.startsWith("=====")) continue
-                    n += assembler.onLine(line).size
+                    count += assembler.onLine(line).size
                 }
             }
-            if (assembler.flush() != null) n++
+            if (assembler.flush() != null) count++
         }
-        return n
+        return count
+    }
+
+    private fun newSessionFile(): File {
+        val dir = File(context.filesDir, "recordings").apply { mkdirs() }
+        return File.createTempFile("session_", ".log", dir)
+    }
+
+    private fun deviceHeader(
+        access: String,
+        endpoint: String?,
+        packages: Map<Int, String> = emptyMap(),
+    ) = buildString {
+        appendLine("# access: $access")
+        if (endpoint == null) {
+            appendLine("# device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
+            appendLine("# android: ${android.os.Build.VERSION.RELEASE} (SDK ${android.os.Build.VERSION.SDK_INT})")
+        } else {
+            append(SessionLogMetadata.sourceHeader(endpoint, packages))
+        }
     }
 
     private fun defaultName(): String {
@@ -447,15 +428,8 @@ class RecordingManager @Inject constructor(
         return "Session " + fmt.format(java.util.Date())
     }
 
-    private fun resolveUid(packageName: String?): Int? {
-        if (packageName == null) return null
-        return runCatching {
-            context.packageManager.getApplicationInfo(packageName, 0).uid
-        }.getOrNull()
-    }
-
-    companion object {
-        private const val FLUSH_BATCH = 64L
-        private const val STATE_BATCH = 64L
+    private companion object {
+        const val BATCH = 64L
+        const val WRITER_BYTES = 64 * 1024
     }
 }

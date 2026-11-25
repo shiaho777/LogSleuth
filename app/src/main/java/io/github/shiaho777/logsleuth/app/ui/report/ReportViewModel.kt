@@ -16,10 +16,12 @@ import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.service.RecordService
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
 import javax.inject.Inject
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -52,22 +54,43 @@ class ReportViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _ui.update { it.copy(apps = installedApps.load()) }
+            engine.access.map { it.remoteEndpoint }.distinctUntilChanged().collectLatest { endpoint ->
+                val apps = installedApps.loadForCapture(endpoint?.let(engine::remotePackages))
+                _ui.update { state ->
+                    state.copy(
+                        apps = apps,
+                        selectedApp = state.selectedApp.takeIf { state.isRecording },
+                    )
+                }
+            }
         }
         // Mirror the global recording state.
         viewModelScope.launch {
             recordingManager.state.collect { s ->
+                val wasRecording = _ui.value.isRecording
                 _ui.update {
                     it.copy(isRecording = s.isRecording, recordedLines = s.lineCount)
                 }
-                if (s.isRecording) trackedSessionId = s.sessionId
+                if (s.isRecording) {
+                    trackedSessionId = s.sessionId
+                } else if (wasRecording) {
+                    val id = trackedSessionId
+                    trackedSessionId = null
+                    val session = id?.let { sessionDao.getById(it) }
+                    if (session?.endedAt != null) {
+                        _ui.update { state ->
+                            if (state.step == 2) state.copy(step = 3, finishedSession = session) else state
+                        }
+                    }
+                }
             }
         }
         // Auto-stop when the selected app crashes during a report recording.
         viewModelScope.launch {
             engine.crashes.collect { signal ->
                 val selected = _ui.value.selectedApp ?: return@collect
-                if (!_ui.value.isRecording || autoStopHandled) return@collect
+                val active = engine.activeRecording ?: return@collect
+                if (!_ui.value.isRecording || autoStopHandled || signal.remoteEndpoint != active.remoteEndpoint) return@collect
                 if (signal.packageName == selected.packageName) {
                     autoStopHandled = true
                     _ui.update { it.copy(crashCaught = selected.packageName) }
@@ -101,22 +124,6 @@ class ReportViewModel @Inject constructor(
         context.startService(
             Intent(context, RecordService::class.java).setAction(RecordService.ACTION_STOP),
         )
-        viewModelScope.launch {
-            // Wait for the service to finalize the session row.
-            val id = trackedSessionId
-            var session: SessionEntity? = null
-            repeat(20) {
-                delay(150)
-                session = id?.let { sessionDao.getById(it) }
-                if (session?.endedAt != null) return@repeat
-            }
-            _ui.update {
-                it.copy(
-                    step = 3,
-                    finishedSession = session ?: it.finishedSession,
-                )
-            }
-        }
     }
 
     fun share(format: SessionExporter.Format, onResult: (Result<Unit>) -> Unit) {

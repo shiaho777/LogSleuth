@@ -37,6 +37,8 @@ data class LogcatEntry(
     val message: String,
     val raw: String,
     val seq: Long = 0,
+    val remoteEndpoint: String? = null,
+    val remotePackage: String? = null,
 ) {
     val displayTime: String
         get() {
