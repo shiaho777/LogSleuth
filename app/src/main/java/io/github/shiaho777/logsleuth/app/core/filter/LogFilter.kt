@@ -40,7 +40,6 @@ data class LogFilter(
     /** Tag must equal [tagQuery] (ignore-case) instead of containing it. */
     val tagExact: Boolean = false,
     val useRegex: Boolean = false,
-    /** Per-app filter, applied server-side via `logcat --uid` (Shizuku only). */
     val packageName: String? = null,
     /**
      * When true, this saved rule joins the stack. The quick filter on the
@@ -142,8 +141,9 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
 
     // Per-app filter: compare the entry's uid column against the resolved uid.
     // null = no app filter; NO_UID = filter set but uid unresolvable (match nothing).
+    private val requiredPackage = rule.packageName
     private val requiredUid: Int? = when {
-        rule.packageName == null -> null
+        requiredPackage == null -> null
         resolvedUid != null -> resolvedUid
         else -> NO_UID
     }
@@ -179,8 +179,12 @@ class CompiledFilter(rule: LogFilter, resolvedUid: Int? = null) {
         if (regexInvalid) return false
         if (entry.level !in levels) return false
 
-        if (requiredUid != null) {
-            if (requiredUid == NO_UID || entry.uid != requiredUid) return false
+        if (requiredPackage != null) {
+            if (entry.remoteEndpoint != null) {
+                if (entry.remotePackage != requiredPackage) return false
+            } else if (requiredUid == NO_UID || entry.uid != requiredUid) {
+                return false
+            }
         }
         if (uidUnresolvable) return false
         if (uidExact != null && entry.uid != uidExact) return false

@@ -31,6 +31,8 @@ data class AccessState(
     val readLogsGranted: Boolean,
     val rootReady: Boolean = false,
     val remoteReady: Boolean = false,
+    val remoteEndpoint: String? = null,
+    val remoteFallback: Boolean = false,
 ) {
     val granted: Boolean get() = kind != AccessKind.NONE
 }

@@ -259,7 +259,7 @@ fun LogRow(
         Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val cache = LocalAppIconCache.current
-                val icon = cache?.iconFor(entry.uid)
+                val icon = if (entry.remoteEndpoint == null) cache?.iconFor(entry.uid) else null
                 if (icon != null) {
                     Image(
                         bitmap = icon,
@@ -271,7 +271,8 @@ fun LogRow(
                     )
                 }
                 if (prefs.showPackage) {
-                    cache?.labelFor(entry.uid)?.let { label ->
+                    val label = if (entry.remoteEndpoint != null) entry.remotePackage else cache?.labelFor(entry.uid)
+                    label?.let {
                         Text(
                             text = label,
                             style = logMetaStyle(scale),
@@ -513,7 +514,9 @@ private fun EntryDetailContent(
     Column(modifier.padding(horizontal = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             LevelBadge(entry.level)
-            LocalAppIconCache.current?.iconFor(entry.uid)?.let { icon ->
+            val cache = LocalAppIconCache.current
+            val icon = if (entry.remoteEndpoint == null) cache?.iconFor(entry.uid) else null
+            icon?.let {
                 Spacer(Modifier.width(8.dp))
                 Image(
                     bitmap = icon,
@@ -523,7 +526,8 @@ private fun EntryDetailContent(
                         .clip(RoundedCornerShape(4.dp)),
                 )
             }
-            LocalAppIconCache.current?.labelFor(entry.uid)?.let { label ->
+            val label = if (entry.remoteEndpoint != null) entry.remotePackage else cache?.labelFor(entry.uid)
+            label?.let {
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = label,
@@ -543,7 +547,8 @@ private fun EntryDetailContent(
             )
         }
         Spacer(Modifier.height(8.dp))
-        val detailPackage = LocalAppIconCache.current?.packageFor(entry.uid)
+        val detailPackage = if (entry.remoteEndpoint != null) entry.remotePackage
+            else LocalAppIconCache.current?.packageFor(entry.uid)
         Text(
             text = "${entry.displayTime}  ·  pid ${entry.pid}  ·  tid ${entry.tid}" +
                 (entry.uid?.let { "  ·  uid $it" } ?: "") +

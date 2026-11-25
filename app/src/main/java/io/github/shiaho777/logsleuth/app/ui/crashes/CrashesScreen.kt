@@ -371,6 +371,13 @@ fun CrashCard(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                crash.remoteEndpoint?.let {
+                    Text(
+                        stringResource(R.string.log_source_remote, it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CrashTypeBadge(typeLabel, severity)
                     Spacer(Modifier.width(6.dp))

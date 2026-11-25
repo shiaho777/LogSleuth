@@ -33,11 +33,11 @@ workflow builds from the tagged commit.
    ```
 
 5. **Watch the workflow.** `.github/workflows/release.yml` runs the string
-   gate, the unit tests and `assembleRelease` (signed with the keystore
-   committed in the repository), then attaches `LogSleuth-X.Y.Z.APK` to the
-   GitHub Release with the committed notes as the body. The run stops before
-   building if the tag does not match `versionName`, or if the notes file is
-   missing.
+   gate and unit tests, builds the sample against the staged Maven SDK, and
+   verifies the signed APK against the configured certificate. It publishes
+   `LogSleuth-X.Y.Z.APK`, `logsleuth-sdk-X.Y.Z-maven.zip`, and a SHA-256
+   manifest with the committed notes. The docs workflow then deploys the SDK
+   version to the public Maven repository.
 
    The asset name is `<app>-<version>.APK`, the same shape the mature
    `web-to-app` releases use. The in-app updater matches the asset by its
@@ -74,9 +74,37 @@ Requires Android 8.0 (API 26)+.
 - **用户能拿到什么** —— 写行为，不写 diff。(#124)
 ```
 
-Mention the signing key whenever it changes: if the certificate is not the one
-that signed the previous release, the new build does not install over it and
-the user has to uninstall first.
+## Release signing
+
+Before tagging, configure the GitHub Actions environment named `release` for
+release tags. Set `LOGSLEUTH_RELEASE_KEYSTORE_BASE64`,
+`LOGSLEUTH_RELEASE_STORE_PASSWORD`, `LOGSLEUTH_RELEASE_KEY_ALIAS` and
+`LOGSLEUTH_RELEASE_KEY_PASSWORD` as environment secrets. Set the public
+SHA-256 signing-certificate fingerprint as the environment variable
+`LOGSLEUTH_RELEASE_CERT_SHA256`. The workflow verifies the signed APK before
+publishing.
+
+Treat the historic key in Git as exposed. Record the signing certificate for
+each distribution channel and test the upgrade from its last release before
+selecting a replacement. Android 9 and newer can use a v3 signing lineage for
+APK rotation. Android 8.x cannot switch to the new signer through that lineage.
+For these devices, decide how existing installations will migrate and how users
+can preserve sessions before changing what the release serves. Google Play
+signing has its own key upgrade workflow.
+
+See the [Android APK signing reference](https://developer.android.com/tools/apksigner)
+and [Play signing guide](https://developer.android.com/studio/publish/app-signing).
+
+## SDK smoke build
+
+```bash
+./gradlew :sdk:publishReleasePublicationToStagingRepository -Plogsleuth.sdkVersion=0.0.0-local
+./gradlew :sample:assembleDebug -Plogsleuth.sdkVersion=0.0.0-local
+```
+
+Install the sample, export its log ZIP, and open that ZIP in the viewer to
+verify replay. The Maven archive contains the AAR, POM, Gradle metadata and
+sources for the release version.
 
 ## What the workflow refuses to do
 
@@ -91,9 +119,6 @@ the user has to uninstall first.
 
 `versionCode` must increase — the in-app updater compares it. `versionName`
 is what the user sees, and it is the tag without the `v`.
-
-A build that changes the signing key does not install over the previous one.
-Say so in the release notes, and tell the user to uninstall first.
 
 ## Checklist
 

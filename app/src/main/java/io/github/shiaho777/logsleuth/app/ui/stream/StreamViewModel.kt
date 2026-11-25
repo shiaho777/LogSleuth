@@ -32,6 +32,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -48,6 +51,7 @@ private const val HITS_REFRESH_MS = 250L
 
 data class StreamUiState(
     val access: AccessState? = null,
+    val remoteEndpoint: String? = null,
     val engineState: LogcatEngine.State = LogcatEngine.State.STOPPED,
     val filter: LogFilter = LogFilter.DEFAULT,
     val regexInvalid: Boolean = false,
@@ -205,35 +209,27 @@ class StreamViewModel @Inject constructor(
                 refilter()
             }
         }
-        viewModelScope.launch {
-            _ui.update { it.copy(apps = installedApps.load()) }
-        }
-
-        // Collector: stage entries; a drainer publishes them once per frame
-        // so a busy logcat cannot trigger a recompose per line. On Default —
-        // the snapshot path filter-matches up to the whole buffer cap and must
-        // not run on the main thread (it froze cold/warm starts).
-        //
-        // onSubscription runs after this subscriber is registered but before
-        // it receives anything: the snapshot taken inside therefore covers
-        // every emission this subscription could miss, and seq dedup drops
-        // entries already included in it. No gap, no duplicates.
-        //
-        // The drainer suspends until a line arrives, then waits one frame so
-        // a burst becomes one update. Idle does not wake.
         viewModelScope.launch(Dispatchers.Default) {
-            var snapshotSeq = 0L
-            engine.entries
-                .onSubscription {
-                    val snap = engine.snapshot()
-                    snapshotSeq = snap.maxSeq
-                    snapshotToLists(snap.entries)
-                }
-                .collect { entry ->
-                    if (entry.seq <= snapshotSeq) return@collect
+            engine.access.map { it.remoteEndpoint }.distinctUntilChanged().collectLatest { endpoint ->
+                val apps = installedApps.loadForCapture(endpoint?.let(engine::remotePackages))
+                var snapshotSeq = 0L
+                engine.entries.onSubscription {
+                    stagedMutex.withLock {
+                        val snap = engine.snapshot(endpoint)
+                        snapshotSeq = snap.maxSeq
+                        staged.clear()
+                        _ui.update {
+                            it.copy(remoteEndpoint = endpoint, apps = apps, searchHits = emptyList(), searchHitIndex = -1)
+                        }
+                        pipeline.snapshot(snap.entries, ::currentRules)
+                    }
+                    refreshSearchHits()
+                }.collect { entry ->
+                    if (entry.remoteEndpoint != endpoint || entry.seq <= snapshotSeq) return@collect
                     stagedMutex.withLock { staged.add(entry) }
                     stagedSignal.trySend(Unit)
                 }
+            }
         }
         viewModelScope.launch(Dispatchers.Default) {
             while (isActive) {
@@ -245,18 +241,14 @@ class StreamViewModel @Inject constructor(
         }
     }
 
-    private suspend fun snapshotToLists(snapshot: List<LogcatEntry>) {
-        pipeline.snapshot(snapshot, ::currentRules)
-    }
-
     private suspend fun drainStaged() {
-        val batch = stagedMutex.withLock {
+        val changed = stagedMutex.withLock {
             if (staged.isEmpty()) return
-            ArrayList(staged).also { staged.clear() }
+            val batch = ArrayList(staged)
+            staged.clear()
+            pipeline.append(batch, ::currentRules)
         }
-        // Keep hit ids fresh while the search bar is open — the stream keeps
-        // appending, so a one-shot scan goes stale within seconds.
-        if (pipeline.append(batch, ::currentRules)) refreshSearchHitsThrottled()
+        if (changed) refreshSearchHitsThrottled()
     }
 
     /** Main thread. [filteredOut] is written only when it changes. */
@@ -315,11 +307,11 @@ class StreamViewModel @Inject constructor(
 
     fun clear() {
         viewModelScope.launch {
-            engine.clearBuffer()
-            // `staged` holds in-flight emissions between the collector and the
-            // next frame flush — without it a clear would let those lines return.
-            stagedMutex.withLock { staged.clear() }
-            pipeline.clear()
+            stagedMutex.withLock {
+                engine.clearBuffer(_ui.value.remoteEndpoint)
+                staged.clear()
+                pipeline.clear()
+            }
             _ui.update { it.copy(searchHits = emptyList(), searchHitIndex = -1) }
         }
     }
@@ -331,13 +323,23 @@ class StreamViewModel @Inject constructor(
      */
     suspend fun appGroups(): List<io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup> {
         val entries = pipeline.allEntries()
-        val launchable = installedApps.load().mapTo(HashSet()) { it.packageName }
+        val isRemote = entries.firstOrNull()?.remoteEndpoint != null
+        val remotePackages = if (isRemote) {
+            entries.mapNotNull { entry ->
+                entry.uid?.let { uid -> entry.remotePackage?.let { uid to it } }
+            }.toMap()
+        } else emptyMap()
+        val launchable = if (isRemote) emptySet() else installedApps.load().mapTo(HashSet()) { it.packageName }
         val pm = context.packageManager
         return withContext(Dispatchers.Default) {
             groupEntriesByApp(
                 entries = entries,
                 unattributedLabel = context.getString(R.string.scope_unattributed),
             ) { uid ->
+                if (isRemote) {
+                    val pkg = remotePackages[uid]
+                    return@groupEntriesByApp pkg to (pkg ?: "UID $uid")
+                }
                 val pkgs = runCatching { pm.getPackagesForUid(uid)?.toList() }
                     .getOrNull().orEmpty()
                 val pkg = pkgs.firstOrNull { it in launchable } ?: pkgs.firstOrNull()
@@ -415,7 +417,7 @@ class StreamViewModel @Inject constructor(
             tid = entry.tid,
             uid = entry.uid,
             level = entry.level,
-            packageName = installedApps.packageForUid(entry.uid),
+            packageName = if (entry.remoteEndpoint != null) entry.remotePackage else installedApps.packageForUid(entry.uid),
         )
 
     fun saveFilter(filter: LogFilter) {

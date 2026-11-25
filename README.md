@@ -174,6 +174,8 @@ filter bar, pauses the stream, types a search query, and pops the scope
 picker for you. Skip it or replay it later from Settings → About → "Replay
 guided tour".
 
+[Remote device setup](docs/guide/remote-device.md) covers reading logs from a second device over classic TCP ADB.
+
 ## Everyday workflows
 
 - **"The app keeps crashing for a user"** → Report tab → pick the app →
@@ -192,13 +194,27 @@ guided tour".
 
 ## Embedding the SDK
 
-Add the module to your project (source module today; a Maven artifact is
-planned after the public release):
+For a GitHub release that includes a `logsleuth-sdk-<version>-maven.zip` asset,
+add the public Maven repository and use that release's version.
 
 ```kotlin
-// app/build.gradle.kts
-implementation(project(":sdk"))
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            url = uri("https://shiaho777.github.io/LogSleuth/maven/")
+            content { includeModule("io.github.shiaho777.logsleuth", "logsleuth-sdk") }
+        }
+    }
+}
 ```
+
+```kotlin
+implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:<version>")
+```
+
+You can also unzip the Maven asset and point `maven { url = uri(...) }` at
+the extracted directory. For a source checkout, `implementation(project(":sdk"))`
+continues to work.
 
 ```kotlin
 class MyApp : Application() {

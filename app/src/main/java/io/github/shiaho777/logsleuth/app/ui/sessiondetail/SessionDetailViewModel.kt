@@ -24,6 +24,8 @@ import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.stream.UiLogEntry
 import java.io.File
 import javax.inject.Inject
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.SessionLogMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -46,6 +48,9 @@ data class SessionDetailUiState(
     val presets: List<LogFilter> = emptyList(),
     val loading: Boolean = true,
     val missingFile: Boolean = false,
+    val remoteEndpoint: String? = null,
+    val missedEntries: Long = 0L,
+    val sourceChanged: Boolean = false,
     val searching: Boolean = false,
     val searchQuery: String = "",
     val searchHits: List<Int> = emptyList(),
@@ -93,10 +98,19 @@ class SessionDetailViewModel @Inject constructor(
                 _ui.update { it.copy(loading = false, missingFile = true) }
                 return@launch
             }
-            all = parseFile(session)
+            val (entries, metadata, fileMissing) = parseFile(session)
+            all = entries
+            val apps = installedApps.loadForCapture(metadata.remotePackages.takeIf { metadata.remoteEndpoint != null })
+            _ui.update {
+                it.copy(
+                    missingFile = fileMissing,
+                    apps = apps,
+                    remoteEndpoint = metadata.remoteEndpoint,
+                    missedEntries = metadata.missedEntries,
+                    sourceChanged = metadata.sourceChanged,
+                )
+            }
             parsed = true
-            val fileMissing = withContext(Dispatchers.IO) { !File(session.filePath).exists() }
-            _ui.update { it.copy(missingFile = all.isEmpty() && fileMissing) }
             requestFilter()
         }
         viewModelScope.launch {
@@ -105,7 +119,6 @@ class SessionDetailViewModel @Inject constructor(
         viewModelScope.launch {
             bookmarkDao.observeForSession(sessionId).collect { b -> _ui.update { it.copy(bookmarks = b) } }
         }
-        viewModelScope.launch { _ui.update { it.copy(apps = installedApps.load()) } }
         viewModelScope.launch {
             settingsRepository.settings.collect { s ->
                 val changed = s.searchCaseSensitive != _ui.value.searchCaseSensitive
@@ -258,26 +271,40 @@ class SessionDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun parseFile(session: SessionEntity): List<UiLogEntry> =
+    private data class ParsedSession(
+        val entries: List<UiLogEntry>,
+        val metadata: SessionLogMetadata,
+        val missing: Boolean = false,
+    )
+
+    private suspend fun parseFile(session: SessionEntity): ParsedSession =
         withContext(Dispatchers.IO) {
             val file = File(session.filePath)
-            if (!file.exists()) return@withContext emptyList()
+            val endpoint = session.remoteEndpoint ?: "".takeIf { session.accessKind == "REMOTE_ADB" }
+            val metadata = SessionLogMetadata(endpoint)
+            if (!file.isFile) return@withContext ParsedSession(emptyList(), metadata, missing = true)
             val assembler = EntryAssembler()
-            val out = ArrayList<UiLogEntry>(session.lineCount.toInt().coerceAtLeast(16))
+            val out = ArrayList<UiLogEntry>(session.lineCount.coerceIn(16, 200_000).toInt())
             var seq = 0L
+            fun add(entry: LogcatEntry) {
+                val sourced = if (metadata.remoteEndpoint == null) entry else entry.copy(
+                    remoteEndpoint = metadata.remoteEndpoint,
+                    remotePackage = entry.uid?.let(metadata.remotePackages::get),
+                )
+                out.add(UiLogEntry(seq++, sourced))
+            }
             file.bufferedReader().useLines { lines ->
                 for (line in lines) {
+                    ensureActive()
+                    metadata.consume(line)
                     if (line.startsWith("#") || line.startsWith("=====")) continue
-                    out += assembler.onLine(line).map { UiLogEntry(seq++, it) }
+                    assembler.onLine(line).forEach(::add)
                 }
             }
-            assembler.flush()?.let { out += UiLogEntry(seq++, it) }
-            out
+            assembler.flush()?.let(::add)
+            ParsedSession(out, metadata)
         }
 
-    // The recorded uid column is from the recording device — resolution is
-    // only meaningful for sessions captured on this device (imported SDK
-    // bundles carry no uid column and match nothing either way).
     private fun resolveUid(packageName: String?): Int? = installedApps.resolveUid(packageName)
 
     fun share(format: SessionExporter.Format, onResult: (Result<Unit>) -> Unit) {

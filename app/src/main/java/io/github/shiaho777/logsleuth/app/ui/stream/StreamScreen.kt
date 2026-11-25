@@ -121,6 +121,12 @@ fun StreamScreen(
     var filterDraft by remember { mutableStateOf<LogFilter?>(null) }
     val selecting = selAnchor >= 0L
     val selectingNow by rememberUpdatedState(selecting)
+    LaunchedEffect(ui.remoteEndpoint) {
+        selAnchor = -1L
+        selEnd = -1L
+        parkedSeq = -1L
+        followTail = true
+    }
 
     fun parkAt(index: Int, offset: Int) {
         viewModel.entries.getOrNull(index)?.let { parkedSeq = it.seq }
@@ -182,6 +188,10 @@ fun StreamScreen(
     // confirm never mutates the buffer during the demo. Cleared on every
     // close path so a later user-opened dialog behaves normally.
     var scopeByTour by remember { mutableStateOf(false) }
+    LaunchedEffect(ui.remoteEndpoint) {
+        scopeDialog = null
+        scopeGroups = null
+    }
     LaunchedEffect(scopeDialog) {
         if (scopeDialog != null) scopeGroups = viewModel.appGroups()
     }
@@ -368,6 +378,7 @@ fun StreamScreen(
             ) {
                 RecordingBanner(
                     lineCount = ui.recording.lineCount,
+                    missedEntries = ui.recording.missedEntries,
                     paused = ui.recording.paused,
                     onPause = viewModel::toggleRecordingPause,
                     onStop = viewModel::toggleRecording,
@@ -386,6 +397,17 @@ fun StreamScreen(
                         onResume = { viewModel.setPaused(false) },
                     )
                 }
+            }
+
+            val endpoint = ui.remoteEndpoint
+            when {
+                endpoint != null -> CaptureNotice(stringResource(R.string.log_source_remote, endpoint))
+                ui.access?.remoteFallback == true -> CaptureNotice(
+                    stringResource(
+                        if (ui.access?.granted == true) R.string.log_source_local_fallback
+                        else R.string.log_source_remote_unavailable,
+                    ),
+                )
             }
 
             Box(Modifier.tourTarget("filterBar")) {
@@ -692,6 +714,17 @@ private fun StreamListPane(
     val selHi = maxOf(selAnchor, selEnd)
     val rowPrefs = LocalLogRowPrefs.current
     val iconCache = LocalAppIconCache.current
+    fun selectedText(selection: List<UiLogEntry>): String =
+        selection.joinToString("\n") { row ->
+            val entry = row.entry
+            val remote = entry.remoteEndpoint != null
+            formatVisible(
+                entry,
+                rowPrefs.visibleColumns(),
+                appLabel = if (remote) entry.remotePackage else iconCache?.labelFor(entry.uid),
+                packageName = if (remote) entry.remotePackage else iconCache?.packageFor(entry.uid),
+            )
+        }
     Box(Modifier.fillMaxSize()) {
         when {
             ui.access?.granted != true -> NoAccessState(onOpenSetup = onOpenSetup)
@@ -769,16 +802,7 @@ private fun StreamListPane(
                 onSelectAll(first, last)
             },
             onExtendedCopy = {
-                onExtendedCopy(
-                    entries.filter { it.seq in selLo..selHi }.joinToString("\n") {
-                        formatVisible(
-                            it.entry,
-                            rowPrefs.visibleColumns(),
-                            appLabel = iconCache?.labelFor(it.entry.uid),
-                            packageName = iconCache?.packageFor(it.entry.uid),
-                        )
-                    },
-                )
+                onExtendedCopy(selectedText(entries.filter { it.seq in selLo..selHi }))
             },
             onSave = {
                 onSaveSelection(
@@ -787,14 +811,7 @@ private fun StreamListPane(
             },
             onCopy = {
                 val selected = entries.filter { it.seq in selLo..selHi }
-                val text = selected.joinToString("\n") {
-                    formatVisible(
-                        it.entry,
-                        rowPrefs.visibleColumns(),
-                        appLabel = iconCache?.labelFor(it.entry.uid),
-                        packageName = iconCache?.packageFor(it.entry.uid),
-                    )
-                }
+                val text = selectedText(selected)
                 if (ClipboardGuard.fits(text)) onCopy(text) else onCopyTooLarge(selected.map { it.entry })
             },
             onClear = onClearSelection,

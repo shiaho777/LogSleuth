@@ -79,11 +79,11 @@ class AutomationManager @Inject constructor(
         val rules = compiled
         if (rules.isEmpty()) return
         val now = System.currentTimeMillis()
+        val pkg = if (entry.remoteEndpoint != null) entry.remotePackage else entry.uid?.let(::packageFor)
         for (compiledRule in rules) {
             val rule = compiledRule.rule
             val last = lastSentAt[rule.id]
             if (last != null && now - last < rule.cooldownSeconds.toLong() * 1_000L) continue
-            val pkg = entry.uid?.let { packageFor(it) }
             if (!compiledRule.matches(entry, pkg)) continue
             lastSentAt[rule.id] = now
             send(rule, entry, pkg)
@@ -92,6 +92,7 @@ class AutomationManager @Inject constructor(
 
     private fun send(rule: AutomationRule, entry: LogcatEntry, pkg: String?) {
         val intent = Intent(rule.action).setPackage(rule.targetPackage)
+        entry.remoteEndpoint?.let { intent.putExtra("remote_endpoint", it) }
         for ((key, value) in AutomationPayload.extras(rule, entry, pkg)) {
             when (value) {
                 is String -> intent.putExtra(key, value)

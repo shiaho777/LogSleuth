@@ -7,7 +7,11 @@ import io.github.shiaho777.logsleuth.app.core.remoteadb.AdbKeyManager
 import java.io.File
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -74,6 +78,7 @@ class RemoteAdbEndToEndTest {
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_2_3,
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_3_4,
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_4_5,
+            io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_5_6,
         ).build()
         val notifications = io.github.shiaho777.logsleuth.app.service.NotificationHelper(context)
         val recorder = io.github.shiaho777.logsleuth.app.core.crashes.CrashRecorder(
@@ -87,7 +92,17 @@ class RemoteAdbEndToEndTest {
         withTimeout(15_000) {
             while (remoteManager.state.value.host != host) kotlinx.coroutines.delay(100)
         }
-        remoteManager.forceReadyForTest()
+        remoteManager.testConnection()
+        withTimeout(60_000) {
+            val checked = remoteManager.state.first {
+                it.status == io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager.Status.READY ||
+                    it.status == io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager.Status.FAILED
+            }
+            assertTrue(
+                "remote probe failed: ${checked.detail}",
+                checked.status == io.github.shiaho777.logsleuth.app.core.remoteadb.RemoteAdbManager.Status.READY,
+            )
+        }
         val engine = io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine(
             shizuku, root, checker, recorder, db.bookmarkDao(), remoteManager, settings,
         )
@@ -95,10 +110,47 @@ class RemoteAdbEndToEndTest {
             engine.acquireClient()
             val entry = withTimeout(60_000) { engine.entries.first() }
             assertTrue("engine delivered an empty raw line", entry.raw.isNotBlank())
+            val endpoint = engine.access.value.remoteEndpoint
+            assertTrue("missing source on a remote log entry", endpoint != null && entry.remoteEndpoint == endpoint)
+            assertTrue("local snapshot includes a remote log", engine.snapshot(null).entries.none { it.remoteEndpoint != null })
+            assertTrue("remote snapshot is empty", engine.snapshot(endpoint).entries.isNotEmpty())
             assertTrue(
                 "access kind was ${engine.access.value.kind}",
                 engine.access.value.kind == io.github.shiaho777.logsleuth.app.core.logcat.AccessKind.REMOTE_ADB,
             )
+
+            val recording = io.github.shiaho777.logsleuth.app.service.RecordingManager(
+                context, engine, db.sessionDao(), db.filterDao(), settings, notifications,
+                io.github.shiaho777.logsleuth.app.core.apps.InstalledApps(context),
+            )
+            val sessionId = recording.start("Remote capture test", io.github.shiaho777.logsleuth.app.core.filter.LogFilter.DEFAULT)
+                .getOrThrow()
+            try {
+                val marker = "LogSleuthRemote_${System.nanoTime()}"
+                withTimeout(15_000) {
+                    val received = async(start = CoroutineStart.UNDISPATCHED) {
+                        engine.entries.first { it.remoteEndpoint == endpoint && marker in it.message }
+                    }
+                    withContext(Dispatchers.IO) {
+                        AdbConnection(host, port, keys(), readTimeoutMs = 5_000).use { connection ->
+                            connection.authenticate()
+                            connection.openShell("log -p i -t LogSleuthE2E $marker")
+                            connection.readShell {}
+                        }
+                    }
+                    received.await()
+                }
+                remoteManager.disconnect()
+                withTimeout(15_000) { recording.state.first { !it.isRecording } }
+                val saved = requireNotNull(db.sessionDao().getById(sessionId))
+                val text = File(saved.filePath).readText()
+                assertTrue("remote session source lost", saved.remoteEndpoint == endpoint)
+                assertTrue("remote capture lost the last marker", marker in text)
+                assertTrue("disconnect reason missing", "# LogSleuth source changed" in text)
+                assertTrue("recording not finalized", saved.endedAt != null)
+            } finally {
+                recording.stop()
+            }
         } finally {
             engine.releaseClient()
             db.close()
@@ -125,6 +177,7 @@ class RemoteAdbEndToEndTest {
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_2_3,
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_3_4,
             io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_4_5,
+            io.github.shiaho777.logsleuth.app.data.db.AppDatabase.MIGRATION_5_6,
         ).build()
         val recorder = io.github.shiaho777.logsleuth.app.core.crashes.CrashRecorder(
             db.crashEventDao(),

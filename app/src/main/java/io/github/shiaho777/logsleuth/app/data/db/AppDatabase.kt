@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookmarkEntity::class,
         AutomationRuleEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +24,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun automationRuleDao(): AutomationRuleDao
 
     companion object {
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sessions ADD COLUMN remoteEndpoint TEXT")
+                db.execSQL("ALTER TABLE crash_events ADD COLUMN remoteEndpoint TEXT")
+            }
+        }
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

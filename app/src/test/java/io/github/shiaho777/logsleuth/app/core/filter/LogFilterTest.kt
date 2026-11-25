@@ -22,6 +22,16 @@ class LogFilterTest {
     )
 
     @Test
+    fun `application filter never maps a remote UID to the local app`() {
+        val filter = CompiledFilter(LogFilter(packageName = "local.app"), resolvedUid = 10123)
+        val local = entry(uid = 10123)
+        assertTrue(filter.matches(local))
+        assertFalse(filter.matches(local.copy(remoteEndpoint = "remote:5555", remotePackage = "different.app")))
+        assertFalse(filter.matches(local.copy(remoteEndpoint = "remote:5555")))
+        assertTrue(filter.matches(local.copy(uid = 10999, remoteEndpoint = "remote:5555", remotePackage = "local.app")))
+    }
+
+    @Test
     fun `default filter matches everything`() {
         val f = CompiledFilter(LogFilter.DEFAULT)
         LogLevel.entries.forEach { assertTrue(f.matches(entry(level = it))) }

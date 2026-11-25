@@ -97,13 +97,13 @@ Releases are cut from tags, not from `main` directly:
    user gets, and repeat the whole thing in Chinese after the `<!-- zh-CN -->`
    marker. The format is documented in
    [docs/releases/README.md](docs/releases/README.md).
-2. Tag the merged commit `vX.Y.Z` and push the tag.
-3. `.github/workflows/release.yml` runs the string gate, the unit tests and
-   `assembleRelease` (signed with the keystore committed in this repo), then
-   attaches `LogSleuth-X.Y.Z.APK` to the GitHub Release that the in-app updater
-   downloads, with the committed notes as the release body. The run stops
-   before building if the tag does not match `versionName`, or if the notes
-   file is missing.
+2. Configure the protected signing environment in the
+   [release runbook](docs/developer/release.md), then tag the merged commit
+   `vX.Y.Z` and push the tag.
+3. `.github/workflows/release.yml` runs the string gate and unit tests,
+   builds the sample against the staged SDK, and verifies the APK signer.
+   The GitHub Release includes the APK, SDK Maven archive, checksums, and
+   the committed notes. The in-app updater reads the APK from that release.
 
 
 ---
@@ -148,8 +148,8 @@ python3 scripts/check_string_parity.py   # 双语字符串奇偶校验
    `python3 scripts/draft_release_notes.py` 会生成骨架并列出上一个 tag 之后
    合并的 PR;每一条都改写成「用户能拿到什么」,并在 `<!-- zh-CN -->` 之后
    重复一遍中文。格式见 [docs/releases/README.md](docs/releases/README.md)。
-2. 合并后给该提交打 `vX.Y.Z` 标签并推送。
-3. `.github/workflows/release.yml` 会跑字符串门禁、单测和 `assembleRelease`
-   (用仓库内的 keystore 签名),然后把 `LogSleuth-X.Y.Z.APK` 挂到 GitHub
-   Release 上,应用内更新读的就是它;发布说明直接用仓库里那份文件。标签与
-   `versionName` 不一致、或者说明文件缺失时,都会在构建前直接失败。
+2. 按[发布手册](docs/developer/release.md)配置受保护的签名环境，然后给合并
+   提交打 `vX.Y.Z` 标签并推送。
+3. `.github/workflows/release.yml` 校验双语字符串、运行单测、用暂存的 SDK
+   构建示例 App，并验证 APK 签名。GitHub Release 附 APK、SDK Maven 压缩包、
+   校验和及仓库中的发布说明。应用内更新从该 Release 读取 APK。

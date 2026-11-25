@@ -23,6 +23,8 @@ stops by itself when a limit is reached.
 Sessions are listed on the **Sessions** tab. Each one can be replayed line by
 line, searched, exported as text or zip, or deleted.
 
+During a burst the recorder recovers entries from the retained history. The session and export show a gap count if some entries have already been evicted. The count is measured before filters.
+
 ## Crash and ANR detection
 
 LogSleuth watches three kinds of failure:

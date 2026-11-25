@@ -488,4 +488,10 @@
     <string name="remote_status_failed">Failed: %1$s</string>
     <string name="remote_allow_hint">The remote device may show an \"Allow USB debugging?\" dialog — accept it there (tick \"Always allow\" to skip it next time). For Android 11+ pairing-code flow, use adb pair once from a PC, or add this app\'s key to the device\'s trusted keys.</string>
 
+    <string name="log_source_remote">Remote device: %1$s</string>
+    <string name="log_source_remote_unknown">Remote device (address unavailable)</string>
+    <string name="log_source_local_fallback">Remote device unavailable · Showing logs from this device</string>
+    <string name="log_source_remote_unavailable">Remote device unavailable</string>
+    <string name="recording_source_changed">Recording ended because the log source changed.</string>
+    <string name="recording_gap_count">Log entries unavailable: %1$d</string>
 </resources>

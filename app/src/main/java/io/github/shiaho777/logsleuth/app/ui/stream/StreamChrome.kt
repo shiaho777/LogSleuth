@@ -98,6 +98,7 @@ import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
 @Composable
 internal fun RecordingBanner(
     lineCount: Long,
+    missedEntries: Long,
     paused: Boolean,
     onPause: () -> Unit,
     onStop: () -> Unit,
@@ -135,14 +136,21 @@ internal fun RecordingBanner(
                 )
             }
             Spacer(Modifier.size(10.dp))
-            Text(
-                text = stringResource(
-                    if (paused) R.string.recording_banner_paused else R.string.recording_banner,
-                    lineCount,
-                ),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(
+                        if (paused) R.string.recording_banner_paused else R.string.recording_banner,
+                        lineCount,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                if (missedEntries > 0) {
+                    Text(
+                        stringResource(R.string.recording_gap_count, missedEntries),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
             TextButton(onClick = onPause) {
                 Icon(
                     if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
@@ -163,6 +171,18 @@ internal fun RecordingBanner(
             }
         }
     }
+}
+
+@Composable
+internal fun CaptureNotice(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 /** Small pill showing the engine state at the top-right of the list. */

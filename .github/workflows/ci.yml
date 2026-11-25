@@ -59,8 +59,11 @@ jobs:
       - name: Lint
         run: ./gradlew lint --no-daemon
 
-      - name: Assemble debug (all modules)
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Stage SDK Maven artifact
+        run: ./gradlew :sdk:publishReleasePublicationToStagingRepository -Plogsleuth.sdkVersion=0.0.0-ci --no-daemon
+
+      - name: Assemble debug against the staged SDK
+        run: ./gradlew assembleDebug -Plogsleuth.sdkVersion=0.0.0-ci --no-daemon
 
       # Debug-signed — never distribute these artifacts; releases are cut
       # from tags with the release workflow.

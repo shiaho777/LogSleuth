@@ -219,7 +219,8 @@ fun CrashDetailsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val icon = LocalAppIconCache.current?.iconForPackage(crash.packageName)
+            val cache = LocalAppIconCache.current
+            val icon = if (crash.remoteEndpoint == null) cache?.iconForPackage(crash.packageName) else null
             if (icon != null) {
                 Image(
                     bitmap = icon,
@@ -236,6 +237,9 @@ fun CrashDetailsScreen(
             )
             crash.packageName?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            }
+            crash.remoteEndpoint?.let {
+                Text(stringResource(R.string.log_source_remote, it), style = MaterialTheme.typography.bodySmall)
             }
             crashVersionLine(crash)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall)
@@ -263,8 +267,10 @@ fun CrashDetailsScreen(
                     Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.copy))
                 }
-                FilledTonalButton(onClick = viewModel::openAppInfo, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.crash_open_app), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (crash.remoteEndpoint == null) {
+                    FilledTonalButton(onClick = viewModel::openAppInfo, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.crash_open_app), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
             TextButton(onClick = viewModel::openChannel) {

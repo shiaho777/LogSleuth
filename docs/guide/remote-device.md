@@ -7,9 +7,8 @@ install and no root: its own `adbd` serves the log stream, exactly like
 
 ## Setup
 
-1. **On the remote device**: enable Developer options → Wireless debugging
-   (Android 11+), or connect it once to a PC and run `adb tcpip 5555`.
-   Note the IP address and port it shows.
+1. **On the remote device**: connect it to a PC and run `adb tcpip 5555`
+   to enable the legacy TCP listener. Note the device's IP address.
 2. **In LogSleuth**: Settings → Remote device → enter host and port →
    **Test connection**.
 3. The remote screen may show **"Allow USB debugging?"** — accept it there
@@ -21,19 +20,18 @@ install and no root: its own `adbd` serves the log stream, exactly like
 
 ## What you get
 
-- The full buffer set with the uid column (the remote shell runs as uid
-  2000), so per-app filtering works just like the Shizuku path.
-- Recordings, sessions, crash/ANR detection and automation rules all apply
-  to the remote stream unchanged.
-- If the link drops, LogSleuth falls back to a local access path instead of
-  blanking the stream; reconnect from Settings when the remote is back.
+- Logs and UID-to-package attribution come from the remote device. An
+  ambiguous UID stays unattributed. The stream, session and export show
+  the remote endpoint.
+- Recordings, crash detection and automation work with remote logs. A
+  source change ends the current recording and saves it. When the remote
+  link drops, the live view shows the fallback to local access if available.
+  To resume remote capture, test the connection again in Settings.
 
-## Limits, honestly
+## Limits
 
-- One remote device at a time — the engine owns a single logcat stream.
-- The Android 11+ *pairing-code* flow (`adb pair`) is not implemented yet;
-  use the legacy `adb tcpip` port, or pair once from a PC and then connect
-  to the device's debugging port. Devices that only expose TLS-paired
-  connections are rejected with a clear error.
-- Both devices must be on the same network (or otherwise reachable);
-  nothing is sent to any server — the connection is device-to-device.
+- Capture follows one device at a time.
+- Remote capture uses the classic TCP ADB listener. Android's TLS pairing
+  port and pairing codes require a separate implementation.
+- Both devices must be reachable over the network. The connection goes
+  directly between the devices.
