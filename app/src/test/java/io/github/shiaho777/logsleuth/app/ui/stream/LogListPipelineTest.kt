@@ -4,6 +4,7 @@ import io.github.shiaho777.logsleuth.app.core.filter.FilterStack
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.matchesLogSearch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -290,15 +291,16 @@ class LogListPipelineTest {
             ),
             { rules() },
         )
-        val before = harness.pipeline.hits("needle", ignoreCase = true)
+        fun matches(query: String) = harness.shown.filter { it.entry.matchesLogSearch(query, ignoreCase = true) }.map { it.seq }
+        val before = matches("needle")
         assertEquals(harness.shown.take(2).map { it.seq }, before)
 
         // Evict the first row; the surviving hit's id is unchanged.
         harness.pipeline.append(listOf(line(4), line(5, message = "needle"))) { rules() }
 
-        val after = harness.pipeline.hits("needle", ignoreCase = true)
+        val after = matches("needle")
         assertEquals(listOf(before[1]) + harness.shown.last().seq, after)
-        assertEquals(emptyList<Long>(), harness.pipeline.hits("   ", ignoreCase = true))
+        assertEquals(emptyList<Long>(), matches("   "))
     }
 
     @Test

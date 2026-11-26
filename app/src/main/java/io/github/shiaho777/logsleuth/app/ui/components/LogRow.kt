@@ -3,46 +3,28 @@ package io.github.shiaho777.logsleuth.app.ui.components
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,9 +33,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -69,8 +49,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
@@ -143,6 +121,7 @@ fun onColorFor(background: Color): Color =
 @Composable
 fun LogRow(
     entry: LogcatEntry,
+    onOpenDetail: (LogcatEntry) -> Unit,
     modifier: Modifier = Modifier,
     highlight: String? = null,
     isCurrentHit: Boolean = false,
@@ -150,14 +129,7 @@ fun LogRow(
     snackbar: SnackbarHostState? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
-    onMakeFilter: ((LogcatEntry) -> Unit)? = null,
 ) {
-    // Wide windows keep the detail beside the list instead of covering it.
-    // Container size (not screen size) so split-screen and foldables count.
-    val density = LocalDensity.current
-    val containerWidth = LocalWindowInfo.current.containerSize.width
-    val wideScreen = with(density) { containerWidth.toDp() } >= 600.dp
-    var showDetail by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -180,10 +152,6 @@ fun LogRow(
     }
     val levelTint = levelColor(entry.level)
     val isError = entry.level.priority >= LogLevel.E.priority
-
-    fun openDetail() {
-        showDetail = true
-    }
 
     fun copyRaw() {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -220,7 +188,7 @@ fun LogRow(
             .clip(RoundedCornerShape(6.dp))
             .background(rowBg)
             .combinedClickable(
-                onClick = { if (onClick != null) onClick() else openDetail() },
+                onClick = { if (onClick != null) onClick() else onOpenDetail(entry) },
                 onLongClick = {
                     if (onLongClick != null) onLongClick() else copyRaw()
                 },
@@ -231,7 +199,7 @@ fun LogRow(
                 if (selecting) {
                     onClick(label = selectLabel) { onClick!!.invoke(); true }
                 } else {
-                    onClick(label = detailLabel) { openDetail(); true }
+                    onClick(label = detailLabel) { onOpenDetail(entry); true }
                     customActions = listOf(
                         CustomAccessibilityAction(copyLabel) { copyRaw(); true },
                     )
@@ -297,7 +265,7 @@ fun LogRow(
                     Text(
                         text = timeText,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 if (prefs.showUid) {
@@ -305,7 +273,7 @@ fun LogRow(
                     Text(
                         text = uidLabel,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(start = MetaGap),
                     )
                 }
@@ -318,7 +286,7 @@ fun LogRow(
                     Text(
                         text = ids,
                         style = logMetaStyle(scale),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(horizontal = MetaGap),
                     )
                 }
@@ -326,7 +294,7 @@ fun LogRow(
                     Text(
                         text = tagText,
                         style = logMetaStyle(scale),
-                        color = levelTint.copy(alpha = 0.8f),
+                        color = levelTint,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -360,28 +328,6 @@ fun LogRow(
             )
         }
     }
-
-    if (showDetail) {
-        val dismiss = { showDetail = false }
-        if (wideScreen) {
-            EntryDetailPane(
-                entry = entry,
-                snackbar = snackbar,
-                onMakeFilter = onMakeFilter,
-                onDismiss = dismiss,
-            )
-        } else {
-            ModalBottomSheet(onDismissRequest = dismiss) {
-                EntryDetailContent(
-                    entry = entry,
-                    snackbar = snackbar,
-                    onMakeFilter = onMakeFilter,
-                    onDismiss = dismiss,
-                    modifier = Modifier.padding(bottom = 32.dp),
-                )
-            }
-        }
-    }
 }
 
 /** Fixed gap between meta columns — padding, not space characters, so the
@@ -403,7 +349,7 @@ private fun notifyCopied(
  * fatal block can exceed that; copy the head and say it was truncated
  * instead of crashing with TransactionTooLargeException.
  */
-private fun copyGuarded(
+internal fun copyGuarded(
     text: String,
     clipboard: androidx.compose.ui.platform.ClipboardManager,
     snackbar: SnackbarHostState?,
@@ -425,198 +371,6 @@ private fun copyGuarded(
     }
 }
 
-/**
- * Wide-screen detail: a docked pane on the right instead of a sheet, so the
- * stream stays visible beside it. A dialog window gives the pane the same
- * outside-tap/back dismissal the sheet has on phones.
- */
-@Composable
-private fun EntryDetailPane(
-    entry: LogcatEntry,
-    snackbar: SnackbarHostState?,
-    onMakeFilter: ((LogcatEntry) -> Unit)?,
-    onDismiss: () -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            // Scrim: tapping outside the pane closes it, like the sheet.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.32f))
-                    .clickable(onClick = onDismiss),
-            )
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.55f)
-                    .widthIn(min = 360.dp, max = 560.dp),
-                color = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = 1.dp,
-            ) {
-                Column(Modifier.fillMaxSize()) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(start = 20.dp, end = 8.dp, top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            stringResource(R.string.entry_detail),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.close),
-                            )
-                        }
-                    }
-                    HorizontalDivider()
-                    EntryDetailContent(
-                        entry = entry,
-                        snackbar = snackbar,
-                        onMakeFilter = onMakeFilter,
-                        onDismiss = onDismiss,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(top = 12.dp, bottom = 16.dp),
-                        scrollMessage = true,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** The detail body shared by the phone sheet and the wide-screen pane. */
-@Composable
-private fun EntryDetailContent(
-    entry: LogcatEntry,
-    snackbar: SnackbarHostState?,
-    onMakeFilter: ((LogcatEntry) -> Unit)?,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-    scrollMessage: Boolean = false,
-) {
-    val clipboard = LocalClipboardManager.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val copiedMessage = stringResource(R.string.copied)
-
-    Column(modifier.padding(horizontal = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LevelBadge(entry.level)
-            val cache = LocalAppIconCache.current
-            val icon = if (entry.remoteEndpoint == null) cache?.iconFor(entry.uid) else null
-            icon?.let {
-                Spacer(Modifier.width(8.dp))
-                Image(
-                    bitmap = icon,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                )
-            }
-            val label = if (entry.remoteEndpoint != null) entry.remotePackage else cache?.labelFor(entry.uid)
-            label?.let {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = entry.tag.ifEmpty { stringResource(R.string.entry_detail) },
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        val detailPackage = if (entry.remoteEndpoint != null) entry.remotePackage
-            else LocalAppIconCache.current?.packageFor(entry.uid)
-        Text(
-            text = "${entry.displayTime}  ·  pid ${entry.pid}  ·  tid ${entry.tid}" +
-                (entry.uid?.let { "  ·  uid $it" } ?: "") +
-                (detailPackage?.let { "  ·  $it" } ?: ""),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Spacer(Modifier.height(12.dp))
-        SelectionContainer(Modifier.weight(1f, fill = false)) {
-            Text(
-                text = entry.message,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                modifier = if (scrollMessage) {
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                } else {
-                    Modifier
-                },
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {
-                copyGuarded(entry.message, clipboard, snackbar, scope, context, copiedMessage)
-                onDismiss()
-            }) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.copy_message))
-            }
-            OutlinedButton(onClick = {
-                copyGuarded(entry.raw, clipboard, snackbar, scope, context, copiedMessage)
-                onDismiss()
-            }) {
-                Icon(
-                    Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.copy_raw))
-            }
-        }
-        if (onMakeFilter != null) {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = {
-                onMakeFilter(entry)
-                onDismiss()
-            }) {
-                Icon(
-                    Icons.Default.FilterAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.filter_from_line))
-            }
-        }
-    }
-}
-
 @Composable
 private fun logMetaStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
     fontFamily = FontFamily.Monospace,
@@ -625,7 +379,7 @@ private fun logMetaStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy
 )
 
 @Composable
-private fun logMessageStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
+internal fun logMessageStyle(scale: Float) = MaterialTheme.typography.bodySmall.copy(
     fontFamily = FontFamily.Monospace,
     fontSize = 12.sp * scale,
     lineHeight = 16.sp * scale,

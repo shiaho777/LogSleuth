@@ -8,8 +8,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -33,9 +36,10 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -50,8 +54,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.shiaho777.logsleuth.app.R
@@ -78,6 +85,9 @@ fun FilterBar(
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var showAppPicker by remember { mutableStateOf(false) }
+    fun editFilter(updated: LogFilter) {
+        if (updated != filter) onFilterChange(updated.copy(id = 0, name = ""))
+    }
 
     // Tour hooks: let the guided tour expand the detail row itself.
     val tour = LocalTourController.current
@@ -95,7 +105,17 @@ fun FilterBar(
         }
     }
 
-    Surface(tonalElevation = 2.dp) {
+    val selectedPackage = filter.packageName
+    val appLabel = remember(apps, selectedPackage) {
+        apps.firstOrNull { it.packageName == selectedPackage }?.label ?: selectedPackage
+    }
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+        shape = MaterialTheme.shapes.large,
+        color = colors.surfaceContainerLow,
+        border = BorderStroke(1.dp, colors.outlineVariant),
+    ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
             // Always-visible quick row: level, app, expand, save.
             Row(
@@ -104,42 +124,21 @@ fun FilterBar(
             ) {
                 LevelDropdown(
                     filter = filter,
-                    onChange = onFilterChange,
+                    onChange = ::editFilter,
+                    modifier = Modifier.weight(1f),
                 )
                 AssistChip(
+                    modifier = Modifier.weight(1.15f),
                     onClick = { showAppPicker = true },
                     leadingIcon = { Icon(Icons.Default.Apps, contentDescription = stringResource(R.string.app_filter_title)) },
                     label = {
                         Text(
-                            filter.packageName
-                                ?: stringResource(R.string.app_filter_all),
+                            appLabel ?: stringResource(R.string.app_filter_all),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.widthIn(max = 180.dp),
                         )
                     },
                 )
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    presets.forEach { preset ->
-                        FilterChip(
-                            selected = preset.id != 0L && preset.id == filter.id,
-                            onClick = { onApplyPreset(preset) },
-                            label = {
-                                Text(
-                                    preset.name,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.widthIn(max = 140.dp),
-                                )
-                            },
-                        )
-                    }
-                }
                 if (onManageFilters != null) {
                     FilterChip(
                         selected = presets.any { it.enabled },
@@ -152,17 +151,49 @@ fun FilterBar(
                         },
                     )
                 }
-                IconButton(onClick = { expanded = !expanded }) {
-                    val chevron by animateFloatAsState(
+                val expandLabel = stringResource(R.string.filter_expand)
+                val expandState = stringResource(if (expanded) R.string.filter_state_expanded else R.string.filter_state_collapsed)
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.semantics {
+                        contentDescription = expandLabel
+                        stateDescription = expandState
+                    },
+                ) {
+                    val chevron = animateFloatAsState(
                         targetValue = if (expanded) 180f else 0f,
                         label = "chevron",
                     )
                     Icon(
                         Icons.Default.ExpandMore,
-                        contentDescription = stringResource(R.string.filter_expand),
-                        modifier = Modifier.rotate(chevron),
+                        contentDescription = null,
+                        modifier = Modifier.graphicsLayer { rotationZ = chevron.value },
                     )
                 }
+            }
+
+            if (presets.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        presets.forEach { preset ->
+                            FilterChip(
+                                selected = preset.id != 0L && preset.id == filter.id,
+                                onClick = { onApplyPreset(preset) },
+                                label = {
+                                    Text(
+                                        preset.name,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.widthIn(max = 140.dp),
+                                    )
+                                },
+                            )
+                        }
+                    }
             }
 
             val activeRules = presets.filter { it.enabled && it.hasConstraint }
@@ -201,6 +232,45 @@ fun FilterBar(
                 }
             }
 
+            if (!expanded) {
+                val fields = listOf(
+                    FilterSummaryField(R.string.filter_include_short, filter.query) {
+                        editFilter(filter.copy(query = ""))
+                    },
+                    FilterSummaryField(R.string.filter_tag, filter.tagQuery) {
+                        editFilter(filter.copy(tagQuery = ""))
+                    },
+                    FilterSummaryField(R.string.filter_exclude, filter.excludeQuery) {
+                        editFilter(filter.copy(excludeQuery = ""))
+                    },
+                    FilterSummaryField(R.string.filter_pid, filter.pid) {
+                        editFilter(filter.copy(pid = ""))
+                    },
+                    FilterSummaryField(R.string.filter_tid, filter.tid) {
+                        editFilter(filter.copy(tid = ""))
+                    },
+                    FilterSummaryField(R.string.filter_uid, filter.uid) {
+                        editFilter(filter.copy(uid = ""))
+                    },
+                ).filter { it.value.isNotBlank() }
+                if (fields.isNotEmpty() || regexInvalid) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (regexInvalid) {
+                            TextButton(onClick = { expanded = true }) {
+                                Text(stringResource(R.string.filter_regex_invalid), color = colors.error)
+                            }
+                        }
+                        fields.forEach { field ->
+                            FilterSummaryChip(field)
+                        }
+                    }
+                }
+            }
+
             AnimatedVisibility(
                 visible = expanded,
                 enter = expandVertically() + fadeIn(),
@@ -212,7 +282,7 @@ fun FilterBar(
                 ) {
                     FilterTextField(
                         value = filter.query,
-                        onValueChange = { onFilterChange(filter.copy(query = it)) },
+                        onValueChange = { editFilter(filter.copy(query = it)) },
                         label = stringResource(R.string.filter_query),
                         isError = filter.useRegex &&
                             io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
@@ -230,7 +300,7 @@ fun FilterBar(
                     )
                     FilterTextField(
                         value = filter.tagQuery,
-                        onValueChange = { onFilterChange(filter.copy(tagQuery = it)) },
+                        onValueChange = { editFilter(filter.copy(tagQuery = it)) },
                         label = stringResource(R.string.filter_tag),
                         isError = filter.useRegex &&
                             io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
@@ -249,7 +319,7 @@ fun FilterBar(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(
                             checked = filter.tagExact,
-                            onCheckedChange = { onFilterChange(filter.copy(tagExact = it)) },
+                            onCheckedChange = { editFilter(filter.copy(tagExact = it)) },
                         )
                         Text(
                             stringResource(R.string.filter_tag_exact),
@@ -259,7 +329,7 @@ fun FilterBar(
                     }
                     FilterTextField(
                         value = filter.excludeQuery,
-                        onValueChange = { onFilterChange(filter.copy(excludeQuery = it)) },
+                        onValueChange = { editFilter(filter.copy(excludeQuery = it)) },
                         label = stringResource(R.string.filter_exclude),
                         isError = filter.useRegex &&
                             io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
@@ -286,7 +356,7 @@ fun FilterBar(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Switch(
                             checked = filter.useRegex,
-                            onCheckedChange = { onFilterChange(filter.copy(useRegex = it)) },
+                            onCheckedChange = { editFilter(filter.copy(useRegex = it)) },
                         )
                         Text(
                             stringResource(R.string.filter_regex),
@@ -321,7 +391,7 @@ fun FilterBar(
             apps = apps,
             current = filter.packageName,
             onSelect = { pkg ->
-                onFilterChange(filter.copy(packageName = pkg))
+                editFilter(filter.copy(packageName = pkg))
                 showAppPicker = false
             },
             onDismiss = { showAppPicker = false },
@@ -329,19 +399,59 @@ fun FilterBar(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun EmptyFilterActions(
+    hasCurrentFilter: Boolean,
+    hasEnabledRules: Boolean,
+    onResetFilter: () -> Unit,
+    onDisableRules: () -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+        if (hasCurrentFilter) {
+            TextButton(onClick = onResetFilter) { Text(stringResource(R.string.filter_clear_active)) }
+        }
+        if (hasEnabledRules) {
+            TextButton(onClick = onDisableRules) { Text(stringResource(R.string.filter_rules_clear)) }
+        }
+    }
+}
+
+private data class FilterSummaryField(val label: Int, val value: String, val onRemove: () -> Unit)
+
+@Composable
+private fun FilterSummaryChip(field: FilterSummaryField) {
+    val label = stringResource(field.label)
+    val clear = stringResource(R.string.filter_clear_field, label, field.value)
+    InputChip(
+        selected = true,
+        onClick = field.onRemove,
+        modifier = Modifier.semantics { contentDescription = clear },
+        label = {
+            Text(
+                stringResource(R.string.filter_field_value, label, field.value),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 180.dp),
+            )
+        },
+        trailingIcon = { Icon(Icons.Default.Close, null, Modifier.size(16.dp)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LevelDropdown(filter: LogFilter, onChange: (LogFilter) -> Unit) {
+private fun LevelDropdown(filter: LogFilter, onChange: (LogFilter) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     val selected = filter.effectiveLevels
     val label = levelSetLabel(selected)
-    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }, modifier = modifier) {
         FilterChip(
             selected = !filter.admitsAllLevels,
             onClick = { open = true },
             leadingIcon = { LevelBadge(selected.minBy { it.priority }) },
             label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(
             expanded = open,

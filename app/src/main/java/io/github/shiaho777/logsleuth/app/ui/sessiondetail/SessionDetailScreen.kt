@@ -1,6 +1,9 @@
 package io.github.shiaho777.logsleuth.app.ui.sessiondetail
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,18 +12,16 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -30,8 +31,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,22 +40,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
+import io.github.shiaho777.logsleuth.app.ui.components.EmptyFilterActions
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
+import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScope
 import kotlinx.coroutines.launch
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
+import io.github.shiaho777.logsleuth.app.ui.components.LogEntryDetail
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.data.db.EXAMPLE_SESSION_KIND
 import io.github.shiaho777.logsleuth.app.ui.stream.CaptureNotice
+import io.github.shiaho777.logsleuth.app.ui.stream.SearchTopBar
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashCard
 import java.text.DateFormat
 import java.util.Date
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,58 +82,80 @@ fun SessionDetailScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var showShare by remember { mutableStateOf(false) }
+    var detailEntry by remember { mutableStateOf<LogcatEntry?>(null) }
     var showRename by remember { mutableStateOf(false) }
     var renameText by remember(ui.session?.name) { mutableStateOf(ui.session?.name.orEmpty()) }
 
+    val selectedHit = ui.searchHits.getOrNull(ui.searchHitIndex)
+    var bookmarkedLine by remember { mutableStateOf<Long?>(null) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val jumpLabel = stringResource(R.string.bookmark_jump)
+    val noBookmarkLog = stringResource(R.string.bookmark_unavailable)
+    BackHandler(enabled = ui.searching) { viewModel.setSearching(false) }
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage != 0 && viewModel.ui.value.searching) {
+            keyboard?.hide()
+            viewModel.setSearching(false)
+        }
+    }
+
+    LaunchedEffect(selectedHit, pagerState.currentPage) {
+        if (selectedHit != null && pagerState.currentPage == 0) {
+            val index = ui.entries.binarySearchBy(selectedHit) { it.seq }
+            if (index >= 0) listState.requestScrollToItem(index)
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(ui.session?.name ?: stringResource(R.string.sessions_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back),
+            if (ui.searching) {
+                SearchTopBar(
+                    query = ui.searchQuery,
+                    hits = ui.searchHits.size,
+                    hitIndex = ui.searchHitIndex,
+                    pending = ui.searchPending,
+                    caseSensitive = ui.searchCaseSensitive,
+                    onQueryChange = viewModel::setSearchQuery,
+                    onCaseSensitiveChange = viewModel::setSearchCaseSensitive,
+                    onPrev = { viewModel.nextSearchHit(-1) },
+                    onNext = { viewModel.nextSearchHit(1) },
+                    onClose = { viewModel.setSearching(false) },
+                )
+            } else {
+                InstrumentTopBar(
+                    title = {
+                        Text(
+                            ui.session?.name ?: stringResource(R.string.sessions_title),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-                actions = {
-                    if (ui.searching) {
-                        TextField(
-                            value = ui.searchQuery,
-                            onValueChange = viewModel::setSearchQuery,
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text(stringResource(R.string.search_hint)) },
-                        )
-                        IconButton(onClick = { viewModel.setSearchCaseSensitive(!ui.searchCaseSensitive) }) {
-                            Icon(
-                                Icons.Default.TextFields,
-                                contentDescription = stringResource(R.string.search_case_sensitive),
-                            )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.navigate_back))
                         }
-                        IconButton(onClick = { viewModel.setSearching(false) }) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.close),
-                            )
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            bookmarkedLine = null
+                            viewModel.setSearching(true)
+                            scope.launch { pagerState.scrollToPage(0) }
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
                         }
-                    } else {
-                    IconButton(onClick = { viewModel.setSearching(true) }) {
-                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
-                    }
-                    IconButton(onClick = {
-                        renameText = ui.session?.name.orEmpty()
-                        showRename = true
-                    }) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.session_rename))
-                    }
-                    IconButton(onClick = { showShare = true }) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_logs))
-                    }
-                    }
-                },
-            )
+                        IconButton(onClick = {
+                            renameText = ui.session?.name.orEmpty()
+                            showRename = true
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.session_rename))
+                        }
+                        IconButton(onClick = { showShare = true }) {
+                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_logs))
+                        }
+                    },
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -132,6 +163,7 @@ fun SessionDetailScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .then(
                     if (sharedScope != null) {
                         with(sharedScope) {
@@ -192,15 +224,16 @@ fun SessionDetailScreen(
                                     if (ui.filteredOut) R.string.empty_logs_filtered
                                     else R.string.empty_logs,
                                 ),
-                                action = if (ui.filteredOut && ui.presets.any { it.enabled }) {
+                                action = if (ui.filteredOut && (ui.filter.hasConstraint || ui.presets.any { it.enabled })) {
                                     {
-                                        TextButton(onClick = viewModel::disableEnabledRules) {
-                                            Text(stringResource(R.string.filter_rules_clear))
-                                        }
+                                        EmptyFilterActions(
+                                            hasCurrentFilter = ui.filter.hasConstraint,
+                                            hasEnabledRules = ui.presets.any { it.enabled },
+                                            onResetFilter = { viewModel.setFilter(LogFilter.DEFAULT) },
+                                            onDisableRules = viewModel::disableEnabledRules,
+                                        )
                                     }
-                                } else {
-                                    null
-                                },
+                                } else null,
                             )
                             else -> LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                                 items(
@@ -210,10 +243,10 @@ fun SessionDetailScreen(
                                 ) { index ->
                                     LogRow(
                                         entry = ui.entries[index].entry,
-                                        modifier = Modifier.animateItem(),
+                                        onOpenDetail = { detailEntry = it },
                                         snackbar = snackbar,
                                         highlight = ui.searchQuery.takeIf { it.isNotBlank() },
-                                        isCurrentHit = ui.searchHits.getOrNull(ui.searchHitIndex) == index,
+                                        isCurrentHit = ui.entries[index].seq == (selectedHit ?: bookmarkedLine),
                                     )
                                 }
                             }
@@ -229,7 +262,7 @@ fun SessionDetailScreen(
                             )
                         }
                         if (ui.crashes.isEmpty()) {
-                            item { EmptyState(stringResource(R.string.crashes_empty)) }
+                            item { EmptyState(stringResource(R.string.crashes_empty), graphic = R.drawable.sleuth_crash) }
                         }
                     }
 
@@ -251,11 +284,28 @@ fun SessionDetailScreen(
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
                                 },
-                                modifier = Modifier.animateItem(),
+                                trailingContent = {
+                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+                                },
+                                modifier = Modifier.animateItem().clickable(onClickLabel = jumpLabel) {
+                                    scope.launch {
+                                        val seq = viewModel.bookmarkLine(bookmark)
+                                        val entries = viewModel.ui.value.entries
+                                        val index = seq?.let { entries.binarySearchBy(it) { row -> row.seq } } ?: -1
+                                        if (index < 0) {
+                                            snackbar.showSnackbar(noBookmarkLog)
+                                        } else {
+                                            viewModel.setSearching(false)
+                                            bookmarkedLine = seq
+                                            listState.requestScrollToItem(index)
+                                            pagerState.scrollToPage(0)
+                                        }
+                                    }
+                                },
                             )
                         }
                         if (ui.bookmarks.isEmpty()) {
-                            item { EmptyState(stringResource(R.string.bookmarks_empty)) }
+                            item { EmptyState(stringResource(R.string.bookmarks_empty), graphic = R.drawable.sleuth_archive) }
                         }
                     }
                 }
@@ -291,6 +341,10 @@ fun SessionDetailScreen(
 
     val shareFailedMsg = stringResource(R.string.share_failed)
     val saveFailedMsg = stringResource(R.string.save_failed)
+    detailEntry?.let { entry ->
+        LogEntryDetail(entry = entry, onDismiss = { detailEntry = null })
+    }
+
     val onShareResult: (Result<Unit>) -> Unit = { result ->
         result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
     }

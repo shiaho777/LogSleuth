@@ -14,6 +14,9 @@ import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.data.db.toEntity
 import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.EntryAssembler
+import io.github.shiaho777.logsleuth.app.core.logcat.matchesLogSearch
+import io.github.shiaho777.logsleuth.app.core.logcat.nearestTimestampIndex
+import io.github.shiaho777.logsleuth.app.core.logcat.retainedSearchHitIndex
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.BookmarkEntity
 import io.github.shiaho777.logsleuth.app.data.db.CrashEventDao
@@ -53,8 +56,9 @@ data class SessionDetailUiState(
     val sourceChanged: Boolean = false,
     val searching: Boolean = false,
     val searchQuery: String = "",
-    val searchHits: List<Int> = emptyList(),
+    val searchHits: List<Long> = emptyList(),
     val searchHitIndex: Int = -1,
+    val searchPending: Boolean = false,
     val searchCaseSensitive: Boolean = false,
     val filteredOut: Boolean = false,
 )
@@ -208,12 +212,13 @@ class SessionDetailViewModel @Inject constructor(
         searchJob?.cancel()
         resetHitIndex = false
         _ui.update {
-            it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1)
+            it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1, searchPending = false)
         }
     }
 
     fun setSearchQuery(query: String) {
-        _ui.update { it.copy(searchQuery = query) }
+        if (query == _ui.value.searchQuery) return
+        _ui.update { it.copy(searchQuery = query, searchHits = emptyList(), searchHitIndex = -1, searchPending = query.isNotBlank()) }
         requestHits(resetIndex = true, debounce = true)
     }
 
@@ -223,7 +228,7 @@ class SessionDetailViewModel @Inject constructor(
 
     fun nextSearchHit(direction: Int) {
         _ui.update { state ->
-            if (state.searchHits.isEmpty()) state
+            if (state.searchPending || state.searchHits.isEmpty()) state
             else state.copy(
                 searchHitIndex = (state.searchHitIndex + direction).mod(state.searchHits.size),
             )
@@ -238,22 +243,19 @@ class SessionDetailViewModel @Inject constructor(
      */
     private fun requestHits(resetIndex: Boolean = false, debounce: Boolean = false) {
         searchJob?.cancel()
+        val state = _ui.value
+        if (!state.searching || state.searchQuery.isBlank()) {
+            resetHitIndex = false
+            return
+        }
         resetHitIndex = resetHitIndex || resetIndex
+        _ui.update { it.copy(searchPending = true) }
         searchJob = viewModelScope.launch {
             if (debounce) delay(SEARCH_DEBOUNCE_MS)
-            val state = _ui.value
-            val query = state.searchQuery
-            val ignore = !state.searchCaseSensitive
-            val entries = state.entries
-            val hits = if (query.isBlank()) {
-                emptyList()
-            } else {
-                withContext(Dispatchers.Default) {
-                    entries.mapIndexedNotNull { index, uiEntry ->
-                        ensureActive()
-                        val e = uiEntry.entry
-                        if (e.tag.contains(query, ignore) || e.message.contains(query, ignore)) index else null
-                    }
+            val hits = withContext(Dispatchers.Default) {
+                state.entries.mapNotNull { row ->
+                    ensureActive()
+                    row.seq.takeIf { row.entry.matchesLogSearch(state.searchQuery, !state.searchCaseSensitive) }
                 }
             }
             val reset = resetHitIndex
@@ -261,13 +263,20 @@ class SessionDetailViewModel @Inject constructor(
             _ui.update {
                 it.copy(
                     searchHits = hits,
-                    searchHitIndex = when {
-                        hits.isEmpty() -> -1
-                        reset -> 0
-                        else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
-                    },
+                    searchHitIndex = retainedSearchHitIndex(hits, if (reset) null else it.searchHits.getOrNull(it.searchHitIndex)),
+                    searchPending = false,
                 )
             }
+        }
+    }
+
+    suspend fun bookmarkLine(bookmark: BookmarkEntity): Long? {
+        val entries = _ui.value.entries
+        return withContext(Dispatchers.Default) {
+            nearestTimestampIndex(entries.size, bookmark.time) {
+                ensureActive()
+                entries[it].entry.timestampMillis
+            }?.let { entries[it].seq }
         }
     }
 
