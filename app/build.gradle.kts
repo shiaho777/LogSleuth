@@ -73,6 +73,8 @@ android {
         }
     }
 
+    sourceSets.getByName("main").assets.srcDir(rootProject.file("mcp/contract"))
+
     buildFeatures {
         compose = true
         buildConfig = true

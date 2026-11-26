@@ -4,10 +4,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.shiaho777.logsleuth.app.core.crashes.CrashDeleter
+import io.github.shiaho777.logsleuth.app.core.sessions.SessionDeleter
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
-import io.github.shiaho777.logsleuth.app.data.db.BookmarkDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionDao
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.service.RecordingManager
@@ -26,7 +25,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** A session row plus its log file's size, resolved off the main thread. */
 data class SessionRow(val session: SessionEntity, val sizeBytes: Long)
@@ -34,8 +32,7 @@ data class SessionRow(val session: SessionEntity, val sizeBytes: Long)
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
     private val sessionDao: SessionDao,
-    private val crashDeleter: CrashDeleter,
-    private val bookmarkDao: BookmarkDao,
+    private val sessionDeleter: SessionDeleter,
     private val exporter: SessionExporter,
     private val importer: LogImporter,
     private val recordingManager: RecordingManager,
@@ -88,20 +85,7 @@ class SessionsViewModel @Inject constructor(
 
     private fun delete(session: SessionEntity) {
         viewModelScope.launch {
-            // Keep the row when the file is still there: removing the row
-            // first would leave the file with nothing pointing at it, and no
-            // way to retry from the UI.
-            val fileGone = withContext(Dispatchers.IO) {
-                val file = File(session.filePath)
-                !file.exists() || file.delete()
-            }
-            if (!fileGone) {
-                _deleteFailed.update { it + 1 }
-                return@launch
-            }
-            crashDeleter.deleteSession(session.id)
-            bookmarkDao.deleteForSession(session.id)
-            sessionDao.delete(session)
+            if (!sessionDeleter.delete(session.id)) _deleteFailed.update { it + 1 }
         }
     }
 

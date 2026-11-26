@@ -68,6 +68,10 @@ LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub 
 
 详细操作见[筛选与预设](docs/zh/guide/filters.md)和[录制与崩溃检测](docs/zh/guide/recording-and-crashes.md)。
 
+## 本地 MCP
+
+同一台手机上的 Termux Agent 可以通过 MCP 操作 LogSleuth。在「设置 → 本地 MCP」启用并配对后，可以让 Agent 录制日志、按行号查询和导出 ZIP。[安装与配对指南](docs/zh/guide/local-mcp.md)
+
 ## 集成 SDK
 
 SDK 只采集宿主应用的日志、Java 崩溃和 ANR。它不声明安卓权限，不发起网络请求，还可以在落盘前按配置脱敏。用户无需安装 LogSleuth 查看器，也能从你的应用分享 ZIP。

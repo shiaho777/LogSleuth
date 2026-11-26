@@ -31,7 +31,8 @@ export default defineConfig({
             { text: 'Getting started', link: '/guide/' },
             { text: 'Log access', link: '/guide/log-access' },
             { text: 'Filters & rules', link: '/guide/filters' },
-            { text: 'Recording & crashes', link: '/guide/recording-and-crashes' }
+            { text: 'Recording & crashes', link: '/guide/recording-and-crashes' },
+            { text: 'Local MCP', link: '/guide/local-mcp' }
           ]
         }
       ],
@@ -105,7 +106,8 @@ export default defineConfig({
                 { text: '快速开始', link: '/zh/guide/' },
                 { text: '日志权限', link: '/zh/guide/log-access' },
                 { text: '过滤与规则', link: '/zh/guide/filters' },
-                { text: '录制与崩溃', link: '/zh/guide/recording-and-crashes' }
+                { text: '录制与崩溃', link: '/zh/guide/recording-and-crashes' },
+                { text: '本地 MCP', link: '/zh/guide/local-mcp' }
               ]
             }
           ]

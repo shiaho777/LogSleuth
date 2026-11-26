@@ -541,4 +541,21 @@
     <string name="filter_state_expanded">已展开</string>
     <string name="filter_state_collapsed">已收起</string>
     <string name="filter_clear_active">重置当前筛选</string>
+    <string name="mcp_title">本地 MCP</string>
+    <string name="mcp_open">管理本地 MCP</string>
+    <string name="mcp_description">让这台手机上的 Termux Agent 连接 LogSleuth。配对后，Agent 可以读取设备日志并更改应用数据和设置。</string>
+    <string name="mcp_start">启用 MCP</string>
+    <string name="mcp_stop">停止 MCP</string>
+    <string name="mcp_off">MCP 已关闭</string>
+    <string name="mcp_starting">正在启动 MCP…</string>
+    <string name="mcp_running">MCP 可在本机连接</string>
+    <string name="mcp_failed">无法启动 MCP。请检查端口 47137 是否被其他应用占用，然后重试。</string>
+    <string name="mcp_paired">Termux 桥接已配对</string>
+    <string name="mcp_unpaired">配对 Termux 桥接以连接</string>
+    <string name="mcp_pair">生成配对串</string>
+    <string name="mcp_pair_help">在 Termux 中运行 logsleuth-mcp pair，然后粘贴配对串。配对串两分钟内有效。</string>
+    <string name="mcp_copy">复制配对串</string>
+    <string name="mcp_revoke">撤销配对</string>
+    <string name="mcp_active_calls">正在处理 %1$d 个请求</string>
+    <string name="mcp_notification_recording">MCP 可连接，录制正在进行</string>
 </resources>

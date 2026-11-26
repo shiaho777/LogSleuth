@@ -90,6 +90,15 @@
              watcher runs whenever the user leaves it on; a recording runs until
              the user stops it. See service/ForegroundStart.kt. -->
         <service
+            android:name=".mcp.McpService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="user_enabled_on_device_log_analysis" />
+        </service>
+
+        <service
             android:name=".service.RecordService"
             android:exported="false"
             android:foregroundServiceType="specialUse">

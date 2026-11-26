@@ -28,6 +28,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prepare Node for Termux bridge tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+
       - name: Prepare Java
         uses: actions/setup-java@v4
         with:
@@ -97,6 +104,9 @@ jobs:
           ./gradlew :sample:assembleDebug -Plogsleuth.sdkVersion="$version" --no-daemon
           (cd sdk/build/maven-repository && zip -qr "$GITHUB_WORKSPACE/logsleuth-sdk-$version-maven.zip" io)
 
+      - name: Test and package the Termux bridge
+        run: scripts/package_mcp.sh "$GITHUB_WORKSPACE/logsleuth-mcp-${GITHUB_REF_NAME#v}.tgz"
+
       - name: Assemble and verify signed release
         env:
           LOGSLEUTH_KEYSTORE_BASE64: ${{ secrets.LOGSLEUTH_RELEASE_KEYSTORE_BASE64 }}
@@ -123,7 +133,7 @@ jobs:
           [[ "$actual" == "$expected" ]] || { echo "::error::APK signer does not match the configured certificate"; exit 1; }
           version="${GITHUB_REF_NAME#v}"
           cp "$src" "LogSleuth-$version.APK"
-          sha256sum "LogSleuth-$version.APK" "logsleuth-sdk-$version-maven.zip" > "LogSleuth-$version-SHA256SUMS.txt"
+          sha256sum "LogSleuth-$version.APK" "logsleuth-sdk-$version-maven.zip" "logsleuth-mcp-$version.tgz" > "LogSleuth-$version-SHA256SUMS.txt"
 
       - name: Publish the GitHub Release
         env:
@@ -132,7 +142,7 @@ jobs:
           set -euo pipefail
           tag="$GITHUB_REF_NAME"
           version="${tag#v}"
-          assets=("LogSleuth-$version.APK" "logsleuth-sdk-$version-maven.zip" "LogSleuth-$version-SHA256SUMS.txt")
+          assets=("LogSleuth-$version.APK" "logsleuth-sdk-$version-maven.zip" "logsleuth-mcp-$version.tgz" "LogSleuth-$version-SHA256SUMS.txt")
           notes="docs/releases/$tag.md"
           if gh release view "$tag" >/dev/null 2>&1; then
             if [[ $(gh release view "$tag" --json isDraft --jq '.isDraft') == false ]]; then
@@ -158,5 +168,6 @@ jobs:
             LogSleuth-*.APK
             LogSleuth-*-SHA256SUMS.txt
             logsleuth-sdk-*-maven.zip
+            logsleuth-mcp-*.tgz
           if-no-files-found: error
           retention-days: 14

@@ -68,6 +68,10 @@ Read the [log access guide](docs/guide/log-access.md) for setup and [the remote-
 
 For more detail, see [filters and presets](docs/guide/filters.md) and [recording and crash detection](docs/guide/recording-and-crashes.md).
 
+## Local MCP
+
+An Agent running in Termux on the same Android phone can operate LogSleuth through MCP. Enable it in **Settings → Local MCP**, pair the local bridge, and ask the Agent to record, query logs with line references, or export a ZIP. [Install and pair the Termux bridge](docs/guide/local-mcp.md)
+
 ## Embedding the SDK
 
 The SDK captures its host app’s logs, Java crashes, and ANRs. It declares no Android permissions, makes no network requests, and can redact configured patterns before writing logs. A user can share a ZIP from your app even if the LogSleuth viewer is absent.

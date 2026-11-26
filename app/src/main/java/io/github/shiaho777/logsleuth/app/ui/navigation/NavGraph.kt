@@ -51,6 +51,7 @@ import io.github.shiaho777.logsleuth.app.ui.guide.TourOverlay
 import io.github.shiaho777.logsleuth.app.ui.report.ReportScreen
 import io.github.shiaho777.logsleuth.app.ui.sessiondetail.SessionDetailScreen
 import io.github.shiaho777.logsleuth.app.ui.sessions.SessionsScreen
+import io.github.shiaho777.logsleuth.app.mcp.McpScreen
 import io.github.shiaho777.logsleuth.app.ui.settings.SettingsScreen
 import io.github.shiaho777.logsleuth.app.ui.setup.SetupScreen
 import io.github.shiaho777.logsleuth.app.ui.setup.WelcomeScreen
@@ -70,6 +71,7 @@ object Routes {
     const val FILTERS = "filters"
     const val AUTOMATION = "automation"
     const val SETTINGS = "settings"
+    const val MCP = "mcp"
 
     /** Route token for a crash whose package logcat never named. */
     const val UNKNOWN_PACKAGE = "_unknown"
@@ -249,11 +251,15 @@ fun LogSleuthNavHost(
                     composable(Routes.AUTOMATION) {
                         AutomationScreen(onBack = { navController.popBackStack() })
                     }
+                    composable(Routes.MCP) {
+                        McpScreen(onBack = { navController.popBackStack() })
+                    }
                     composable(Routes.SETTINGS) {
                         SettingsScreen(
                             onBack = { navController.popBackStack() },
                             onOpenSetup = { navController.navigate(Routes.SETUP) },
                             onOpenAutomation = { navController.navigate(Routes.AUTOMATION) },
+                            onOpenMcp = { navController.navigate(Routes.MCP) },
                             onOpenWelcome = { navController.navigate(Routes.WELCOME) },
                             onOpenGuide = {
                                 navController.navigate(Routes.STREAM) {
