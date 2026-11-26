@@ -25,7 +25,7 @@ Instructions for coding agents working in this repository.
 | `sample/` | Demo app consuming `:sdk`; used for manual verification of the SDK loop. |
 | `scripts/` | Repo gates (`check_string_parity.py`) and release helpers (`draft_release_notes.py`). |
 | `docs/` | Documentation site source (`docs/guide`, `docs/developer`, `docs/zh`) and the per-release notes in `docs/releases/`. |
-| `docs/screenshots/` | README screenshot set (15 real device captures, both READMEs). |
+| `docs/screenshots/` | Real app screenshots and capture index, shared by both READMEs. |
 | `fastlane/metadata/` | Store listing copy (en-US + zh-CN), shared by F-Droid and Play. |
 
 User-facing product docs: `README.md`, `README.zh-CN.md`, `CONTRIBUTING.md`,

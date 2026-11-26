@@ -1,335 +1,194 @@
-# LogSleuth
+<div align="center">
+  <h1>LogSleuth</h1>
+  <img src="docs/screenshots/app-icon.svg" width="88" height="88" alt="LogSleuth 图标，日志行上的放大镜">
+  <p><strong>找到安卓故障前后的日志，把它保存成可以回放的会话。</strong></p>
+  <p>可以看实时 Logcat、录下复现过程，也可以打开别人发来的报告。内嵌 SDK 能在你自己的应用里采集日志、崩溃和 ANR。</p>
+  <p>
+    <a href="https://github.com/shiaho777/LogSleuth/releases/latest">下载 APK</a> ·
+    <a href="#快速上手">快速上手</a> ·
+    <a href="#集成-sdk">集成 SDK</a> ·
+    <a href="README.md">English</a>
+  </p>
+  <p>
+    <a href="https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml"><img src="https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg" alt="查看构建和测试状态"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-245c52" alt="阅读 Apache 2.0 许可证"></a>
+  </p>
+</div>
 
-**在手机上录制并回放安卓崩溃。**
-保存故障前后的日志，发给其他人打开排查。也可以把 SDK 嵌入自己的 App，让用户分享诊断报告。
+## 安装
 
-[下载 APK](https://github.com/shiaho777/LogSleuth/releases/latest) · [打开第一份报告](https://shiaho777.github.io/LogSleuth/zh/guide/) · [集成 SDK](#集成-sdk) · [English](README.md)
+LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest) 下载名为 `LogSleuth-*.APK` 的安装包。
 
-[![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/shiaho777/LogSleuth?style=for-the-badge)](https://github.com/shiaho777/LogSleuth/stargazers)
-[![Docs](https://img.shields.io/badge/docs-online-blue?style=for-the-badge)](https://shiaho777.github.io/LogSleuth/zh/guide/)
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/guide/topics/manifest/uses-sdk-element#ApiLevels)
+下方图库来自当前源码版。要体验首次启动的示例报告和图中的界面，可以[从源码构建](#构建与贡献)。稳定版 v0.4.2 APK 使用上一版界面。
 
 ## 截图
 
-| 实时日志流 | 搜索与命中跳转 | 过滤与预设 |
-| :---: | :---: | :---: |
-| <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" alt="实时日志流" width="280"></a> | <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" alt="搜索" width="280"></a> | <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" alt="过滤" width="280"></a> |
-| **崩溃 / ANR 侦测** | **日志详情** | **多选与复制** |
-| <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" alt="崩溃侦测" width="280"></a> | <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" alt="日志详情" width="280"></a> | <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" alt="多选" width="280"></a> |
-| **按应用范围选择** | **录制会话** | **会话回放** |
-| <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" alt="范围选择" width="280"></a> | <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" alt="录制" width="280"></a> | <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" alt="回放" width="280"></a> |
-| **报告向导与导出** | **保存与分享** | **权限向导** |
-| <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" alt="报告向导" width="280"></a> | <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" alt="分享" width="280"></a> | <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" alt="权限向导" width="280"></a> |
-| **设置与应用内更新** | **使用引导** | **内嵌 SDK 示例** |
-| <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" alt="设置" width="280"></a> | <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" alt="使用引导" width="280"></a> | <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" alt="SDK 示例" width="280"></a> |
+<p align="center">
+  <a href="docs/screenshots/16-welcome.png"><img src="docs/screenshots/16-welcome.png" width="156" alt="首次启动入口，可打开示例、导入文件或采集日志"></a>
+  <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" width="156" alt="结账示例报告，显示日志时间线、崩溃和书签标签页"></a>
+  <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" width="156" alt="采集完成的报告，可预览、分享或保留会话"></a>
+</p>
 
-## LogSleuth 是什么?
+<p align="center">首次启动 · 会话回放 · 采集完成。点击图片可查看原图。</p>
 
-LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作:
+<details>
+<summary>首次使用与日志权限</summary>
 
-- **查看器 App**——面向全设备的 Logcat 风格实时日志查看器,Kotlin +
-  Jetpack Compose(Material 3)编写。Shizuku、Root,或一次 ADB 授权都能
-  读到设备日志。手机没有 Root 时,仍然推荐 Shizuku。
-- **`logsleuth-sdk`**——嵌入你自己 App 的日志库,**零权限、零网络**地
-  记录本应用的日志、崩溃与 ANR,打包成 zip 让用户一键发给你。查看器
-  App 可以直接打开这些 zip 回放。
+<p align="center">
+  <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" width="206" alt="日志访问配置，包含 Shizuku 和 ADB 选项"></a>
+  <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" width="206" alt="引导式导览，可继续或跳过"></a>
+  <a href="docs/screenshots/25-import.png"><img src="docs/screenshots/25-import.png" width="206" alt="SDK 示例分享的 ZIP 已在 LogSleuth 中打开为导入会话"></a>
+</p>
 
-## 功能总览
+</details>
 
-### 看流
+<details>
+<summary>实时日志、筛选、搜索与多选</summary>
 
-| 功能 | 说明 |
+<p align="center">
+  <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" width="206" alt="实时 Logcat，已筛选 Checkout 标签"></a>
+  <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" width="206" alt="展开日志筛选，显示标签、关键词、排除条件和正则开关"></a>
+  <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" width="206" alt="实时搜索高亮支付授权相关日志，并显示匹配项导航"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" width="206" alt="日志多选模式与复制工具栏"></a>
+  <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" width="206" alt="保存至会话对话框，已选择按应用限定范围"></a>
+</p>
+
+</details>
+
+<details>
+<summary>会话回放、日志详情与书签</summary>
+
+<p align="center">
+  <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" width="206" alt="会话列表，包含导入报告、录制记录和内置示例"></a>
+  <a href="docs/screenshots/20-bookmarks.png"><img src="docs/screenshots/20-bookmarks.png" width="206" alt="书签标签页，记有示例用户点击支付的时刻"></a>
+  <a href="docs/screenshots/26-entry-message.png"><img src="docs/screenshots/26-entry-message.png" width="206" alt="日志详情的消息标签页，可复制消息"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" width="206" alt="日志详情的原始日志页，显示进程字段与复制操作"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/21-wide-detail.png"><img src="docs/screenshots/21-wide-detail.png" width="640" alt="横屏会话视图，日志时间线与详情并排"></a>
+</p>
+
+</details>
+
+<details>
+<summary>复现故障、查看崩溃与分享</summary>
+
+<p align="center">
+  <a href="docs/screenshots/17-report-app.png"><img src="docs/screenshots/17-report-app.png" width="206" alt="引导式上报的应用选择页，已选中 Sleuth Sample"></a>
+  <a href="docs/screenshots/18-report-recording.png"><img src="docs/screenshots/18-report-recording.png" width="206" alt="上报录制中，显示实时计数和打开目标应用的入口"></a>
+  <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" width="206" alt="按应用分组的崩溃与 ANR 列表"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/19-crash-detail.png"><img src="docs/screenshots/19-crash-detail.png" width="206" alt="崩溃详情，显示结账异常及堆栈"></a>
+  <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" width="206" alt="录制保存后的底部面板，可分享 TXT 或 ZIP"></a>
+</p>
+
+</details>
+
+<details>
+<summary>设置、远程采集、自动化与 SDK</summary>
+
+<p align="center">
+  <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" width="206" alt="设置页，显示当前设备与日志来源选项"></a>
+  <a href="docs/screenshots/23-remote-adb.png"><img src="docs/screenshots/23-remote-adb.png" width="206" alt="远程 ADB 设置，显示主机与端口字段"></a>
+  <a href="docs/screenshots/22-automation.png"><img src="docs/screenshots/22-automation.png" width="206" alt="自动化规则编辑器，可设置匹配条件、目标应用和冷却时间"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/24-dark-theme.png"><img src="docs/screenshots/24-dark-theme.png" width="206" alt="深色主题下的结账示例报告"></a>
+  <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" width="206" alt="SDK 示例应用，可生成测试日志并分享 ZIP"></a>
+</p>
+
+</details>
+
+[截图索引与采集信息](docs/screenshots/README.md)
+
+## 快速上手
+
+1. **打开第一份报告。** 源码版首屏可选「打开示例报告」，查看一次虚构的结账崩溃，也可选「导入日志文件」打开 ZIP、TXT 或 LOG。使用 v0.4.2 时，跳过设置向导再从「会话」导入。这两条体验路径都无需设备日志权限。
+2. **沿时间线找故障。** 打开一个会话，在「日志」「崩溃」「书签」间切换。示例里的「点击支付」书签可以跳到附近的日志。点开一行，可在消息和原始日志之间切换。
+3. **开始自己的采集。** 源码版首屏选择「采集设备日志」，也可以从「设置」打开设置向导。先筛选再录制，保存后点「预览日志」，确认内容再分享 TXT 或 ZIP。想跟踪一个特定应用时，可以从「上报」进入引导式录制。
+
+### 选择日志来源
+
+| 来源 | 适用场景 |
 | --- | --- |
-| 实时 logcat | threadtime 行:级别着色、pid·tid·uid 列、每行显示所属应用图标 |
-| 缓冲区轨道 | 右侧把整个缓冲区画成级别指纹,滑块可拖可点,实时显示「第 N 行 / 共 M 行」 |
-| 丝滑追底 | 传送带式自动滚动,速度跟随到达速率;上滑脱钉,回滑到底自动复钉 |
-| 暂停缓冲 | 冻结显示但后台继续攒行——横幅按当前过滤条件实时统计攒了多少条 |
-| 搜索 | 全缓冲区检索:命中计数、匹配高亮、上/下一条跳转 |
-| 跳转按钮 | FAB 一键跳到缓冲最早一条,或回到实时尾部 |
-| 引擎状态徽标 | Streaming / Connecting / Stopped / Error 一眼可知;失败时显示真实原因(如 `logcat exited 1`);指数退避自动重连 |
-| 重新读取日志 | 溢出菜单里手动重连,保留续读位置,不会把环形缓冲再倒一遍 |
+| **Shizuku** | 推荐给无 Root 的手机。启动 Shizuku 后授权 LogSleuth，可以按应用筛选，并在后台持续采集。 |
+| **ADB 授权** | 有电脑时可用来读取本机日志。Android 13 及以上启动或重连日志流时，请让查看器保持在前台，以便确认系统授权。 |
+| **Root** | 适用于已经 Root 的设备。在设置向导中主动开启「使用 Root」。 |
+| **远程 ADB** | 源码版可通过传统 TCP ADB，在可信网络中读取第二台安卓设备的日志。 |
 
-### 收窄范围
+详细步骤见[日志权限指南](docs/zh/guide/log-access.md)和[远程设备指南](docs/zh/guide/remote-device.md)。
 
-| 功能 | 说明 |
-| --- | --- |
-| 过滤器 | 级别阈值(V–A)、Tag、关键字、排除模式、正则开关——可组合 |
-| 过滤预设 | 一组条件存成预设随取随用,预设拥有独立管理页 |
-| 过滤器编辑器 | 可以选应用、勾选允许的级别集合;从某一行日志创建过滤器时会打开预填好的编辑器,而不是塞一条固定规则 |
-| 按应用过滤 | 流上方芯片,只看某个 App 的日志(包名来自 uid 列,需要 Shizuku 或 Root) |
-| 应用选择器 | 已安装应用列表,带图标与各应用行数统计 |
+## 可以用它做什么
 
-### 就地操作
+- **找到关键行。** 按级别、Tag、文本或正则筛选，组合包含和排除规则。可以在搜索结果间跳转，也可以用右侧的日志轨道寻找错误集中的位置。
+- **保留故障前后。** 保存快照，或录制当前筛选后的日志流。复现时可从通知或可选的悬浮控件添加书签，稍后回到会话里查看那一刻的上下文。
+- **排查崩溃和卡死。** 查看 Java 崩溃、原生崩溃和 ANR，阅读堆栈与已有的上下文日志。保存记录和通知提醒可以分别设置。
+- **发出可回放的报告。** 预览会话后分享 TXT 或 ZIP，也可以把 SDK 导出的 ZIP 导回查看器。启用[自动化规则](docs/zh/guide/automation.md)后，可把匹配的日志行发送给自己选定的应用。
 
-| 功能 | 说明 |
-| --- | --- |
-| 日志详情 | 点按行尾 ℹ 看完整消息、pid/tid/uid,可复制消息或原始行 |
-| 多选 | 长按进入选择,再点扩展范围,整块复制 |
-| 按范围清理/保存 | 擦除或快照**全部**,也可在双栏选择器里勾选指定应用(带各应用行数/错误/告警统计) |
-| 会话快照 | 一键把当前缓冲区存成会话 |
-
-### 录制与回放
-
-| 功能 | 说明 |
-| --- | --- |
-| 后台录制 | 前台服务,通知里实时显示已捕获行数(附"停止/书签"按钮) |
-| 快捷开关瓷贴 | "录制日志"磁贴,录制中实时显示行数 |
-| 悬浮气泡 | 可选悬浮控件:在其他应用上就能录制/打书签/收起(需悬浮窗权限) |
-| 时间戳书签 | 录制中标记"问题就是这一刻"——回放时会话的书签页可见 |
-| 自动停止上限 | 体积上限(8–512 MB,默认 64)与时长上限(0–24 小时,默认不限) |
-| 前段回填 | 录制可包含你按下录制键之前已缓冲的行 |
-| 会话回放 | 重开任意会话——日志/崩溃/书签三页签,与实时流同一套过滤和搜索 |
-| 会话管理 | 滑动删除 + 可撤销;每个会话都可再次分享 |
-
-### 崩溃与 ANR
-
-| 功能 | 说明 |
-| --- | --- |
-| 实时侦测 | 流式或录制期间自动标记 `FATAL EXCEPTION`、原生 `Fatal signal` 与 ANR |
-| 事件列表 | 按应用分组(图标、名称、条数)。可搜索、排序,点进一个应用看堆栈、版本和附近的日志。可一次删掉该应用的崩溃,并撤销 |
-| 崩溃内搜索 | 可搜堆栈与保存的附近日志,支持上一条/下一条、命中计数,当前命中自动滚到可见位置;返回键先关搜索再离开页面 |
-| 忽略应用 | 在崩溃页面里直接忽略或取消忽略出问题的包 |
-| 通知 | Java 崩溃、原生崩溃、ANR 的保存和通知彼此独立。每个应用可以单独一条渠道,在系统设置里关掉某一个,记录仍会留下。通知里能看堆栈、复制,并打开那一条崩溃 |
-| 附近的日志 | 崩溃当下最多 200 行会一起存下来,分享的 zip 里也有 |
-
-### 报告、导出与导入
-
-| 功能 | 说明 |
-| --- | --- |
-| 报告向导 | 三步:选出问题的 App → 复现期间后台录制 → 分享 ZIP/TXT 或保留到会话;窗口期内的崩溃自动标记附带 |
-| 导出 | 会话与报告可导出 `.txt` 或 `.zip`(zip 附带设备信息);崩溃按纯文本分享,堆栈过大时改为发文件 |
-| 导入 | 从文件管理器或分享面板打开 `.zip`/`.txt`/`.log`——LogSleuth 直接渲染成会话(SDK 导出包也走这条路) |
-
-### 体验细节
-
-| 功能 | 说明 |
-| --- | --- |
-| 使用引导 | 17 步手把手引导,直接驱动真实 UI;随时可从 设置 → 关于 重播 |
-| 权限向导 | Shizuku、可选的 Root 卡片,以及可复制的 ADB 授权命令,就地复检 |
-| 双语 | English / 简体中文,应用内语言可覆盖系统 |
-| 主题与字号 | 跟随系统 / 浅色 / 深色;日志字号紧凑 / 默认 / 舒适 |
-| 应用内更新 | GitHub Releases 检查、发行说明、APK 断点续传(暂停/继续/取消)、一键安装、版本历史 |
-| 缓冲区可调 | 内存环形缓冲 1,000–200,000 行(默认 20,000)。可选冷启动只跟上新行;中途重连仍从最后一行续上 |
-| 日志行 | 可选显示完整行,不再截成 8 行。搜索栏上可切换是否区分大小写 |
-| 会话 | 在列表或详情里给会话改名 |
-| 恢复默认设置 | 设置里一个按钮把所有偏好恢复为默认值,确认框会写清楚哪些东西会被保留 |
-| 社区入口 | 设置页底部一键直达 Q 群与哔哩哔哩 |
-| 后台监看 | 离开应用后继续监听崩溃——用 `specialUse` 前台服务,不再撞 Android 15 的时长上限 |
-
-### 内嵌 SDK(`logsleuth-sdk`)
-
-给 App 开发者——上面那一套能力,但只对着*你自己的*进程:
-
-| 能力 | 说明 |
-| --- | --- |
-| 零门槛 | 不声明任何权限、无网络、无账号——App 本来就能读自己的日志 |
-| 采集 | 自进程 logcat 线程 + Java 崩溃接管(链式回传给原处理器)+ 主线程 ANR 看门狗 |
-| 存储 | 环形日志文件(默认 3 个 × 各 ≤2 MB),自动轮转 |
-| 隐私 | `addRedaction(Regex)` 落盘前脱敏密钥 |
-| 回调 | `Sleuth.onCrash { … }`——默认下次启动时回调,也可改为崩溃当场 |
-| 分享 | `Sleuth.shareLogs(activity)` 打包日志 + 设备信息 + 元数据,弹系统分享面板 |
-
-## 上手
-
-### 1. 安装
-
-从 [Releases](https://github.com/shiaho777/LogSleuth/releases) 下载 APK 安装
-(Android 8.0+ / API 26,约 2.4 MB)。
-
-### 2. 打开报告或采集日志
-
-从当前源码构建的版本，打开后可选「打开示例报告」或「导入日志文件」。
-两项都无需日志采集权限。使用当前稳定版 APK 时，可跳过权限向导，
-再从「会话」导入 ZIP、TXT 或 LOG 文件。
-
-要读本机日志，从首屏选择「采集设备日志」，也可以在
-**设置 → 日志权限 → 打开设置向导** 开始授权。
-
-从 Android 4.1 起,应用无法读取其他 App 的日志——这是平台限制,对所有
-日志类 App 一视同仁。下面任一授权都够用:
-
-1. **Shizuku(推荐)**——无需 Root,Android 11+ 可经"无线调试"在手机上
-   直接激活,无需电脑。安装 [Shizuku](https://shizuku.rikka.app/),启动
-   一次,授权 LogSleuth 即可;顺带解锁按应用过滤。
-2. **Root**——手机上已经有 Magisk、KernelSU 或 APatch 时,在权限向导里
-   打开 Root。LogSleuth 在你点下去之前不会执行 `su`,所以没 Root 的手机
-   不会弹出授权框。Root 和 Shizuku 一样能读全部日志,也包括按应用过滤。
-   自动模式在两者都可用时仍优先 Shizuku;可以在设置里把 Root 放到前面。
-3. **ADB 授权**——有电脑的话执行一次。权限会保留到卸载:
-   ```bash
-   adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
-   ```
-   Android 13 及以后,这条授权不是后台日志来源。系统只在 LogSleuth
-   处于前台时弹出确认;在后台启动会被拒绝,并记住大约一分钟。已经批准的
-   流在离开应用后会继续跑。Shizuku 和 Root 不受影响,开机后的崩溃监听也一样。
-
-### 3. 熟悉实时日志
-
-从 **设置 → 关于 → 重播使用引导** 打开互动导览，体验过滤、暂停、
-搜索和范围选择。
-
-[远程设备指南](docs/zh/guide/remote-device.md) 介绍如何通过传统 TCP ADB 读取第二台设备的日志。
-
-## 日常用法
-
-- **"用户反馈某 App 老崩溃"** → 报告页 → 选中该应用 → 开始录制 → 把手机
-  交给对方 → 停止并分享。窗口期内的崩溃自动标记附带。
-- **"日志太吵"** → 展开过滤栏,只勾选 Warn 和 Error(或任意级别集合),再加 Tag/关键字——或按
-  应用过滤(Shizuku 或 Root)。常用组合可存成预设。
-- **"我要标记出事那一刻"** → 开启悬浮控件(需悬浮窗权限)或用快捷开关
-  瓷贴:不用离开被测应用就能录制 + 打书签。
-- **"收到一份日志 zip / txt"** → 直接用 LogSleuth 打开,或在会话页点
-  导入——进来就是可回放的会话。
-- **"这一行很关键"** → 点行尾 ℹ 看完整消息并可复制;长按多选可复制
-  一整块。
+详细操作见[筛选与预设](docs/zh/guide/filters.md)和[录制与崩溃检测](docs/zh/guide/recording-and-crashes.md)。
 
 ## 集成 SDK
 
-如果 GitHub Release 附有 `logsleuth-sdk-<version>-maven.zip`，在工程中
-添加公开 Maven 仓库，并把依赖版本设为该 Release 的版本。
+SDK 只采集宿主应用的日志、Java 崩溃和 ANR。它不声明安卓权限，不发起网络请求，还可以在落盘前按配置脱敏。用户无需安装 LogSleuth 查看器，也能从你的应用分享 ZIP。
+
+当前稳定版 Release 提供查看器 APK。接入可先看仓库里的[示例应用](sample/)和 [SDK 源码模块](sdk/)。两者位于同一个 Gradle 构建时，在应用中加入模块依赖。
 
 ```kotlin
-dependencyResolutionManagement {
-    repositories {
-        maven {
-            url = uri("https://shiaho777.github.io/LogSleuth/maven/")
-            content { includeModule("io.github.shiaho777.logsleuth", "logsleuth-sdk") }
-        }
-    }
-}
+implementation(project(":sdk"))
 ```
 
-```kotlin
-implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:<version>")
-```
-
-也可以解压 Maven ZIP，将 `maven { url = uri(...) }` 指向解压后的目录。
-从源码集成时仍可用 `implementation(project(":sdk"))`。
+在 `Application` 里初始化。如果新建了子类，请在 Manifest 的 `<application>` 上设置 `android:name=".MyApp"`。
 
 ```kotlin
+import android.app.Application
+import io.github.shiaho777.logsleuth.sdk.Sleuth
+
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        Sleuth.init(this)   // 即刻开始采集——无需任何权限
+        Sleuth.init(this)
     }
 }
-
-// App 内任意位置——比如"发送日志"客服按钮:
-Sleuth.shareLogs(activity)   // 弹系统分享面板,打包好的日志 zip
 ```
 
-通过 `SleuthConfig.Builder` 配置:
-
-| 选项 | 默认值 | 含义 |
-| --- | --- | --- |
-| `tagFilter(String)` | `null`(全部) | 只记录 Tag 含该串的行(外加所有 ERROR 行) |
-| `maxFiles(Int)` | 3 | 环形缓冲文件数,1–20 |
-| `maxFileBytes(Long)` | 2 MB | 单文件超过即轮转(最小 64 KB) |
-| `captureLogcat(Boolean)` | `true` | 设为 false 则只记崩溃/ANR |
-| `watchAnr(Boolean)` | `true` | 主线程心跳 ANR 看门狗 |
-| `onCrashInvokedOnNextStart(Boolean)` | `true` | 崩溃回调放在下次 init 投递,而非崩溃当场 |
-| `addRedaction(Regex)` | — | 额外脱敏模式,写盘前剥离 |
-
-完整 API:
+在 Activity 的帮助或反馈入口调用以下方法。
 
 ```kotlin
-Sleuth.init(context, SleuthConfig.Builder().tagFilter("net").build())
-Sleuth.onCrash { report -> /* 默认下次启动时投递——入队即可 */ }
-Sleuth.log("Checkout", "order=42 placed")       // 注入自定义日志行
-Sleuth.logException("Checkout", throwable)
-val files: List<File> = Sleuth.logFiles()       // 底层环形缓冲文件
-Sleuth.shareLogs(activity)
+Sleuth.shareLogs(this)
 ```
 
-zip 包含 `device.txt`(厂商/机型/Android 版本)、`meta.txt` 和日志文件;
-查看器 App 原生打开它,所以客服流程就是"把 zip 发我"→ 点开即可回放。
+如果要通过 Maven 产物验证接入，可以发布到当前检出的本地暂存仓库，再用该产物构建示例。[SDK 构建和发布说明](docs/developer/release.md#sdk-smoke-build)
 
-## 架构
+## 构建与贡献
 
-```text
-LogcatSource(本机 READ_LOGS / Shizuku shell / Root shell)
-  → LogcatEngine(唯一的 logcat 进程持有者,断线自动重连)
-      ├→ 实时日志流 UI(级别着色、过滤、搜索、暂停缓冲)
-      ├→ RecordingManager(前台服务 → 会话文件 + Room)
-      └→ CrashDetector(FATAL EXCEPTION / Fatal signal / ANR → 事件 + 通知)
-
-logsleuth-sdk(内嵌在宿主 App——零权限、零网络):
-  Sleuth.init → 自进程日志捕获 + 崩溃接管 + ANR 看门狗
-              → 环形日志文件(带密钥脱敏)
-              → 一键 zip 分享(查看器可直接打开回放)
-```
-
-## 权限说明
-
-App 声明的每个权限及用途:
-
-| 权限 | 用途 |
-| --- | --- |
-| `READ_LOGS` | 走 ADB 授权时读取设备日志。Android 13 及以后,新的 logcat 只在 LogSleuth 处于前台时启动。Shizuku 和 Root 则通过 shell 读日志 |
-| `moe.shizuku…API_V23` | 与 Shizuku 服务通信 |
-| `FOREGROUND_SERVICE` + `…_SPECIAL_USE` | 保持崩溃监看和后台录制存活 |
-| `POST_NOTIFICATIONS` | 录制状态、崩溃/ANR 提醒、自动停止通知 |
-| `SYSTEM_ALERT_WINDOW` | 悬浮录制/书签气泡——仅在你开启时生效 |
-| `RECEIVE_BOOT_COMPLETED` | 开机后恢复崩溃监看——仅在你保持开启时生效 |
-| `INTERNET` | 仅用于 GitHub Releases 更新检查——无统计、无广告 |
-| `REQUEST_INSTALL_PACKAGES` | 安装下载好的 APK 更新 |
-
-**SDK 自身不声明任何权限**——它只读宿主 App 自己的日志。
-
-## 项目结构
-
-```
-app/      LogSleuth 查看器 App(Kotlin + Jetpack Compose, Material 3)
-sdk/      logsleuth-sdk —— 可内嵌的零权限日志库
-sample/   演示 SDK 集成的示例 App
-```
-
-## 从源码构建
-
-需要 JDK 17+ 和 Android SDK platform 36。
+使用与 CI 一致的 **JDK 21**，并安装 **Android SDK Platform 36**。
 
 ```bash
 git clone https://github.com/shiaho777/LogSleuth.git
 cd LogSleuth
-./gradlew assembleDebug          # app + sdk + sample
-./gradlew test                   # 单元测试
-python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
+python3 scripts/check_string_parity.py
+./gradlew assembleDebug test lint
 ```
 
-## 文档
+查看器 APK 位于 `app/build/outputs/apk/debug/app-debug.apk`，SDK 示例 APK 位于 `sample/build/outputs/apk/debug/`。欢迎改进查看器、SDK、测试或翻译，参加前可看[贡献指南](CONTRIBUTING.md)和[开发者指南](docs/developer/index.md)。
 
-文档站发布在 **[shiaho777.github.io/LogSleuth](https://shiaho777.github.io/LogSleuth/)**：
+## 帮助与隐私
 
-| 板块 | 地址 | 内容 |
-| --- | --- | --- |
-| 指南 | [/zh/guide/](https://shiaho777.github.io/LogSleuth/zh/guide/) | 快速开始、日志权限、过滤与规则、录制与崩溃 |
-| English | [/guide/](https://shiaho777.github.io/LogSleuth/guide/) | 同一份指南的英文版 |
-| 开发者 | [/developer/](https://shiaho777.github.io/LogSleuth/developer/) | 架构、改动配方、发版手册 |
-
-站点源码在 [`docs/`](docs/)，本地预览：`cd docs && npm install && npm run dev`。
-
-## 下载
-
-- [GitHub Releases APK](https://github.com/shiaho777/LogSleuth/releases/latest)
-- F-Droid（计划中）
-- Google Play(计划中)
-
-## 参与贡献
-
-见 [CONTRIBUTING.md](CONTRIBUTING.md)。欢迎通过 GitHub Issues 提交
-Bug 报告和功能建议。
-
-## 联系方式
-
-| 平台 | 入口 |
-| --- | --- |
-| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
-| 哔哩哔哩 | [space.bilibili.com/2127032909](https://space.bilibili.com/2127032909) |
-| QQ 群 | 1127256026 —— [点击加入群聊](https://qm.qq.com/q/Gzj7CpirAs) |
+- **看不到日志或应用名？** 先在「设置」里检查当前来源。[日志权限指南](docs/zh/guide/log-access.md)说明各来源的授权、重连行为，以及哪些来源能把日志关联到应用。
+- **遇到问题？** 请提供 LogSleuth 版本、安卓版本、日志来源和复现步骤。附日志或截图前记得去掉私人信息。[提交 Bug](https://github.com/shiaho777/LogSleuth/issues/new?template=bug_report.yml)
+- **日志会去哪里？** 采集文件保存在设备上。你使用导出或自动化功能时才会有对应的数据传出。查看器联网用于更新和你配置的远程日志源。
+- **其他入口。** [使用指南](https://shiaho777.github.io/LogSleuth/zh/guide/) · [问题列表](https://github.com/shiaho777/LogSleuth/issues) · [QQ 群 1127256026](https://qm.qq.com/q/Gzj7CpirAs) · [Bilibili](https://space.bilibili.com/2127032909)
 
 ## 许可证
 
-[Apache-2.0](LICENSE)
+[Apache License 2.0](LICENSE)。本文使用项目自己的图标，以及查看器和 SDK 示例的界面截图。
