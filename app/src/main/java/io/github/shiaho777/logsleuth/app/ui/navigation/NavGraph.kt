@@ -192,8 +192,12 @@ fun LogSleuthNavHost(
                         SetupScreen(
                             onBack = { navController.popBackStack() },
                             onDone = {
-                                navController.navigate(Routes.STREAM) {
-                                    popUpTo(Routes.SETUP) { inclusive = true }
+                                if (navController.previousBackStackEntry?.destination?.route == Routes.REPORT) {
+                                    navController.popBackStack()
+                                } else {
+                                    navController.navigate(Routes.STREAM) {
+                                        popUpTo(Routes.SETUP) { inclusive = true }
+                                    }
                                 }
                             },
                         )
@@ -224,6 +228,9 @@ fun LogSleuthNavHost(
                         ReportScreen(
                             onBack = { navController.popBackStack() },
                             onOpenSessions = { navController.openTab(Routes.SESSIONS) },
+                            onOpenSetup = { navController.navigate(Routes.SETUP) },
+                            onOpenStream = { navController.openTab(Routes.STREAM) },
+                            onPreviewSession = { id -> navController.navigate(Routes.sessionDetail(id)) },
                         )
                     }
                     composable(Routes.CRASHES) {

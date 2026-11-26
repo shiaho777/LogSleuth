@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +47,7 @@ data class RecordingState(
     val startedAt: Long = 0L,
     val paused: Boolean = false,
     val missedEntries: Long = 0L,
+    val requestId: String? = null,
 )
 
 @Singleton
@@ -88,6 +90,7 @@ class RecordingManager @Inject constructor(
         var missed = 0L
         var backfill: List<LogcatEntry>? = snapshot.entries
         var pendingStop: StopReason? = null
+        val progressSignal = Channel<Unit>(Channel.CONFLATED)
         private val recordedUids = HashSet<Int>()
         val sequence = RecordingSequence(
             start = snapshot.maxSeq,
@@ -123,6 +126,13 @@ class RecordingManager @Inject constructor(
             return true
         }
 
+        fun publishProgress() {
+            _state.update {
+                if (it.sessionId != id || (it.lineCount == lines && it.missedEntries == missed)) it
+                else it.copy(lineCount = lines, missedEntries = missed)
+            }
+        }
+
         fun writeBackfill() {
             val entries = backfill ?: return
             backfill = null
@@ -135,7 +145,12 @@ class RecordingManager @Inject constructor(
         }
     }
 
-    suspend fun start(name: String?, filter: LogFilter): Result<Long> = withContext(Dispatchers.IO) {
+    suspend fun start(
+        name: String?,
+        filter: LogFilter,
+        requestId: String? = null,
+        expectedEndpoint: String? = null,
+    ): Result<Long> = withContext(Dispatchers.IO) {
         lifecycleMutex.withLock {
             if (capture != null) return@withLock Result.failure(IllegalStateException("Already recording"))
             runCatching {
@@ -143,6 +158,7 @@ class RecordingManager @Inject constructor(
                 val access = engine.access.value
                 check(access.granted) { "Log access not granted" }
                 val endpoint = access.remoteEndpoint
+                check(requestId == null || endpoint == expectedEndpoint) { "Recording source changed" }
                 val settings = settingsRepository.settings.first()
                 val rules = filterDao.observeAll().first().map { it.toLogFilter() }
                 val stack = FilterStack.compile(rules, installedApps::resolveUid)
@@ -184,7 +200,12 @@ class RecordingManager @Inject constructor(
                 )
                 capture = current
                 engine.activeRecording = LogcatEngine.ActiveRecording(id, endpoint)
-                _state.value = RecordingState(isRecording = true, sessionId = id, startedAt = System.currentTimeMillis())
+                _state.value = RecordingState(
+                    isRecording = true,
+                    sessionId = id,
+                    startedAt = System.currentTimeMillis(),
+                    requestId = requestId,
+                )
                 engine.acquireClient()
                 jobs = buildList {
                     add(scope.launch {
@@ -195,15 +216,18 @@ class RecordingManager @Inject constructor(
                             }
                         }.collect { entry ->
                             if (entry.remoteEndpoint == endpoint) {
-                                record(current) {
-                                    val before = lines
-                                    sequence.accept(entry)
-                                    if (lines / BATCH != before / BATCH || missed != _state.value.missedEntries) {
-                                        _state.update { it.copy(lineCount = lines, missedEntries = missed) }
-                                    }
-                                }
+                                record(current) { sequence.accept(entry) }
                             } else {
                                 stopAfterSourceChange(current)
+                            }
+                        }
+                    })
+                    add(scope.launch {
+                        for (signal in current.progressSignal) {
+                            delay(PROGRESS_REFRESH_MS)
+                            writeMutex.withLock {
+                                current.progressSignal.tryReceive()
+                                if (capture === current && current.pendingStop == null) current.publishProgress()
                             }
                         }
                     })
@@ -233,6 +257,12 @@ class RecordingManager @Inject constructor(
             try {
                 current.write()
                 if (current.bytes >= current.maxBytes) scheduleStop(current, StopReason.SIZE)
+                val published = _state.value
+                when {
+                    current.missed != published.missedEntries || current.lines / BATCH != published.lineCount / BATCH ->
+                        current.publishProgress()
+                    current.lines != published.lineCount -> current.progressSignal.trySend(Unit)
+                }
             } catch (_: IOException) {
                 scheduleStop(current, StopReason.WRITE_ERROR)
             }
@@ -329,7 +359,7 @@ class RecordingManager @Inject constructor(
         }
     }
 
-    suspend fun stop() = finish()
+    suspend fun stop(expectedId: Long? = null) = finish(expectedId)
 
     private suspend fun finish(expectedId: Long? = null) = lifecycleMutex.withLock {
         val current = capture ?: return@withLock
@@ -430,6 +460,7 @@ class RecordingManager @Inject constructor(
 
     private companion object {
         const val BATCH = 64L
+        const val PROGRESS_REFRESH_MS = 500L
         const val WRITER_BYTES = 64 * 1024
     }
 }
