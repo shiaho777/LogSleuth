@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -33,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
@@ -59,7 +59,7 @@ fun FilterEditorDialog(
     val excludeRegexBad = draft.useRegex && CompiledFilter.isInvalidRegex(draft.excludeQuery)
     val regexBad = queryRegexBad || tagRegexBad || excludeRegexBad
 
-    AlertDialog(
+    SpringAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -228,26 +228,25 @@ fun FilterEditorDialog(
                 )
             }
         },
-        confirmButton = {
+        confirmButton = { close ->
             TextButton(
                 enabled = draft.name.isNotBlank() && !regexBad,
                 onClick = {
-                    onSave(
-                        draft.copy(
-                            name = draft.name.trim(),
-                            query = draft.query.trim(),
-                            tagQuery = draft.tagQuery.trim(),
-                            excludeQuery = draft.excludeQuery.trim(),
-                            pid = draft.pid.trim(),
-                            tid = draft.tid.trim(),
-                            uid = draft.uid.trim(),
-                        ),
+                    val saved = draft.copy(
+                        name = draft.name.trim(),
+                        query = draft.query.trim(),
+                        tagQuery = draft.tagQuery.trim(),
+                        excludeQuery = draft.excludeQuery.trim(),
+                        pid = draft.pid.trim(),
+                        tid = draft.tid.trim(),
+                        uid = draft.uid.trim(),
                     )
+                    close { onSave(saved) }
                 },
             ) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        dismissButton = { close ->
+            TextButton(onClick = { close(onDismiss) }) { Text(stringResource(R.string.cancel)) }
         },
     )
 

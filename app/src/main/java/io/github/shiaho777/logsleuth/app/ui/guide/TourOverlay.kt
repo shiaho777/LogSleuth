@@ -6,7 +6,6 @@ import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateValueAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -62,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 import io.github.shiaho777.logsleuth.app.ui.navigation.Routes
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -338,8 +338,8 @@ private fun TourCard(
             AnimatedContent(
                 targetState = index,
                 transitionSpec = {
-                    (fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 6 })
-                        .togetherWith(fadeOut(tween(140)))
+                    (fadeIn(SleuthMotion.defaultEffectsSpec()) + slideInVertically(SleuthMotion.spatial()) { it / 6 })
+                        .togetherWith(fadeOut(SleuthMotion.defaultEffectsSpec()))
                 },
                 label = "tourStep",
             ) {

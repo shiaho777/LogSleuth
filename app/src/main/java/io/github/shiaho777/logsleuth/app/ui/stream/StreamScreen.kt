@@ -1,10 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.stream
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -27,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -65,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
 import io.github.shiaho777.logsleuth.app.core.logcat.formatVisible
 import io.github.shiaho777.logsleuth.app.core.text.ClipboardGuard
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
@@ -389,8 +386,8 @@ fun StreamScreen(
             // Recording status banner — appears with a slide-down animation
             AnimatedVisibility(
                 visible = ui.recording.isRecording,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
+                enter = SleuthMotion.expand(),
+                exit = SleuthMotion.collapse(),
             ) {
                 RecordingBanner(
                     lineCount = ui.recording.lineCount,
@@ -408,8 +405,8 @@ fun StreamScreen(
             // Paused banner — tells the user new lines are being buffered.
             AnimatedVisibility(
                 visible = ui.paused,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
+                enter = SleuthMotion.expand(),
+                exit = SleuthMotion.collapse(),
             ) {
                 Box(Modifier.tourTarget("pausedBanner")) {
                     PausedBanner(
@@ -657,7 +654,7 @@ fun StreamScreen(
     }
 
     extendedCopyText?.let { text ->
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { extendedCopyText = null },
             title = { Text(stringResource(R.string.extended_copy)) },
             text = {
@@ -673,8 +670,8 @@ fun StreamScreen(
                     )
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { extendedCopyText = null }) {
+            confirmButton = { close ->
+                TextButton(onClick = { close { extendedCopyText = null } }) {
                     Text(stringResource(R.string.close))
                 }
             },

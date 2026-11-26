@@ -2,17 +2,8 @@ package io.github.shiaho777.logsleuth.app.ui.navigation
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VisibilityThreshold
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
@@ -38,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
@@ -65,6 +55,7 @@ import io.github.shiaho777.logsleuth.app.ui.settings.SettingsScreen
 import io.github.shiaho777.logsleuth.app.ui.setup.SetupScreen
 import io.github.shiaho777.logsleuth.app.ui.setup.WelcomeScreen
 import io.github.shiaho777.logsleuth.app.ui.stream.StreamScreen
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 
 object Routes {
     const val WELCOME = "welcome"
@@ -163,10 +154,10 @@ fun LogSleuthNavHost(
                     modifier = Modifier
                         .padding(padding)
                         .consumeWindowInsets(padding),
-                    enterTransition = { enterPage(pageOffset(tabTravel, pageTravel, returning = false)) },
-                    exitTransition = { exitPage(pageOffset(tabTravel, pageTravel, returning = false)) },
-                    popEnterTransition = { enterPage(pageOffset(tabTravel, pageTravel, returning = true)) },
-                    popExitTransition = { exitPage(pageOffset(tabTravel, pageTravel, returning = true)) },
+                    enterTransition = { SleuthMotion.enter(pageOffset(tabTravel, pageTravel, returning = false)) },
+                    exitTransition = { SleuthMotion.exit(pageOffset(tabTravel, pageTravel, returning = false)) },
+                    popEnterTransition = { SleuthMotion.enter(pageOffset(tabTravel, pageTravel, returning = true)) },
+                    popExitTransition = { SleuthMotion.exit(pageOffset(tabTravel, pageTravel, returning = true)) },
                 ) {
                     composable(Routes.WELCOME) {
                         WelcomeScreen(
@@ -306,21 +297,6 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.pageOffset(
         else -> pageTravel
     }
 }
-
-private fun enterPage(offset: Int): EnterTransition =
-    fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-        slideInHorizontally(
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold),
-            initialOffsetX = { offset },
-        )
-
-private fun exitPage(offset: Int): ExitTransition =
-    fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
-        slideOutHorizontally(
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold),
-            targetOffsetX = { -offset },
-        )
-
 
 private fun NavHostController.openTab(route: String) {
     if (currentDestination?.route == route) return

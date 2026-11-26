@@ -1,13 +1,7 @@
 package io.github.shiaho777.logsleuth.app.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,18 +35,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 import io.github.shiaho777.logsleuth.app.ui.theme.instrumentSurface
+import io.github.shiaho777.logsleuth.app.ui.theme.selectionPlate
 import kotlin.math.abs
 
 @Composable
@@ -68,7 +59,7 @@ internal fun InstrumentNavigation(
     }
     val position = animateFloatAsState(
         targetValue = (if (selectedIndex >= 0) selectedIndex else lastSelectedIndex).toFloat(),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = SleuthMotion.spatial(),
         label = "navigationSelection",
     )
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
@@ -79,10 +70,8 @@ internal fun InstrumentNavigation(
     ) {
         AnimatedVisibility(
             visible = selectedIndex >= 0,
-            enter = expandVertically(expandFrom = Alignment.Bottom, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
-                fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
-                fadeOut(spring(stiffness = Spring.StiffnessMediumLow)),
+            enter = SleuthMotion.expand(Alignment.Bottom),
+            exit = SleuthMotion.collapse(Alignment.Bottom),
         ) {
             NavigationPlate(destinations, selectedIndex, position, onSelect)
         }
@@ -105,17 +94,7 @@ private fun NavigationPlate(
             .tourTarget("navBar")
             .instrumentSurface()
             .padding(4.dp)
-            .drawBehind {
-                val tabWidth = size.width / destinations.size
-                val index = position.value.coerceIn(0f, destinations.lastIndex.toFloat())
-                val visualIndex = if (layoutDirection == LayoutDirection.Rtl) destinations.lastIndex - index else index
-                drawRoundRect(
-                    color = colors.primaryContainer,
-                    topLeft = Offset(tabWidth * visualIndex, 0f),
-                    size = Size(tabWidth, size.height),
-                    cornerRadius = CornerRadius(15.dp.toPx()),
-                )
-            }
+            .selectionPlate(destinations.size, { position.value }, colors.primaryContainer, 15.dp)
             .selectableGroup(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
