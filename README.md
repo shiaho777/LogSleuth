@@ -23,93 +23,57 @@ The gallery shows the current source build. For the sample report on first launc
 
 ## Screenshots
 
-<p align="center">
-  <a href="docs/screenshots/16-welcome.png"><img src="docs/screenshots/16-welcome.png" width="156" alt="First launch with options to open the sample, import a file, or capture logs"></a>
-  <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" width="156" alt="Sample checkout report with the log timeline, crash, and bookmark tabs"></a>
-  <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" width="156" alt="Captured report with actions to preview, share, or keep the session"></a>
-</p>
+Select any screenshot to see it at full size.
 
-<p align="center">First launch · Session replay · Report ready. Select an image to view it at full size.</p>
+<table align="center">
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/01-welcome.png"><img src="docs/screenshots/viewer-fd19e78/01-welcome.png" width="128" alt="The welcome screen offers a sample report, file import, and device capture."></a><br><sub>First launch</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/02-log-access.png"><img src="docs/screenshots/viewer-fd19e78/02-log-access.png" width="128" alt="Choose Shizuku, root, or an ADB grant."></a><br><sub>Log access</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/03-android-approval.png"><img src="docs/screenshots/viewer-fd19e78/03-android-approval.png" width="128" alt="Android asks for one-time access to device logs after an ADB grant."></a><br><sub>Android approval</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/04-live-home.png"><img src="docs/screenshots/viewer-fd19e78/04-live-home.png" width="128" alt="The main Logs tab is streaming with all levels and apps visible."></a><br><sub>Live logs home</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/05-guided-tour.png"><img src="docs/screenshots/viewer-fd19e78/05-guided-tour.png" width="128" alt="The tour explains the controls directly on the live screen."></a><br><sub>Guided tour</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/06-filter-controls.png"><img src="docs/screenshots/viewer-fd19e78/06-filter-controls.png" width="128" alt="Set a tag, keywords, exclusions, or regular expressions."></a><br><sub>Filter controls</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/07-filtered-live-logs.png"><img src="docs/screenshots/viewer-fd19e78/07-filtered-live-logs.png" width="128" alt="Follow live checkout logs with the Checkout tag active."></a><br><sub>Filtered logs</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/08-log-search.png"><img src="docs/screenshots/viewer-fd19e78/08-log-search.png" width="128" alt="Search for payment authorization and jump between matches."></a><br><sub>Search matches</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/09-select-log-lines.png"><img src="docs/screenshots/viewer-fd19e78/09-select-log-lines.png" width="128" alt="Select log lines and copy them together."></a><br><sub>Select log lines</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/10-save-scope.png"><img src="docs/screenshots/viewer-fd19e78/10-save-scope.png" width="128" alt="Choose which apps to include in a saved session."></a><br><sub>Choose save scope</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/11-recording-saved.png"><img src="docs/screenshots/viewer-fd19e78/11-recording-saved.png" width="128" alt="Preview a saved recording or share it as ZIP or TXT."></a><br><sub>Share logs</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/12-sessions.png"><img src="docs/screenshots/viewer-fd19e78/12-sessions.png" width="128" alt="Browse recordings, imports, and built-in examples."></a><br><sub>Session library</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/13-session-replay.png"><img src="docs/screenshots/viewer-fd19e78/13-session-replay.png" width="128" alt="Read the fictional checkout crash in its original timeline."></a><br><sub>Replay a session</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/14-bookmarks.png"><img src="docs/screenshots/viewer-fd19e78/14-bookmarks.png" width="128" alt="The Tapped Pay bookmark jumps to the nearby logs."></a><br><sub>Jump to Pay</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/15-log-message.png"><img src="docs/screenshots/viewer-fd19e78/15-log-message.png" width="128" alt="Read and copy the message in the log inspector."></a><br><sub>Inspect a message</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/16-raw-log-line.png"><img src="docs/screenshots/viewer-fd19e78/16-raw-log-line.png" width="128" alt="Switch to the raw log and copy the original line."></a><br><sub>View the raw line</sub></td>
+  </tr>
+  <tr>
+    <td colspan="4" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/17-landscape-inspector.png"><img src="docs/screenshots/viewer-fd19e78/17-landscape-inspector.png" width="550" alt="A landscape session keeps the timeline and inspector visible together."></a><br><sub>Inspect logs in landscape</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/18-report-target.png"><img src="docs/screenshots/viewer-fd19e78/18-report-target.png" width="128" alt="The report wizard is scoped to Sleuth Sample."></a><br><sub>Pick the report app</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/19-report-recording.png"><img src="docs/screenshots/viewer-fd19e78/19-report-recording.png" width="128" alt="A recording shows a live line count and can reopen the selected app."></a><br><sub>Record the bug</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/20-report-ready.png"><img src="docs/screenshots/viewer-fd19e78/20-report-ready.png" width="128" alt="The report shows the captured crash and offers preview, share, and save actions."></a><br><sub>Captured report</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/21-report-preview.png"><img src="docs/screenshots/viewer-fd19e78/21-report-preview.png" width="128" alt="Review a captured report in the session reader before sharing it."></a><br><sub>Preview the report</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/22-crash-list.png"><img src="docs/screenshots/viewer-fd19e78/22-crash-list.png" width="128" alt="The Crashes tab groups reports by app."></a><br><sub>Browse crash groups</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/23-crash-stack.png"><img src="docs/screenshots/viewer-fd19e78/23-crash-stack.png" width="128" alt="Open the Sleuth Sample crash and read the exception stack."></a><br><sub>Read the stack trace</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/24-settings.png"><img src="docs/screenshots/viewer-fd19e78/24-settings.png" width="128" alt="View the active log source and choose a preferred access method."></a><br><sub>Log source settings</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/25-remote-adb.png"><img src="docs/screenshots/viewer-fd19e78/25-remote-adb.png" width="128" alt="Set the host and port of a device to connect to over ADB."></a><br><sub>Remote ADB</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/26-automation-rule.png"><img src="docs/screenshots/viewer-fd19e78/26-automation-rule.png" width="128" alt="Define matching conditions, a target app, and the cooldown."></a><br><sub>Add a rule</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/27-dark-replay.png"><img src="docs/screenshots/viewer-fd19e78/27-dark-replay.png" width="128" alt="Replay the sample session in the dark theme."></a><br><sub>Dark theme</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/28-sdk-sample.png"><img src="docs/screenshots/viewer-fd19e78/28-sdk-sample.png" width="128" alt="Generate test logs in the sample and share an SDK ZIP."></a><br><sub>SDK sample app</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/29-sdk-import.png"><img src="docs/screenshots/viewer-fd19e78/29-sdk-import.png" width="128" alt="Open the SDK ZIP as an imported session and filter the test logs."></a><br><sub>Import the SDK ZIP</sub></td>
+  </tr>
+</table>
 
-<details>
-<summary>First launch and log access</summary>
-
-<p align="center">
-  <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" width="206" alt="Log access setup with Shizuku and ADB options"></a>
-  <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" width="206" alt="Guided tour overlay with controls to continue or skip"></a>
-  <a href="docs/screenshots/25-import.png"><img src="docs/screenshots/25-import.png" width="206" alt="SDK sample ZIP shared into LogSleuth and opened as an imported session"></a>
-</p>
-
-</details>
-
-<details>
-<summary>Live stream, filter, search, and select</summary>
-
-<p align="center">
-  <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" width="206" alt="Live Logcat filtered to the Checkout tag"></a>
-  <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" width="206" alt="Expanded log filters with a tag, keyword, exclusion, and regex controls"></a>
-  <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" width="206" alt="Live search highlights payment authorization and shows match navigation"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" width="206" alt="Log selection mode with the copy toolbar"></a>
-  <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" width="206" alt="Save-to-session dialog with the per-app scope selected"></a>
-</p>
-
-</details>
-
-<details>
-<summary>Replay, inspect, and bookmark</summary>
-
-<p align="center">
-  <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" width="206" alt="Sessions list with an imported report, a recording, and the bundled sample"></a>
-  <a href="docs/screenshots/20-bookmarks.png"><img src="docs/screenshots/20-bookmarks.png" width="206" alt="Bookmarks tab showing when the sample user tapped Pay"></a>
-  <a href="docs/screenshots/26-entry-message.png"><img src="docs/screenshots/26-entry-message.png" width="206" alt="Log inspector on the message tab with the copy action"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" width="206" alt="Log inspector on the raw line with its process fields and copy action"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/21-wide-detail.png"><img src="docs/screenshots/21-wide-detail.png" width="640" alt="Landscape session view with the timeline and log inspector side by side"></a>
-</p>
-
-</details>
-
-<details>
-<summary>Reproduce, inspect crashes, and share</summary>
-
-<p align="center">
-  <a href="docs/screenshots/17-report-app.png"><img src="docs/screenshots/17-report-app.png" width="206" alt="Guided report with Sleuth Sample selected as the target"></a>
-  <a href="docs/screenshots/18-report-recording.png"><img src="docs/screenshots/18-report-recording.png" width="206" alt="Guided report recording with a live count and a shortcut to the target app"></a>
-  <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" width="206" alt="Crash and ANR list grouped by app"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/19-crash-detail.png"><img src="docs/screenshots/19-crash-detail.png" width="206" alt="Crash detail with the checkout exception and stack trace"></a>
-  <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" width="206" alt="Recording saved sheet with TXT and ZIP share actions"></a>
-</p>
-
-</details>
-
-<details>
-<summary>Settings, remote capture, automation, and SDK</summary>
-
-<p align="center">
-  <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" width="206" alt="Settings with the active device and log source controls"></a>
-  <a href="docs/screenshots/23-remote-adb.png"><img src="docs/screenshots/23-remote-adb.png" width="206" alt="Remote ADB settings with host and port fields"></a>
-  <a href="docs/screenshots/22-automation.png"><img src="docs/screenshots/22-automation.png" width="206" alt="Automation rule editor for match criteria, target app, and cooldown"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/24-dark-theme.png"><img src="docs/screenshots/24-dark-theme.png" width="206" alt="Sample checkout report in the dark theme"></a>
-  <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" width="206" alt="SDK sample app with controls to generate logs and share a ZIP"></a>
-</p>
-
-</details>
-
-[Screenshot index and capture details](docs/screenshots/README.md)
+[Screenshot capture details](docs/screenshots/README.md)
 
 ## Quick start
 

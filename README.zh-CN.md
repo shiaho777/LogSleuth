@@ -23,93 +23,57 @@ LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub 
 
 ## 截图
 
-<p align="center">
-  <a href="docs/screenshots/16-welcome.png"><img src="docs/screenshots/16-welcome.png" width="156" alt="首次启动入口，可打开示例、导入文件或采集日志"></a>
-  <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" width="156" alt="结账示例报告，显示日志时间线、崩溃和书签标签页"></a>
-  <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" width="156" alt="采集完成的报告，可预览、分享或保留会话"></a>
-</p>
+点击任意截图可查看原图。
 
-<p align="center">首次启动 · 会话回放 · 采集完成。点击图片可查看原图。</p>
+<table align="center">
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/01-welcome.png"><img src="docs/screenshots/viewer-fd19e78/01-welcome.png" width="128" alt="启动页提供示例报告、文件导入和设备采集入口。"></a><br><sub>首次启动</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/02-log-access.png"><img src="docs/screenshots/viewer-fd19e78/02-log-access.png" width="128" alt="可通过 Shizuku、Root 或 ADB 授权。"></a><br><sub>权限设置</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/03-android-approval.png"><img src="docs/screenshots/viewer-fd19e78/03-android-approval.png" width="128" alt="完成 ADB 授权后，Android 请求一次性读取设备日志。"></a><br><sub>系统授权</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/04-live-home.png"><img src="docs/screenshots/viewer-fd19e78/04-live-home.png" width="128" alt="首页实时采集，显示所有级别和应用的日志。"></a><br><sub>日志首页</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/05-guided-tour.png"><img src="docs/screenshots/viewer-fd19e78/05-guided-tour.png" width="128" alt="导览直接在实时日志页介绍操作。"></a><br><sub>交互导览</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/06-filter-controls.png"><img src="docs/screenshots/viewer-fd19e78/06-filter-controls.png" width="128" alt="可设置 Tag、关键词、排除条件或正则。"></a><br><sub>筛选条件</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/07-filtered-live-logs.png"><img src="docs/screenshots/viewer-fd19e78/07-filtered-live-logs.png" width="128" alt="只显示匹配 Checkout 标签的实时日志。"></a><br><sub>筛选结果</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/08-log-search.png"><img src="docs/screenshots/viewer-fd19e78/08-log-search.png" width="128" alt="搜索支付授权并在匹配项之间跳转。"></a><br><sub>搜索跳转</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/09-select-log-lines.png"><img src="docs/screenshots/viewer-fd19e78/09-select-log-lines.png" width="128" alt="选择日志行并一次性复制。"></a><br><sub>多选日志</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/10-save-scope.png"><img src="docs/screenshots/viewer-fd19e78/10-save-scope.png" width="128" alt="按应用选择要保存到会话的日志。"></a><br><sub>保存范围</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/11-recording-saved.png"><img src="docs/screenshots/viewer-fd19e78/11-recording-saved.png" width="128" alt="预览录制内容，或分享为 ZIP、TXT。"></a><br><sub>分享录制</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/12-sessions.png"><img src="docs/screenshots/viewer-fd19e78/12-sessions.png" width="128" alt="浏览录制、导入和内置示例会话。"></a><br><sub>会话列表</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/13-session-replay.png"><img src="docs/screenshots/viewer-fd19e78/13-session-replay.png" width="128" alt="按原时间线查看虚构的结账故障。"></a><br><sub>回放会话</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/14-bookmarks.png"><img src="docs/screenshots/viewer-fd19e78/14-bookmarks.png" width="128" alt="点开「点击支付」书签，跳到附近日志。"></a><br><sub>定位书签</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/15-log-message.png"><img src="docs/screenshots/viewer-fd19e78/15-log-message.png" width="128" alt="在日志详情中阅读和复制消息。"></a><br><sub>日志消息</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/16-raw-log-line.png"><img src="docs/screenshots/viewer-fd19e78/16-raw-log-line.png" width="128" alt="切换到原始日志并复制完整原文。"></a><br><sub>原始日志</sub></td>
+  </tr>
+  <tr>
+    <td colspan="4" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/17-landscape-inspector.png"><img src="docs/screenshots/viewer-fd19e78/17-landscape-inspector.png" width="550" alt="横屏时可以同时看到会话时间线和日志详情。"></a><br><sub>横屏并排查看日志与详情</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/18-report-target.png"><img src="docs/screenshots/viewer-fd19e78/18-report-target.png" width="128" alt="上报向导已选中 Sleuth Sample。"></a><br><sub>选定应用</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/19-report-recording.png"><img src="docs/screenshots/viewer-fd19e78/19-report-recording.png" width="128" alt="录制中显示日志行数，可重新打开目标应用。"></a><br><sub>录制复现</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/20-report-ready.png"><img src="docs/screenshots/viewer-fd19e78/20-report-ready.png" width="128" alt="上报页显示已捕获的故障，可以预览、分享或保留。"></a><br><sub>采集结果</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/21-report-preview.png"><img src="docs/screenshots/viewer-fd19e78/21-report-preview.png" width="128" alt="分享前可在会话阅读器里检查已采集的日志。"></a><br><sub>预览报告</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/22-crash-list.png"><img src="docs/screenshots/viewer-fd19e78/22-crash-list.png" width="128" alt="崩溃页按应用分组展示。"></a><br><sub>崩溃列表</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/23-crash-stack.png"><img src="docs/screenshots/viewer-fd19e78/23-crash-stack.png" width="128" alt="打开 Sleuth Sample 的崩溃记录，查看异常堆栈。"></a><br><sub>异常堆栈</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/24-settings.png"><img src="docs/screenshots/viewer-fd19e78/24-settings.png" width="128" alt="查看当前日志来源并选择首选访问方式。"></a><br><sub>日志来源</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/25-remote-adb.png"><img src="docs/screenshots/viewer-fd19e78/25-remote-adb.png" width="128" alt="填写远程设备地址和端口。"></a><br><sub>远程连接</sub></td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/26-automation-rule.png"><img src="docs/screenshots/viewer-fd19e78/26-automation-rule.png" width="128" alt="设置匹配条件、目标应用和触发间隔。"></a><br><sub>规则编辑</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/27-dark-replay.png"><img src="docs/screenshots/viewer-fd19e78/27-dark-replay.png" width="128" alt="在深色主题下查看示例会话。"></a><br><sub>深色主题</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/28-sdk-sample.png"><img src="docs/screenshots/viewer-fd19e78/28-sdk-sample.png" width="128" alt="在示例中生成测试日志并分享 SDK ZIP。"></a><br><sub>SDK 示例</sub></td>
+    <td width="25%" align="center" valign="top"><a href="docs/screenshots/viewer-fd19e78/29-sdk-import.png"><img src="docs/screenshots/viewer-fd19e78/29-sdk-import.png" width="128" alt="将 SDK ZIP 导入会话，再筛选其中的测试日志。"></a><br><sub>导入报告</sub></td>
+  </tr>
+</table>
 
-<details>
-<summary>首次使用与日志权限</summary>
-
-<p align="center">
-  <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" width="206" alt="日志访问配置，包含 Shizuku 和 ADB 选项"></a>
-  <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" width="206" alt="引导式导览，可继续或跳过"></a>
-  <a href="docs/screenshots/25-import.png"><img src="docs/screenshots/25-import.png" width="206" alt="SDK 示例分享的 ZIP 已在 LogSleuth 中打开为导入会话"></a>
-</p>
-
-</details>
-
-<details>
-<summary>实时日志、筛选、搜索与多选</summary>
-
-<p align="center">
-  <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" width="206" alt="实时 Logcat，已筛选 Checkout 标签"></a>
-  <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" width="206" alt="展开日志筛选，显示标签、关键词、排除条件和正则开关"></a>
-  <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" width="206" alt="实时搜索高亮支付授权相关日志，并显示匹配项导航"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" width="206" alt="日志多选模式与复制工具栏"></a>
-  <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" width="206" alt="保存至会话对话框，已选择按应用限定范围"></a>
-</p>
-
-</details>
-
-<details>
-<summary>会话回放、日志详情与书签</summary>
-
-<p align="center">
-  <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" width="206" alt="会话列表，包含导入报告、录制记录和内置示例"></a>
-  <a href="docs/screenshots/20-bookmarks.png"><img src="docs/screenshots/20-bookmarks.png" width="206" alt="书签标签页，记有示例用户点击支付的时刻"></a>
-  <a href="docs/screenshots/26-entry-message.png"><img src="docs/screenshots/26-entry-message.png" width="206" alt="日志详情的消息标签页，可复制消息"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" width="206" alt="日志详情的原始日志页，显示进程字段与复制操作"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/21-wide-detail.png"><img src="docs/screenshots/21-wide-detail.png" width="640" alt="横屏会话视图，日志时间线与详情并排"></a>
-</p>
-
-</details>
-
-<details>
-<summary>复现故障、查看崩溃与分享</summary>
-
-<p align="center">
-  <a href="docs/screenshots/17-report-app.png"><img src="docs/screenshots/17-report-app.png" width="206" alt="引导式上报的应用选择页，已选中 Sleuth Sample"></a>
-  <a href="docs/screenshots/18-report-recording.png"><img src="docs/screenshots/18-report-recording.png" width="206" alt="上报录制中，显示实时计数和打开目标应用的入口"></a>
-  <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" width="206" alt="按应用分组的崩溃与 ANR 列表"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/19-crash-detail.png"><img src="docs/screenshots/19-crash-detail.png" width="206" alt="崩溃详情，显示结账异常及堆栈"></a>
-  <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" width="206" alt="录制保存后的底部面板，可分享 TXT 或 ZIP"></a>
-</p>
-
-</details>
-
-<details>
-<summary>设置、远程采集、自动化与 SDK</summary>
-
-<p align="center">
-  <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" width="206" alt="设置页，显示当前设备与日志来源选项"></a>
-  <a href="docs/screenshots/23-remote-adb.png"><img src="docs/screenshots/23-remote-adb.png" width="206" alt="远程 ADB 设置，显示主机与端口字段"></a>
-  <a href="docs/screenshots/22-automation.png"><img src="docs/screenshots/22-automation.png" width="206" alt="自动化规则编辑器，可设置匹配条件、目标应用和冷却时间"></a>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/24-dark-theme.png"><img src="docs/screenshots/24-dark-theme.png" width="206" alt="深色主题下的结账示例报告"></a>
-  <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" width="206" alt="SDK 示例应用，可生成测试日志并分享 ZIP"></a>
-</p>
-
-</details>
-
-[截图索引与采集信息](docs/screenshots/README.md)
+[截图采集信息](docs/screenshots/README.md)
 
 ## 快速上手
 
