@@ -3,11 +3,8 @@ package io.github.shiaho777.logsleuth.app.ui.guide
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateValueAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,6 +14,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -55,7 +55,7 @@ import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -211,10 +211,10 @@ fun TourOverlay(
 
         // Hole: element bounds inflated slightly; a target that has not
         // been laid out yet parks the hole off-screen (solid scrim).
-        val raw = step.targetKey?.let { controller.targets[it] }
-        val holeVisible = raw != null
-        val hole by animateValueAsState(
-            targetValue = raw?.inflate(pad) ?: Rect(-400f, -400f, -300f, -300f),
+        val target = step.targetKey?.let { controller.targets[it]?.inflate(pad) }
+        val holeVisible = target != null
+        val hole = animateValueAsState(
+            targetValue = target ?: Rect(-400f, -400f, -300f, -300f),
             typeConverter = Rect.VectorConverter,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
@@ -223,14 +223,7 @@ fun TourOverlay(
             label = "hole",
         )
 
-        val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
-            initialValue = 0.45f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-            ),
-            label = "p",
-        )
+        val scrim = remember { Path().apply { fillType = PathFillType.EvenOdd } }
 
         Canvas(
             Modifier
@@ -240,17 +233,16 @@ fun TourOverlay(
                     detectTapGestures { advance() }
                 },
         ) {
-            val scrim = Path().apply {
-                fillType = PathFillType.EvenOdd
-                addRect(Rect(0f, 0f, size.width, size.height))
-                if (holeVisible) addRoundRect(RoundRect(hole, corner, corner))
-            }
+            val bounds = hole.value
+            scrim.rewind()
+            scrim.addRect(Rect(0f, 0f, size.width, size.height))
+            if (holeVisible) scrim.addRoundRect(RoundRect(bounds, corner, corner))
             drawPath(scrim, color = Color.Black.copy(alpha = 0.72f))
             if (holeVisible) {
                 drawRoundRect(
-                    color = Color.White.copy(alpha = pulse),
-                    topLeft = hole.topLeft,
-                    size = hole.size,
+                    color = Color.White.copy(alpha = 0.85f),
+                    topLeft = bounds.topLeft,
+                    size = bounds.size,
                     cornerRadius = CornerRadius(corner),
                     style = Stroke(width = 2.dp.toPx()),
                 )
@@ -267,10 +259,10 @@ fun TourOverlay(
         val margin = with(density) { 12.dp.toPx() }
         val cardTop = when {
             cardH == 0 -> h // parked off-screen until measured
-            !holeVisible -> (h - cardH) / 2f
-            hole.center.y < h * 0.52f -> hole.bottom + gap
-            else -> hole.top - cardH - gap
-        }.coerceIn(margin, h - cardH - margin)
+            target == null -> (h - cardH) / 2f
+            target.center.y < h * 0.52f -> target.bottom + gap
+            else -> target.top - cardH - gap
+        }.coerceIn(margin, (h - cardH - margin).coerceAtLeast(margin))
         val animCardTop by animateFloatAsState(
             targetValue = cardTop,
             animationSpec = spring(
@@ -283,8 +275,6 @@ fun TourOverlay(
         TourCard(
             index = index,
             count = steps.size,
-            titleRes = step.titleRes,
-            descRes = step.descRes,
             isLast = index == steps.size - 1,
             onSkip = onFinished,
             onNext = ::advance,
@@ -292,7 +282,8 @@ fun TourOverlay(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .offset { IntOffset(0, animCardTop.roundToInt()) }
-                .onGloballyPositioned { cardH = it.size.height }
+                .heightIn(max = (maxHeight - 24.dp).coerceAtLeast(1.dp))
+                .onSizeChanged { cardH = it.height }
                 .graphicsLayer { alpha = if (cardH == 0) 0f else 1f }
                 // Tapping the card itself also advances — otherwise the
                 // biggest visible thing would be a dead touch zone.
@@ -305,8 +296,6 @@ fun TourOverlay(
 private fun TourCard(
     index: Int,
     count: Int,
-    titleRes: Int,
-    descRes: Int,
     isLast: Boolean,
     onSkip: () -> Unit,
     onNext: () -> Unit,
@@ -318,7 +307,7 @@ private fun TourCard(
         shadowElevation = 10.dp,
         modifier = modifier,
     ) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Progress dots, animated like the pager's.
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {

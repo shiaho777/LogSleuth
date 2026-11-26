@@ -1,17 +1,23 @@
 # Getting started
 
-LogSleuth reads the device log. The first minute is about granting it a way
-to do that; after that it is a live list you can filter, record and export.
+## Install
 
-## 1. Install
+Download the APK from [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest).
+Requires Android 8.0 (API 26) or newer.
 
-Grab the APK from
-[GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest),
-[F-Droid](https://f-droid.org/packages/io.github.shiaho777.logsleuth/) or the
-[Play Store](https://play.google.com/store/apps/details?id=io.github.shiaho777.logsleuth).
-Android 8.0 (API 26) or newer.
+## Open a report
 
-## 2. Grant log access
+On builds from the current source, tap **Open sample report**. Open **Bookmarks**
+to find when Pay was tapped, then open **Crashes** to see what failed. Use
+**Import a log file** to replay a ZIP, TXT, or LOG from someone else. Both paths
+work without log access. On the stable APK, skip the access wizard and import
+from **Sessions**. **Settings → About → Quick start** reopens the start screen
+on builds that include it.
+
+## Capture device logs
+
+On the start screen, choose **Capture device logs**. You can also open
+**Settings → Log access → Open setup guide**.
 
 Android does not let an app read other apps' logs without a deliberate
 grant. LogSleuth supports three, and you can change later in
@@ -21,21 +27,20 @@ grant. LogSleuth supports three, and you can change later in
 | --- | --- | --- |
 | **Shizuku** | The Shizuku app, restarted after a reboot | Everything, on and off screen |
 | **Root** | A rooted phone, with root switched on inside LogSleuth | Everything, on and off screen |
-| **ADB grant** | `adb shell pm grant io.github.shiaho777.logsleuth android.permission.READ_LOGS` | Everything while LogSleuth is on screen |
+| **ADB grant** | `adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS` | Everything while LogSleuth is on screen |
 
 **Shizuku is the recommended path** for an unrooted phone: it needs no
 system modification, and it survives reboots if you restart it yourself.
 LogSleuth's default *Auto* mode tries Shizuku first, then root, then the ADB
 grant, so an existing Shizuku setup never triggers a root prompt.
 
-The ADB grant has one honest limitation: since Android 13, a logcat started
-as your app only works while LogSleuth is on screen. Leave the app and the
-stream stops. See [Log access](/guide/log-access) for the details.
+On Android 13 and later, the ADB-granted stream must start or reconnect while
+LogSleuth is on screen. An already approved stream can continue in the
+background. See [Log access](/guide/log-access).
 
-## 3. Take the tour
+## Take the tour
 
-The first launch walks through the three access paths and the main screen.
-Skip it if you like — **Settings → Feature tour** replays it.
+From **Settings → About**, replay the guided tour to try the live controls.
 
 ## Reading the list
 
@@ -62,7 +67,7 @@ Skip it if you like — **Settings → Feature tour** replays it.
 | Keep a session | **Save** in the top bar, or the tile in quick settings |
 | Read a crash | The **Crashes** tab, or a notification when one is detected |
 | Start over with clean settings | **Settings → Restore defaults**. It asks first, and says what it keeps |
-| Ask a question | The QQ group and the Bilibili space are one tap away at the bottom of **Settings** |
+| Report a problem | [Tell us which step got you stuck](https://github.com/shiaho777/LogSleuth/issues/new?template=bug_report.yml) |
 
 ## Next
 

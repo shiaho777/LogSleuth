@@ -4,9 +4,8 @@
 
     <!-- 引导 -->
     <string name="setup_title">设置日志访问</string>
-    <string name="setup_explainer">从 Android 4.1 开始,应用无法读取其他 App 的日志,需要一次授权。Shizuku 和 ADB 命令不需要 Root。如果这台设备已经有 Root,也可以直接用。</string>
     <string name="setup_shizuku_title">Shizuku(推荐)</string>
-    <string name="setup_shizuku_desc">免 Root,Android 11+ 可通过无线调试在手机上直接激活。支持按应用过滤,日志流最稳定。</string>
+    <string name="setup_shizuku_desc">Android 11 及以上可用无线调试，无需 Root 或电脑。</string>
     <string name="setup_shizuku_not_installed">未安装 Shizuku</string>
     <string name="setup_shizuku_not_running">已安装 Shizuku,但未运行</string>
     <string name="setup_shizuku_needs_permission">Shizuku 运行中,需要授权</string>
@@ -15,18 +14,18 @@
     <string name="setup_open_shizuku">打开 Shizuku</string>
     <string name="setup_grant_shizuku">授权</string>
     <string name="setup_root_title">Root</string>
-    <string name="setup_root_desc">装了 Magisk、KernelSU 或 APatch 时,Root 和 Shizuku 一样能读到全部日志。你不点,就不会去要权限。</string>
+    <string name="setup_root_desc">适用于已使用 Magisk、KernelSU 或 APatch 的设备。</string>
     <string name="setup_root_grant">使用 Root</string>
     <string name="setup_root_ready">Root 已就绪</string>
     <string name="setup_root_denied">Root 被拒绝</string>
     <string name="setup_root_unknown">尚未请求</string>
     <string name="setup_root_checking">正在等待 Root 管理器…</string>
     <string name="setup_adb_title">ADB 一次性授权</string>
-    <string name="setup_adb_desc">有电脑时执行一次下面的命令。授权会保留到卸载。Android 13 及以后，只有 LogSleuth 在前台时系统才会弹出日志访问确认；在后台启动会被拒绝并记住大约一分钟。要在后台持续读取，请用 Shizuku 或 Root。</string>
+    <string name="setup_adb_desc">在电脑上运行一次。Android 13 及以上请保持 LogSleuth 在前台，以便确认系统授权。</string>
     <string name="setup_copy_command">复制命令</string>
     <string name="setup_recheck">我已执行,重新检测</string>
     <string name="setup_adb_granted">已授予 READ_LOGS</string>
-    <string name="setup_skip">暂时跳过</string>
+    <string name="setup_skip">继续，无需日志权限</string>
 
     <!-- 实时流 -->
     <string name="pause">暂停</string>
@@ -45,8 +44,7 @@
     <string name="empty_logs_waiting">正在等待日志。</string>
     <string name="empty_logs_filtered">当前过滤器把所有行都挡掉了。放宽过滤才能看到日志。</string>
     <string name="no_access_title">还没有日志访问权限</string>
-    <string name="no_access_desc">LogSleuth 需要 Shizuku、Root,或一次性 ADB 授权才能读取设备日志。</string>
-    <string name="no_access_action">去设置</string>
+    <string name="no_access_action">设置日志权限</string>
 
     <!-- 过滤器 -->
     <string name="filters_title">过滤器预设</string>
@@ -91,7 +89,7 @@
 
     <!-- 崩溃 -->
     <string name="crashes_title">崩溃与 ANR</string>
-    <string name="crashes_empty">还没有侦测到崩溃。LogSleuth 会在流式查看或录制时标记 FATAL EXCEPTION、原生崩溃与 ANR 事件。</string>
+    <string name="crashes_empty">暂无崩溃或 ANR 记录</string>
     <string name="unknown_app">未知应用</string>
     <string name="copy">复制</string>
     <string name="close">关闭</string>
@@ -154,7 +152,7 @@
     <string name="duration_min_sec">%1$d 分 %2$d 秒</string>
     <string name="crash_deleted">崩溃事件已删除</string>
     <string name="settings_about">关于</string>
-    <string name="settings_version">LogSleuth %1$s · 开源(Apache-2.0)</string>
+    <string name="settings_version">%1$s · Apache-2.0</string>
 
     <!-- 通知与服务 -->
     <string name="notif_channel_recording">录制</string>
@@ -494,4 +492,17 @@
     <string name="log_source_remote_unavailable">远程设备不可用</string>
     <string name="recording_source_changed">日志来源已切换，录制已结束。</string>
     <string name="recording_gap_count">缺失日志条数：%1$d</string>
+    <string name="setup_continue">打开实时日志</string>
+    <string name="welcome_example">打开示例报告</string>
+    <string name="welcome_import">导入日志文件</string>
+    <string name="welcome_capture">采集设备日志</string>
+    <string name="welcome_saved_sessions">查看已保存的会话</string>
+    <string name="welcome_opening">正在打开报告…</string>
+    <string name="example_report_name">示例报告 · 结账崩溃</string>
+    <string name="example_report_bookmark">点击支付</string>
+    <string name="example_report_notice">示例报告 · 使用虚构数据</string>
+    <string name="example_report_error">无法打开示例报告</string>
+    <string name="settings_notifications_permission_desc">允许 Android 通知后才能收到崩溃提醒。崩溃记录按下方选项保存。</string>
+    <string name="settings_system_notifications">打开系统通知设置</string>
+    <string name="welcome_quick_start">快速开始</string>
 </resources>

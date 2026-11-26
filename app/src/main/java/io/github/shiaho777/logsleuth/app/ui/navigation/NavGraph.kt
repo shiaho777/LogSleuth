@@ -1,11 +1,14 @@
 package io.github.shiaho777.logsleuth.app.ui.navigation
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
@@ -16,25 +19,23 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ShortNavigationBar
-import androidx.compose.material3.ShortNavigationBarItem
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -51,15 +52,16 @@ import io.github.shiaho777.logsleuth.app.ui.filters.FiltersScreen
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.TourController
 import io.github.shiaho777.logsleuth.app.ui.guide.TourOverlay
-import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.report.ReportScreen
 import io.github.shiaho777.logsleuth.app.ui.sessiondetail.SessionDetailScreen
 import io.github.shiaho777.logsleuth.app.ui.sessions.SessionsScreen
 import io.github.shiaho777.logsleuth.app.ui.settings.SettingsScreen
 import io.github.shiaho777.logsleuth.app.ui.setup.SetupScreen
+import io.github.shiaho777.logsleuth.app.ui.setup.WelcomeScreen
 import io.github.shiaho777.logsleuth.app.ui.stream.StreamScreen
 
 object Routes {
+    const val WELCOME = "welcome"
     const val SETUP = "setup"
     const val STREAM = "stream"
     const val SESSIONS = "sessions"
@@ -90,14 +92,14 @@ object Routes {
     }
 }
 
-private data class TopLevelDestination(
+internal data class TopLevelDestination(
     val route: String,
     val labelRes: Int,
     val icon: ImageVector,
 )
 
 private val topLevelDestinations = listOf(
-    TopLevelDestination(Routes.STREAM, R.string.nav_stream, Icons.Filled.Article),
+    TopLevelDestination(Routes.STREAM, R.string.nav_stream, Icons.AutoMirrored.Filled.Article),
     TopLevelDestination(Routes.SESSIONS, R.string.nav_sessions, Icons.Filled.History),
     TopLevelDestination(Routes.REPORT, R.string.nav_report, Icons.Filled.Flag),
     TopLevelDestination(Routes.CRASHES, R.string.nav_crashes, Icons.Filled.BugReport),
@@ -113,22 +115,17 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 fun LogSleuthNavHost(
     navController: NavHostController,
     startDestination: String,
-    guideCompleted: Boolean = true,
-    onTourFinished: () -> Unit = {},
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in topLevelRoutes
+    val travelPx = with(LocalDensity.current) { 18.dp.roundToPx() }
+    val forwardOffset = if (LocalLayoutDirection.current == LayoutDirection.Ltr) travelPx else -travelPx
 
     // Coach-mark tour: one controller for the whole graph. Screens mark
     // their highlight elements with Modifier.tourTarget; the overlay sits
     // above everything (nav bar included) inside this Box.
     val tour = remember { TourController() }
-    LaunchedEffect(guideCompleted, currentRoute) {
-        if (!guideCompleted && !tour.hasRun && currentRoute == Routes.STREAM) {
-            tour.start()
-        }
-    }
 
     CompositionLocalProvider(LocalTourController provides tour) {
         Box(Modifier.fillMaxSize()) {
@@ -142,26 +139,9 @@ fun LogSleuthNavHost(
         ),
         bottomBar = {
             if (showBottomBar) {
-                ShortNavigationBar(Modifier.tourTarget("navBar")) {
-                    topLevelDestinations.forEach { dest ->
-                        ShortNavigationBarItem(
-                            selected = currentRoute == dest.route,
-                            onClick = {
-                                if (currentRoute != dest.route) {
-                                    navController.navigate(dest.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                }
-                            },
-                            icon = {
-                                Icon(dest.icon, contentDescription = stringResource(dest.labelRes))
-                            },
-                            label = { Text(stringResource(dest.labelRes)) },
-                        )
+                InstrumentNavigation(topLevelDestinations, currentRoute) { destination ->
+                    if (currentRoute != destination.route) {
+                        navController.openTab(destination.route)
                     }
                 }
             }
@@ -180,24 +160,43 @@ fun LogSleuthNavHost(
                         .padding(padding)
                         .consumeWindowInsets(padding),
                     enterTransition = {
-                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start) + fadeIn()
+                        if (initialState.destination.route in topLevelRoutes && targetState.destination.route in topLevelRoutes) {
+                            fadeIn(tween(130))
+                        } else {
+                            fadeIn(tween(160)) + slideInHorizontally(tween(200)) { forwardOffset }
+                        }
                     },
                     exitTransition = {
-                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start) + fadeOut()
+                        if (initialState.destination.route in topLevelRoutes && targetState.destination.route in topLevelRoutes) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(tween(100))
+                        }
                     },
-                    popEnterTransition = {
-                        slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End) + fadeIn()
-                    },
+                    popEnterTransition = { fadeIn(tween(160)) },
                     popExitTransition = {
-                        slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End) + fadeOut()
+                        fadeOut(tween(120)) + slideOutHorizontally(tween(180)) { forwardOffset }
                     },
                 ) {
+                    composable(Routes.WELCOME) {
+                        WelcomeScreen(
+                            onOpenSession = { id ->
+                                navController.navigate(Routes.SESSIONS)
+                                navController.navigate(Routes.sessionDetail(id))
+                            },
+                            onOpenSetup = { navController.navigate(Routes.SETUP) },
+                            onOpenSessions = { navController.navigate(Routes.SESSIONS) },
+                        )
+                    }
                     composable(Routes.SETUP) {
-                        SetupScreen(onDone = {
-                            navController.navigate(Routes.STREAM) {
-                                popUpTo(Routes.SETUP) { inclusive = true }
-                            }
-                        })
+                        SetupScreen(
+                            onBack = { navController.popBackStack() },
+                            onDone = {
+                                navController.navigate(Routes.STREAM) {
+                                    popUpTo(Routes.SETUP) { inclusive = true }
+                                }
+                            },
+                        )
                     }
                     composable(Routes.STREAM) {
                         StreamScreen(onNavigate = { route -> navController.navigate(route) })
@@ -224,7 +223,7 @@ fun LogSleuthNavHost(
                     composable(Routes.REPORT) {
                         ReportScreen(
                             onBack = { navController.popBackStack() },
-                            onOpenSessions = { navController.navigate(Routes.SESSIONS) },
+                            onOpenSessions = { navController.openTab(Routes.SESSIONS) },
                         )
                     }
                     composable(Routes.CRASHES) {
@@ -267,6 +266,7 @@ fun LogSleuthNavHost(
                             onBack = { navController.popBackStack() },
                             onOpenSetup = { navController.navigate(Routes.SETUP) },
                             onOpenAutomation = { navController.navigate(Routes.AUTOMATION) },
+                            onOpenWelcome = { navController.navigate(Routes.WELCOME) },
                             onOpenGuide = {
                                 navController.navigate(Routes.STREAM) {
                                     popUpTo(navController.graph.findStartDestination().id) {
@@ -288,23 +288,19 @@ fun LogSleuthNavHost(
             if (tour.active) {
                 TourOverlay(
                     controller = tour,
-                    // Same semantics as the bottom bar — save/restore tab
-                    // state so the stream keeps its scroll position.
-                    onNavigate = { route ->
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onFinished = {
-                        tour.stop()
-                        onTourFinished()
-                    },
+                    onNavigate = navController::openTab,
+                    onFinished = tour::stop,
                 )
             }
         }
+    }
+}
+
+
+private fun NavHostController.openTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }

@@ -1,16 +1,20 @@
 # 快速开始
 
-LogSleuth 读的是设备日志。第一个要做的事情是给它一条读日志的路径，之后就是
-一个可以过滤、录制、导出的实时列表。
+## 安装
 
-## 1. 安装
+从 [GitHub Releases 下载 APK](https://github.com/shiaho777/LogSleuth/releases/latest)。
+需要 Android 8.0（API 26）及以上。
 
-从 [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest)、
-[F-Droid](https://f-droid.org/packages/io.github.shiaho777.logsleuth/) 或
-[Play 商店](https://play.google.com/store/apps/details?id=io.github.shiaho777.logsleuth)
-下载安装包。需要 Android 8.0（API 26）及以上。
+## 打开报告
 
-## 2. 授予日志权限
+从当前源码构建的版本，点 **打开示例报告**。先到「书签」找到点击支付的时刻，
+再到「崩溃」查看失败原因。用 **导入日志文件** 回放别人发来的 ZIP、TXT 或 LOG。
+两种方式都无需日志采集权限。使用稳定版 APK 时，可跳过权限向导，再从「会话」导入。包含新首屏的版本可通过
+**设置 → 关于 → 快速开始** 随时回到这里。
+
+## 采集设备日志
+
+在首屏点 **采集设备日志**，或前往 **设置 → 日志权限 → 打开设置向导**。
 
 Android 不允许 App 随手读取别的 App 的日志，必须由用户明确授权。LogSleuth
 支持三种路径，之后可以在 **设置 → 日志权限** 里随时更换：
@@ -19,20 +23,18 @@ Android 不允许 App 随手读取别的 App 的日志，必须由用户明确�
 | --- | --- | --- |
 | **Shizuku** | Shizuku App，重启后需要自己再启动一次 | 全部日志，前台后台都可以 |
 | **Root** | 已 Root 的手机，并在 LogSleuth 里打开 root 开关 | 全部日志，前台后台都可以 |
-| **ADB 授权** | `adb shell pm grant io.github.shiaho777.logsleuth android.permission.READ_LOGS` | LogSleuth 在前台时可以读全部日志 |
+| **ADB 授权** | `adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS` | LogSleuth 在前台时可以读全部日志 |
 
 未 Root 的手机**推荐用 Shizuku**：不需要改动系统，而且重启后只要重新启动
 Shizuku 就能继续用。默认的「自动」模式会先试 Shizuku，再试 root，最后才用 ADB
 授权，所以已经装好 Shizuku 的设备不会莫名其妙弹出 root 提示。
 
-ADB 授权有一个诚实的限制：Android 13 起，以 App 身份启动的 logcat 只在
-LogSleuth 位于前台时有效，退到后台流就断了。细节见
-[日志权限](/zh/guide/log-access)。
+Android 13 及以上，通过 ADB 授权启动或重连日志流时，LogSleuth 需要在前台。
+已获批准的日志流可以继续在后台运行。详见 [日志权限](/zh/guide/log-access)。
 
-## 3. 跟着引导走一遍
+## 熟悉实时日志
 
-首次启动会走一遍三种授权方式和主界面。不想看可以跳过，之后在
-**设置 → 功能引导** 里随时重看。
+从 **设置 → 关于 → 重播使用引导** 体验实时日志的常用操作。
 
 ## 怎么看这个列表
 
@@ -56,7 +58,7 @@ LogSleuth 位于前台时有效，退到后台流就断了。细节见
 | 保留一段会话 | 顶栏的 **保存**、快捷设置磁贴，或者悬浮控件 |
 | 看一次崩溃 | **崩溃** 标签页，或者侦测到时的通知 |
 | 把设置恢复干净 | **设置 → 恢复默认设置**，会先问一句，并写清楚哪些东西会保留 |
-| 提个问题 | Q 群和哔哩哔哩在 **设置** 底部，一键可达 |
+| 反馈问题 | [告诉我们卡在了哪一步](https://github.com/shiaho777/LogSleuth/issues/new?template=bug_report.yml) |
 
 ## 接下来
 

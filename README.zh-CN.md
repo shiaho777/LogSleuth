@@ -1,9 +1,9 @@
 # LogSleuth
 
-**强大的安卓日志查看器 + 内嵌日志 SDK。**
-目标是做安卓上操作最方便、体验最好的日志工具。
+**在手机上录制并回放安卓崩溃。**
+保存故障前后的日志，发给其他人打开排查。也可以把 SDK 嵌入自己的 App，让用户分享诊断报告。
 
-[English](README.md)
+[下载 APK](https://github.com/shiaho777/LogSleuth/releases/latest) · [打开第一份报告](https://shiaho777.github.io/LogSleuth/zh/guide/) · [集成 SDK](#集成-sdk) · [English](README.md)
 
 [![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
@@ -139,7 +139,14 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
 从 [Releases](https://github.com/shiaho777/LogSleuth/releases) 下载 APK 安装
 (Android 8.0+ / API 26,约 2.4 MB)。
 
-### 2. 授予日志权限
+### 2. 打开报告或采集日志
+
+从当前源码构建的版本，打开后可选「打开示例报告」或「导入日志文件」。
+两项都无需日志采集权限。使用当前稳定版 APK 时，可跳过权限向导，
+再从「会话」导入 ZIP、TXT 或 LOG 文件。
+
+要读本机日志，从首屏选择「采集设备日志」，也可以在
+**设置 → 日志权限 → 打开设置向导** 开始授权。
 
 从 Android 4.1 起,应用无法读取其他 App 的日志——这是平台限制,对所有
 日志类 App 一视同仁。下面任一授权都够用:
@@ -159,14 +166,10 @@ LogSleuth 是一个开源(Apache-2.0)的安卓日志工具箱,两半配合工作
    处于前台时弹出确认;在后台启动会被拒绝,并记住大约一分钟。已经批准的
    流在离开应用后会继续跑。Shizuku 和 Root 不受影响,开机后的崩溃监听也一样。
 
-首次启动的权限向导会带你看这些路径;之后随时可从 设置 → 日志权限 →
-"打开设置向导"重进。
+### 3. 熟悉实时日志
 
-### 3. 跟着引导走一遍
-
-首启会有 17 步手把手引导,直接驱动真实 UI——替你展开过滤栏、暂停流、
-输入搜索词、弹出范围选择器。可跳过,也可随时从 设置 → 关于 → "重播使用
-引导"再看一遍。
+从 **设置 → 关于 → 重播使用引导** 打开互动导览，体验过滤、暂停、
+搜索和范围选择。
 
 [远程设备指南](docs/zh/guide/remote-device.md) 介绍如何通过传统 TCP ADB 读取第二台设备的日志。
 
@@ -310,8 +313,8 @@ python3 scripts/check_string_parity.py   # 双语字符串门禁(CI 会跑)
 
 ## 下载
 
-- GitHub Releases(见 Releases 页面)
-- F-Droid(首个公开版本发布后上架)
+- [GitHub Releases APK](https://github.com/shiaho777/LogSleuth/releases/latest)
+- F-Droid（计划中）
 - Google Play(计划中)
 
 ## 参与贡献

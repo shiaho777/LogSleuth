@@ -30,7 +30,7 @@ LogSleuth 可以通过 [libsu](https://github.com/topjohnwu/libsu) 以 `su` 身�
 接上电脑，或者在手机上用终端执行：
 
 ```bash
-adb shell pm grant io.github.shiaho777.logsleuth android.permission.READ_LOGS
+adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
 ```
 
 - 不需要 root，也不需要 Shizuku，但授权只对当前安装的这一份有效。

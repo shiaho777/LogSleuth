@@ -1,9 +1,10 @@
 # LogSleuth
 
-**A powerful logcat viewer and embedded logging SDK for Android.**
-On a mission to be the easiest and most delightful logging tool on Android.
+**Capture and replay Android crashes on your phone.**
+Record the logs around a failure and send a report another person can open.
+The embeddable SDK captures reports from your own app.
 
-[简体中文](README.zh-CN.md)
+[Download APK](https://github.com/shiaho777/LogSleuth/releases/latest) · [Open your first report](https://shiaho777.github.io/LogSleuth/guide/) · [Embed the SDK](#embedding-the-sdk) · [简体中文](README.zh-CN.md)
 
 [![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
@@ -141,7 +142,15 @@ For app developers — everything above, pointed at *your* app's process:
 
 Grab the APK from [Releases](https://github.com/shiaho777/LogSleuth/releases) and install it (Android 8.0+ / API 26, ~2.4 MB).
 
-### 2. Grant log access
+### 2. Open a report or capture logs
+
+On builds from the current source, choose **Open sample report** to explore a
+fictional crash, or **Import a log file** to replay a ZIP, TXT, or LOG. Both
+work without log access. On the current stable APK, you can skip setup and
+import from **Sessions**.
+
+Choose **Capture device logs** on the start screen, or open
+**Settings → Log access → Open setup guide**, to read logs from your device.
 
 Since Android 4.1, apps cannot read other apps' logs — a platform rule that
 applies to every logcat app. Any one of these grants is enough:
@@ -164,15 +173,10 @@ applies to every logcat app. Any one of these grants is enough:
    already-approved stream keeps running after you leave. Shizuku and root
    are not affected, including the boot crash watch.
 
-The setup wizard walks you through these on first launch and can be reopened
-any time from Settings → Log access → "Open setup guide".
+### 3. Explore the live stream
 
-### 3. Take the tour
-
-On first run a 17-step coach-mark tour drives the real UI — it opens the
-filter bar, pauses the stream, types a search query, and pops the scope
-picker for you. Skip it or replay it later from Settings → About → "Replay
-guided tour".
+**Settings → About → Replay guided tour** opens the interactive tour of filters,
+search, pause, and scope selection.
 
 [Remote device setup](docs/guide/remote-device.md) covers reading logs from a second device over classic TCP ADB.
 
@@ -323,8 +327,8 @@ The site source lives in [`docs/`](docs/); run it locally with
 
 ## Download
 
-- GitHub Releases (see Releases page)
-- F-Droid *(planned after first public release)*
+- [GitHub Releases APK](https://github.com/shiaho777/LogSleuth/releases/latest)
+- F-Droid *(planned)*
 - Google Play *(planned)*
 
 ## Contributing

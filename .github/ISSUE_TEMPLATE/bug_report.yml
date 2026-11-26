@@ -10,6 +10,14 @@ body:
     validations:
       required: true
   - type: input
+    id: version
+    attributes:
+      label: LogSleuth or SDK version
+      description: The viewer version is in Settings → About.
+      placeholder: e.g. 0.4.2
+    validations:
+      required: true
+  - type: input
     id: device
     attributes:
       label: Device & Android version
@@ -22,7 +30,9 @@ body:
       label: Log access method
       options:
         - Shizuku
+        - Root
         - ADB READ_LOGS grant
+        - Remote ADB
         - SDK mode (embedded in my app)
         - Not applicable
     validations:
@@ -31,5 +41,5 @@ body:
     id: logs
     attributes:
       label: Relevant logs
-      description: If LogSleuth itself crashed, please attach the stack trace.
+      description: Attach the relevant stack trace or log excerpt after removing tokens, account details, and other private information.
       render: text

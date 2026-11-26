@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 data class CrashDetailsUi(
     val crash: CrashEventEntity? = null,
     val contextText: String? = null,
+    val isExample: Boolean = false,
     val wrap: Boolean = true,
     val searchQuery: String = "",
     val searchIgnoreCase: Boolean = true,
@@ -66,13 +67,15 @@ class CrashDetailsViewModel @Inject constructor(
     private val contextText = MutableStateFlow<String?>(null)
 
     val ui: StateFlow<CrashDetailsUi> = combine(
-        crashEventDao.observeById(eventId),
+        combine(crashEventDao.observeById(eventId), crashEventDao.observeIsExample(eventId)) { crash, example ->
+            crash to example
+        },
         settingsRepository.settings,
         combine(searchQuery, searching, searchHitIndex) { query, isSearching, hitIndex ->
             Triple(query, isSearching, hitIndex)
         },
         contextText,
-    ) { crash, settings, search, surrounding ->
+    ) { (crash, example), settings, search, surrounding ->
         val (query, isSearching, hitIndex) = search
         val ignoreCase = !settings.searchCaseSensitive
         val stack = crash?.snippet.orEmpty()
@@ -83,6 +86,7 @@ class CrashDetailsViewModel @Inject constructor(
         CrashDetailsUi(
             crash = crash,
             contextText = surrounding,
+            isExample = example,
             wrap = settings.wrapCrashLogLines,
             searchQuery = query,
             searchIgnoreCase = ignoreCase,
