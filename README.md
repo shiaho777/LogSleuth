@@ -1,349 +1,194 @@
-# LogSleuth
+<div align="center">
+  <h1>LogSleuth</h1>
+  <img src="docs/screenshots/app-icon.svg" width="88" height="88" alt="LogSleuth’s magnifier over log lines">
+  <p><strong>Find the Android logs around a failure, then open them again as a session.</strong></p>
+  <p>Watch live Logcat, record a reproduction, or open a report someone sent you. The embedded SDK captures logs, crashes, and ANRs inside your own app.</p>
+  <p>
+    <a href="https://github.com/shiaho777/LogSleuth/releases/latest">Download the APK</a> ·
+    <a href="#quick-start">Quick start</a> ·
+    <a href="#embedding-the-sdk">Embed the SDK</a> ·
+    <a href="README.zh-CN.md">简体中文</a>
+  </p>
+  <p>
+    <a href="https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml"><img src="https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg" alt="View build and test status"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-245c52" alt="Read the Apache 2.0 license"></a>
+  </p>
+</div>
 
-**Capture and replay Android crashes on your phone.**
-Record the logs around a failure and send a report another person can open.
-The embeddable SDK captures reports from your own app.
+## Install
 
-[Download APK](https://github.com/shiaho777/LogSleuth/releases/latest) · [Open your first report](https://shiaho777.github.io/LogSleuth/guide/) · [Embed the SDK](#embedding-the-sdk) · [简体中文](README.zh-CN.md)
+LogSleuth runs on **Android 8.0 (API 26) and newer**. For a regular installation, download the `LogSleuth-*.APK` asset from [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest).
 
-[![CI](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml/badge.svg)](https://github.com/shiaho777/LogSleuth/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/shiaho777/LogSleuth)](https://github.com/shiaho777/LogSleuth/releases/latest)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/shiaho777/LogSleuth?style=for-the-badge)](https://github.com/shiaho777/LogSleuth/stargazers)
-[![Docs](https://img.shields.io/badge/docs-online-blue?style=for-the-badge)](https://shiaho777.github.io/LogSleuth/)
-[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://developer.android.com/guide/topics/manifest/uses-sdk-element#ApiLevels)
+The gallery shows the current source build. For the sample report on first launch and the interface shown below, [build from source](#build-and-contribute). The stable v0.4.2 APK uses the previous interface.
 
 ## Screenshots
 
-| Live logcat stream | Search & hit jumps | Filters & presets |
-| :---: | :---: | :---: |
-| <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" alt="Live Stream" width="280"></a> | <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" alt="Search" width="280"></a> | <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" alt="Filters" width="280"></a> |
-| **Crash & ANR detection** | **Log entry detail** | **Multi-select & copy** |
-| <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" alt="Crashes" width="280"></a> | <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" alt="Entry detail" width="280"></a> | <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" alt="Selection" width="280"></a> |
-| **Per-app scope picker** | **Recording sessions** | **Session replay** |
-| <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" alt="Scope picker" width="280"></a> | <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" alt="Recording" width="280"></a> | <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" alt="Replay" width="280"></a> |
-| **Guided report & export** | **Save & share** | **Setup & grants** |
-| <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" alt="Report" width="280"></a> | <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" alt="Share" width="280"></a> | <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" alt="Setup" width="280"></a> |
-| **Settings & in-app updates** | **Guided tour** | **Embedded SDK sample** |
-| <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" alt="Settings" width="280"></a> | <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" alt="Tour" width="280"></a> | <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" alt="SDK Sample" width="280"></a> |
+<p align="center">
+  <a href="docs/screenshots/16-welcome.png"><img src="docs/screenshots/16-welcome.png" width="156" alt="First launch with options to open the sample, import a file, or capture logs"></a>
+  <a href="docs/screenshots/05-session-replay.png"><img src="docs/screenshots/05-session-replay.png" width="156" alt="Sample checkout report with the log timeline, crash, and bookmark tabs"></a>
+  <a href="docs/screenshots/12-report.png"><img src="docs/screenshots/12-report.png" width="156" alt="Captured report with actions to preview, share, or keep the session"></a>
+</p>
 
-## What is LogSleuth?
+<p align="center">First launch · Session replay · Report ready. Select an image to view it at full size.</p>
 
-LogSleuth is an open-source (Apache-2.0) Android logging toolkit with two
-halves that work together:
+<details>
+<summary>First launch and log access</summary>
 
-- **The viewer app** — a polished, Logcat-style live reader for the whole
-  device, written in Kotlin + Jetpack Compose (Material 3). Shizuku, root,
-  or one ADB grant unlocks the device log. Shizuku stays the recommended
-  path when the phone is not rooted.
-- **`logsleuth-sdk`** — a drop-in library for your own app that records its
-  logs, crashes and ANRs **with zero permissions and zero network**, then
-  packages them into a zip your users can send you. LogSleuth the viewer
-  opens those zips directly.
+<p align="center">
+  <a href="docs/screenshots/11-setup.png"><img src="docs/screenshots/11-setup.png" width="206" alt="Log access setup with Shizuku and ADB options"></a>
+  <a href="docs/screenshots/14-tour.png"><img src="docs/screenshots/14-tour.png" width="206" alt="Guided tour overlay with controls to continue or skip"></a>
+  <a href="docs/screenshots/25-import.png"><img src="docs/screenshots/25-import.png" width="206" alt="SDK sample ZIP shared into LogSleuth and opened as an imported session"></a>
+</p>
 
-## Feature overview
+</details>
 
-### Watch the stream
+<details>
+<summary>Live stream, filter, search, and select</summary>
 
-| Feature | Details |
+<p align="center">
+  <a href="docs/screenshots/01-live-stream.png"><img src="docs/screenshots/01-live-stream.png" width="206" alt="Live Logcat filtered to the Checkout tag"></a>
+  <a href="docs/screenshots/02-filters.png"><img src="docs/screenshots/02-filters.png" width="206" alt="Expanded log filters with a tag, keyword, exclusion, and regex controls"></a>
+  <a href="docs/screenshots/07-search.png"><img src="docs/screenshots/07-search.png" width="206" alt="Live search highlights payment authorization and shows match navigation"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/09-selection.png"><img src="docs/screenshots/09-selection.png" width="206" alt="Log selection mode with the copy toolbar"></a>
+  <a href="docs/screenshots/10-scope-picker.png"><img src="docs/screenshots/10-scope-picker.png" width="206" alt="Save-to-session dialog with the per-app scope selected"></a>
+</p>
+
+</details>
+
+<details>
+<summary>Replay, inspect, and bookmark</summary>
+
+<p align="center">
+  <a href="docs/screenshots/04-sessions.png"><img src="docs/screenshots/04-sessions.png" width="206" alt="Sessions list with an imported report, a recording, and the bundled sample"></a>
+  <a href="docs/screenshots/20-bookmarks.png"><img src="docs/screenshots/20-bookmarks.png" width="206" alt="Bookmarks tab showing when the sample user tapped Pay"></a>
+  <a href="docs/screenshots/26-entry-message.png"><img src="docs/screenshots/26-entry-message.png" width="206" alt="Log inspector on the message tab with the copy action"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/08-entry-detail.png"><img src="docs/screenshots/08-entry-detail.png" width="206" alt="Log inspector on the raw line with its process fields and copy action"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/21-wide-detail.png"><img src="docs/screenshots/21-wide-detail.png" width="640" alt="Landscape session view with the timeline and log inspector side by side"></a>
+</p>
+
+</details>
+
+<details>
+<summary>Reproduce, inspect crashes, and share</summary>
+
+<p align="center">
+  <a href="docs/screenshots/17-report-app.png"><img src="docs/screenshots/17-report-app.png" width="206" alt="Guided report with Sleuth Sample selected as the target"></a>
+  <a href="docs/screenshots/18-report-recording.png"><img src="docs/screenshots/18-report-recording.png" width="206" alt="Guided report recording with a live count and a shortcut to the target app"></a>
+  <a href="docs/screenshots/03-crashes.png"><img src="docs/screenshots/03-crashes.png" width="206" alt="Crash and ANR list grouped by app"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/19-crash-detail.png"><img src="docs/screenshots/19-crash-detail.png" width="206" alt="Crash detail with the checkout exception and stack trace"></a>
+  <a href="docs/screenshots/15-share-sheet.png"><img src="docs/screenshots/15-share-sheet.png" width="206" alt="Recording saved sheet with TXT and ZIP share actions"></a>
+</p>
+
+</details>
+
+<details>
+<summary>Settings, remote capture, automation, and SDK</summary>
+
+<p align="center">
+  <a href="docs/screenshots/13-settings.png"><img src="docs/screenshots/13-settings.png" width="206" alt="Settings with the active device and log source controls"></a>
+  <a href="docs/screenshots/23-remote-adb.png"><img src="docs/screenshots/23-remote-adb.png" width="206" alt="Remote ADB settings with host and port fields"></a>
+  <a href="docs/screenshots/22-automation.png"><img src="docs/screenshots/22-automation.png" width="206" alt="Automation rule editor for match criteria, target app, and cooldown"></a>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/24-dark-theme.png"><img src="docs/screenshots/24-dark-theme.png" width="206" alt="Sample checkout report in the dark theme"></a>
+  <a href="docs/screenshots/06-sdk-sample.png"><img src="docs/screenshots/06-sdk-sample.png" width="206" alt="SDK sample app with controls to generate logs and share a ZIP"></a>
+</p>
+
+</details>
+
+[Screenshot index and capture details](docs/screenshots/README.md)
+
+## Quick start
+
+1. **Open a report.** In the source build, choose **Open sample report** to explore a fictional checkout crash, or **Import a log file** to open a ZIP, TXT, or LOG. On v0.4.2, skip the setup wizard and import from **Sessions**. These paths work without device log access.
+2. **Read the timeline.** In **Sessions**, open a report and switch between **Logs**, **Crashes**, and **Bookmarks**. In the sample, **Tapped Pay** jumps to the nearby log line. Tap a log to switch between its message and raw line.
+3. **Capture your own logs.** Choose **Capture device logs** on the source build’s start screen, or open the setup guide from **Settings**. Filter the live stream, start a recording, and use **Preview logs** before sharing TXT or ZIP. In **Report**, pick a target app to follow the guided capture flow.
+
+### Choose a log source
+
+| Source | When to use it |
 | --- | --- |
-| Live logcat | `threadtime` rows with level colors, pid·tid·uid columns and per-app icons |
-| Buffer rail | The right edge draws the whole buffer as a severity fingerprint, with a draggable viewport thumb and a `Line N of M` readout |
-| Smooth tail-follow | Conveyor-style auto-scroll that tracks the arrival rate; a fling up detaches, a fling back re-pins |
-| Pause & buffer | Freeze the display while lines keep buffering underneath — the banner counts what's waiting, under the filter you are actually using |
-| Search | Query across the whole buffer: hit counter, highlighted matches, prev/next jumps |
-| Jump controls | FABs to snap to the oldest buffered line or back to the live tail |
-| Engine chip | Streaming / Connecting / Stopped / Error at a glance — with the real cause (e.g. `logcat exited 1`) shown when it fails; auto-reconnects with backoff |
-| Restart logging | Overflow action that reconnects a wedged stream, keeping the resume stamp so the ring buffer is not dumped again |
+| **Shizuku** | Recommended for an unrooted phone. Start Shizuku and grant LogSleuth access. It supports per-app filtering and background capture. |
+| **ADB grant** | For local device logs with a computer. On Android 13+, keep the viewer on screen when the stream starts or reconnects so Android can show the approval prompt. |
+| **Root** | For a device that already has root. Enable **Use root** explicitly in the setup guide. |
+| **Remote ADB** | On the source build, read a second Android device on a trusted network using classic TCP ADB. |
 
-### Narrow it down
+Read the [log access guide](docs/guide/log-access.md) for setup and [the remote-device guide](docs/guide/remote-device.md) for the second-device flow.
 
-| Feature | Details |
-| --- | --- |
-| Filters | Level threshold (V–A), tag, keyword, exclude-pattern, regex toggle — combinable |
-| Filter presets | Save a filter combo, reapply it later; presets manage their own screen |
-| Filter editor | Pick a package and an allowed level set; creating a filter from a log line opens the editor prefilled instead of saving a fixed rule |
-| Per-app filter | Chip over the stream filters to one app (package names need the uid column, so Shizuku or root) |
-| App picker | Installed-app list with icons and per-app line stats |
+## What you can do
 
-### Act on what you see
+- **Find the lines that matter.** Filter by level, tag, text, or regex. Combine including and excluding rules. Jump between search matches or use the right-edge rail to find clusters of errors in the buffer.
+- **Keep the context.** Save a snapshot or record the filtered stream. Bookmark the moment from the notification or the optional floating controls, then reopen the session to read the surrounding lines.
+- **Investigate crashes and freezes.** Review Java crashes, native crashes, and ANRs. Open the stack and available surrounding logs. Configure saving and notifications separately.
+- **Send a report someone can open.** Preview a session, share TXT or ZIP, or import a ZIP from the embedded SDK back into the viewer. The optional [automation rules](docs/guide/automation.md) can send matching lines to an app you choose.
 
-| Feature | Details |
-| --- | --- |
-| Entry detail | Tap a row for the full message, pid/tid/uid, copy message or raw line |
-| Multi-select | Long-press a row, tap to extend the range, copy the whole block |
-| Clear / save by scope | Wipe or snapshot **everything**, or check the apps you want in a two-pane picker with per-app stats |
-| Session snapshot | Save the current buffer as a session in one tap |
-
-### Record & replay
-
-| Feature | Details |
-| --- | --- |
-| Background recording | Foreground service with a live line-count notification (Stop / Bookmark actions) |
-| Quick Settings tile | "Record logs" tile shows the live count while active |
-| Floating bubble | Optional overlay with record / bookmark / hide controls over other apps (needs the overlay permission) |
-| Bookmarks | Timestamp "it happened NOW" during a recording — visible in the session's Bookmarks tab |
-| Auto-stop limits | Configurable size cap (8–512 MB, default 64) and duration cap (0–24 h, default unlimited) |
-| Pre-start backfill | A recording can include the lines buffered before you hit record |
-| Session replay | Reopen any session — Logs / Crashes / Bookmarks tabs, same filters and search as the live stream |
-| Manage sessions | Swipe-to-delete with Undo; every session can be shared again later |
-
-### Crash & ANR detection
-
-| Feature | Details |
-| --- | --- |
-| Live detection | `FATAL EXCEPTION`, native `Fatal signal` and ANR signatures flagged while streaming or recording |
-| In-app event list | Crashes grouped by app (icon, name, count). Search, sort, and open one app's stack, version, and the surrounding lines. Delete one app's crashes with Undo |
-| Crash search | Search the stack and the saved surrounding logs, with previous/next, a hit counter, and the current match scrolled into view. Back closes the search before leaving the page |
-| Ignore an app | Ignore or un-ignore the crashing package from the crash screen itself |
-| Notifications | Save and notify are separate for Java crashes, native crashes, and ANRs. Each app can have its own channel, so muting one in system settings keeps the record. The alert shows the stack, copies it, and opens that crash |
-| Surrounding logs | Up to 200 lines from the moment of the crash are stored beside it and included in the share zip |
-
-### Reports, export & import
-
-| Feature | Details |
-| --- | --- |
-| Report wizard | Three steps: pick the misbehaving app → reproduce while LogSleuth records → share ZIP/TXT or keep it in Sessions. A crash in the target app is flagged automatically |
-| Export | Sessions and the report share as `.txt` or `.zip` (the zip bundles device info). A crash shares as plain text, or as a file when the stack is too big for the share sheet |
-| Import | Open `.zip`/`.txt`/`.log` from a file manager or share sheet — LogSleuth renders it as a session (this is also how SDK exports arrive) |
-
-### Quality-of-life
-
-| Feature | Details |
-| --- | --- |
-| Guided tour | A 17-step hands-on tour that drives the real UI — replay it anytime from Settings → About |
-| Setup wizard | Shizuku, an opt-in root card, and a copyable ADB grant, re-checkable in place |
-| Bilingual | English & 简体中文, plus an in-app language override |
-| Themes & text | System / Light / Dark themes; Compact / Default / Comfortable log text sizes |
-| In-app updates | GitHub Releases check, release notes, resumable APK download (pause/resume/cancel), one-tap install, version history |
-| Tunable buffer | On-screen ring buffer from 1,000 to 200,000 entries (default 20,000). Optional cold start that follows only new lines; a reconnect still continues from the last line |
-| Log rows | Optional full lines instead of an 8-line clamp. Search has a match-case toggle on the search bar |
-| Sessions | Rename any session from the list or its detail screen |
-| Restore defaults | One button in Settings puts every preference back to its default — after a confirmation that says what is kept |
-| Community | The QQ group and the Bilibili space are one tap away at the bottom of Settings |
-| Background watch | Crash watch that keeps running off screen — with a `specialUse` foreground service, so it no longer trips the Android 15 time limit |
-
-### Embedded SDK (`logsleuth-sdk`)
-
-For app developers — everything above, pointed at *your* app's process:
-
-| Capability | Details |
-| --- | --- |
-| Zero requirements | No permissions, no network, no accounts — an app can always read its own logs |
-| Capture | Own-process logcat thread, Java crash handler (chained to the previous one), main-thread ANR watchdog |
-| Storage | Ring-buffered log files (default 3 × ≤2 MB), automatic rotation |
-| Privacy | `addRedaction(Regex)` strips secrets from recorded logs |
-| Callbacks | `Sleuth.onCrash { … }` — fires on next start by default, or immediately if you prefer |
-| Sharing | `Sleuth.shareLogs(activity)` zips logs + device info + metadata and opens the system share sheet |
-
-## Getting started
-
-### 1. Install
-
-Grab the APK from [Releases](https://github.com/shiaho777/LogSleuth/releases) and install it (Android 8.0+ / API 26, ~2.4 MB).
-
-### 2. Open a report or capture logs
-
-On builds from the current source, choose **Open sample report** to explore a
-fictional crash, or **Import a log file** to replay a ZIP, TXT, or LOG. Both
-work without log access. On the current stable APK, you can skip setup and
-import from **Sessions**.
-
-Choose **Capture device logs** on the start screen, or open
-**Settings → Log access → Open setup guide**, to read logs from your device.
-
-Since Android 4.1, apps cannot read other apps' logs — a platform rule that
-applies to every logcat app. Any one of these grants is enough:
-
-1. **Shizuku (recommended)** — no root, no PC needed on Android 11+ via
-   Wireless Debugging. Install [Shizuku](https://shizuku.rikka.app/), start it
-   once, and authorize LogSleuth. This also unlocks per-app filtering.
-2. **Root** — if the phone already runs Magisk, KernelSU, or APatch, turn
-   root on in the setup wizard. LogSleuth does not exec `su` until you ask,
-   so an unrooted phone never sees a grant dialog. Root reads the same full
-   log as Shizuku, including per-app filtering. Auto mode still prefers
-   Shizuku when both are available; Settings can put root first.
-3. **ADB grant** — with a PC, run once. The permission stays until you uninstall:
-   ```bash
-   adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
-   ```
-   On Android 13 and later this grant is not a background log source. Android
-   only shows the approval dialog while LogSleuth is on screen, and a start
-   from the background is refused and remembered for about a minute. An
-   already-approved stream keeps running after you leave. Shizuku and root
-   are not affected, including the boot crash watch.
-
-### 3. Explore the live stream
-
-**Settings → About → Replay guided tour** opens the interactive tour of filters,
-search, pause, and scope selection.
-
-[Remote device setup](docs/guide/remote-device.md) covers reading logs from a second device over classic TCP ADB.
-
-## Everyday workflows
-
-- **"The app keeps crashing for a user"** → Report tab → pick the app →
-  start recording → hand them the phone → Stop & share. Crashes inside the
-  window are flagged and attached automatically.
-- **"It's too noisy"** → unfold the filter bar, pick only Warn and Error (or
-  any level set) and a tag or keyword — or filter by app (Shizuku or root).
-  Save the combo as a preset.
-- **"I need to mark when it happened"** → enable Floating controls (needs the
-  overlay permission) or use the Quick Settings tile: record + bookmark
-  without leaving the app under test.
-- **"I got a log zip / txt"** → open it with LogSleuth or use Import on the
-  Sessions tab — it lands as a replayable session.
-- **"That line matters"** → tap its ℹ icon for the full message and copy
-  buttons; long-press to multi-select and copy a whole block.
+For more detail, see [filters and presets](docs/guide/filters.md) and [recording and crash detection](docs/guide/recording-and-crashes.md).
 
 ## Embedding the SDK
 
-For a GitHub release that includes a `logsleuth-sdk-<version>-maven.zip` asset,
-add the public Maven repository and use that release's version.
+The SDK captures its host app’s logs, Java crashes, and ANRs. It declares no Android permissions, makes no network requests, and can redact configured patterns before writing logs. A user can share a ZIP from your app even if the LogSleuth viewer is absent.
+
+The current stable Release ships the viewer APK. Start with the included [sample app](sample/) and the [SDK source module](sdk/). When both modules are in the same Gradle build, add the project dependency in your app.
 
 ```kotlin
-dependencyResolutionManagement {
-    repositories {
-        maven {
-            url = uri("https://shiaho777.github.io/LogSleuth/maven/")
-            content { includeModule("io.github.shiaho777.logsleuth", "logsleuth-sdk") }
-        }
-    }
-}
+implementation(project(":sdk"))
 ```
 
-```kotlin
-implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:<version>")
-```
-
-You can also unzip the Maven asset and point `maven { url = uri(...) }` at
-the extracted directory. For a source checkout, `implementation(project(":sdk"))`
-continues to work.
+Initialize from your `Application`. If you create a new subclass, register it with `android:name=".MyApp"` on your manifest’s `<application>` element.
 
 ```kotlin
+import android.app.Application
+import io.github.shiaho777.logsleuth.sdk.Sleuth
+
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        Sleuth.init(this)   // capture starts immediately — no permissions
+        Sleuth.init(this)
     }
 }
-
-// Anywhere in your app — e.g. a "send logs" support button:
-Sleuth.shareLogs(activity)   // opens the system share sheet with a zip
 ```
 
-Configuration via `SleuthConfig.Builder`:
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `tagFilter(String)` | `null` (all) | Record only lines whose tag contains it (plus all ERROR lines) |
-| `maxFiles(Int)` | 3 | Ring-buffer file count, 1–20 |
-| `maxFileBytes(Long)` | 2 MB | Rotate after this many bytes per file (min 64 KB) |
-| `captureLogcat(Boolean)` | `true` | Set false to record crashes/ANRs only |
-| `watchAnr(Boolean)` | `true` | Main-looper heartbeat ANR watchdog |
-| `onCrashInvokedOnNextStart(Boolean)` | `true` | Deliver the crash callback on next init instead of at crash time |
-| `addRedaction(Regex)` | — | Extra patterns stripped before writing to disk |
-
-Full API:
+In an Activity, call this from your support or feedback action.
 
 ```kotlin
-Sleuth.init(context, SleuthConfig.Builder().tagFilter("net").build())
-Sleuth.onCrash { report -> /* queue it — runs on next start by default */ }
-Sleuth.log("Checkout", "order=42 placed")       // injected into the stream
-Sleuth.logException("Checkout", throwable)
-val files: List<File> = Sleuth.logFiles()       // raw ring-buffer files
-Sleuth.shareLogs(activity)
+Sleuth.shareLogs(this)
 ```
 
-The zip contains `device.txt` (manufacturer/model/Android version),
-`meta.txt` and the log files — and LogSleuth the viewer opens it natively,
-so your support flow is "send me the zip" → they open it → you replay it.
+To test integration through a Maven artifact, publish to the checkout’s local staging repository and run the sample against it. [SDK build and publishing notes](docs/developer/release.md#sdk-smoke-build)
 
-## Architecture
+## Build and contribute
 
-```text
-LogcatSource (local READ_LOGS / Shizuku shell / root shell)
-  → LogcatEngine (single owner of the logcat process, auto-reconnect)
-      ├→ Stream UI (level colors, filters, search, pause/buffering)
-      ├→ RecordingManager (foreground service → session files + Room)
-      └→ CrashDetector (FATAL EXCEPTION / Fatal signal / ANR → events + notifications)
-
-logsleuth-sdk (embedded in a host app — zero permissions, zero network):
-  Sleuth.init → own-process logcat capture + crash handler + ANR watchdog
-              → ring-buffered log files (with secret redaction)
-              → one-tap zip share (opens in the viewer for replay)
-```
-
-## Permissions
-
-Everything the app asks for, and why:
-
-| Permission | Used for |
-| --- | --- |
-| `READ_LOGS` | Device log when you use the ADB grant. On Android 13+ a new logcat starts only while LogSleuth is on screen. Shizuku and root read logs through a shell instead |
-| `moe.shizuku…API_V23` | Talking to the Shizuku service |
-| `FOREGROUND_SERVICE` + `…_SPECIAL_USE` | Keeping the crash watch and background recording alive |
-| `POST_NOTIFICATIONS` | Recording status, crash/ANR alerts, auto-stop notices |
-| `SYSTEM_ALERT_WINDOW` | Floating record/bookmark bubble — only if you enable it |
-| `RECEIVE_BOOT_COMPLETED` | Restarting the crash watch after a reboot — only if you left it on |
-| `INTERNET` | Update checks against GitHub Releases only — no analytics, no ads |
-| `REQUEST_INSTALL_PACKAGES` | Installing downloaded APK updates |
-
-The **SDK itself declares no permissions at all** — it only ever reads its
-host app's own logs.
-
-## Project structure
-
-```
-app/      The LogSleuth viewer app (Kotlin + Jetpack Compose, Material 3)
-sdk/      logsleuth-sdk — the embeddable, zero-permission logging library
-sample/   Demo app showing SDK integration
-```
-
-## Build from source
-
-Requires JDK 17+ and Android SDK platform 36.
+Use **JDK 21** to match CI and install **Android SDK platform 36**.
 
 ```bash
 git clone https://github.com/shiaho777/LogSleuth.git
 cd LogSleuth
-./gradlew assembleDebug          # app + sdk + sample
-./gradlew test                   # unit tests
-python3 scripts/check_string_parity.py   # bilingual string gate (runs in CI)
+python3 scripts/check_string_parity.py
+./gradlew assembleDebug test lint
 ```
 
-## Documentation
+The viewer APK is written to `app/build/outputs/apk/debug/app-debug.apk`. The SDK sample APK is under `sample/build/outputs/apk/debug/`. See the [contribution guide](CONTRIBUTING.md) for changes to the viewer, SDK, tests, or translations, and the [developer guide](docs/developer/index.md) for architecture.
 
-The documentation site is published at **[shiaho777.github.io/LogSleuth](https://shiaho777.github.io/LogSleuth/)**:
+## Help and privacy
 
-| Section | URL | Covers |
-| --- | --- | --- |
-| Guide | [/guide/](https://shiaho777.github.io/LogSleuth/guide/) | Getting started, log access, filters and rules, recording and crashes |
-| 简体中文 | [/zh/guide/](https://shiaho777.github.io/LogSleuth/zh/guide/) | The same guide in Chinese |
-| Developer | [/developer/](https://shiaho777.github.io/LogSleuth/developer/) | Architecture, change recipes, the release runbook |
-
-The site source lives in [`docs/`](docs/); run it locally with
-`cd docs && npm install && npm run dev`.
-
-## Download
-
-- [GitHub Releases APK](https://github.com/shiaho777/LogSleuth/releases/latest)
-- F-Droid *(planned)*
-- Google Play *(planned)*
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests are
-welcome via GitHub Issues.
-
-## Contact
-
-| Platform | Link |
-| --- | --- |
-| GitHub | [github.com/shiaho777/LogSleuth](https://github.com/shiaho777/LogSleuth) |
-| Bilibili | [space.bilibili.com/2127032909](https://space.bilibili.com/2127032909) |
-| QQ Group | 1127256026 — [tap to join](https://qm.qq.com/q/Gzj7CpirAs) |
+- **Missing logs or app names?** Check the active source in **Settings**. The [log access guide](docs/guide/log-access.md) explains the grant, restart behavior, and which sources can associate logs with apps.
+- **Reporting a bug?** Include the LogSleuth version, Android version, log source, and steps to reproduce. Remove private information from any logs or screenshots you attach. [Open a bug report](https://github.com/shiaho777/LogSleuth/issues/new?template=bug_report.yml)
+- **Where does the data go?** Captured files stay on the device. Export and automation send data when you use those features. The viewer uses the network for updates and for a remote source you configure.
+- **More help.** [User guide](https://shiaho777.github.io/LogSleuth/guide/) · [Issues](https://github.com/shiaho777/LogSleuth/issues) · [QQ 1127256026](https://qm.qq.com/q/Gzj7CpirAs) · [Bilibili](https://space.bilibili.com/2127032909)
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Apache License 2.0](LICENSE). The README uses the project’s app icon and captures of the LogSleuth viewer and SDK sample.
