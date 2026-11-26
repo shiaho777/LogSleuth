@@ -35,8 +35,8 @@ workflow builds from the tagged commit.
 5. **Watch the workflow.** `.github/workflows/release.yml` runs the string
    gate and unit tests, builds the sample against the staged Maven SDK, and
    verifies the signed APK against the configured certificate. It publishes
-   `LogSleuth-X.Y.Z.APK`, `logsleuth-sdk-X.Y.Z-maven.zip`, and a SHA-256
-   manifest with the committed notes. The docs workflow then deploys the SDK
+   `LogSleuth-X.Y.Z.APK`, `logsleuth-sdk-X.Y.Z-maven.zip`,
+   `logsleuth-mcp-X.Y.Z.tgz`, and a SHA-256 manifest with the committed notes. The docs workflow then deploys the SDK
    version to the public Maven repository.
 
    The asset name is `<app>-<version>.APK`, the same shape the mature
@@ -94,6 +94,10 @@ signing has its own key upgrade workflow.
 
 See the [Android APK signing reference](https://developer.android.com/tools/apksigner)
 and [Play signing guide](https://developer.android.com/studio/publish/app-signing).
+
+## Termux MCP asset
+
+The tag workflow tests the bridge and installs the packed artifact with an empty npm cache in offline mode. The resulting `logsleuth-mcp-<version>.tgz` ships with the APK and SDK archive, and the release checksum file covers all three. For local QA, run `scripts/package_mcp.sh /tmp/logsleuth-mcp-local.tgz`.
 
 ## SDK smoke build
 

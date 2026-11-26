@@ -1,0 +1,14 @@
+{
+  "name": "logsleuth-mcp",
+  "version": "0.1.0",
+  "description": "On-device MCP bridge for the LogSleuth Android viewer",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "bin": { "logsleuth-mcp": "./cli.mjs" },
+  "files": ["cli.mjs", "bridge.mjs", "contract/tools.json"],
+  "scripts": { "test": "node --test", "build": "node --check cli.mjs && node --check bridge.mjs" },
+  "bundleDependencies": ["@modelcontextprotocol/server"],
+  "dependencies": { "@modelcontextprotocol/server": "2.4.0" },
+  "devDependencies": { "@modelcontextprotocol/client": "2.4.0" }
+}

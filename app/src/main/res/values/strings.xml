@@ -541,4 +541,21 @@
     <string name="filter_state_expanded">Expanded</string>
     <string name="filter_state_collapsed">Collapsed</string>
     <string name="filter_clear_active">Reset current filter</string>
+    <string name="mcp_title">Local MCP</string>
+    <string name="mcp_open">Manage local MCP</string>
+    <string name="mcp_description">Connect an Agent in Termux on this phone. After pairing, the Agent can read device logs and change LogSleuth data and settings.</string>
+    <string name="mcp_start">Enable MCP</string>
+    <string name="mcp_stop">Stop MCP</string>
+    <string name="mcp_off">MCP is off</string>
+    <string name="mcp_starting">Starting MCP…</string>
+    <string name="mcp_running">MCP is available on this phone</string>
+    <string name="mcp_failed">MCP could not start. Check whether another app is using port 47137 and try again.</string>
+    <string name="mcp_paired">Termux bridge paired</string>
+    <string name="mcp_unpaired">Pair the Termux bridge to connect</string>
+    <string name="mcp_pair">Generate pairing code</string>
+    <string name="mcp_pair_help">Run logsleuth-mcp pair in Termux and paste this code. It expires in two minutes.</string>
+    <string name="mcp_copy">Copy pairing code</string>
+    <string name="mcp_revoke">Revoke pairing</string>
+    <string name="mcp_active_calls">Active requests: %1$d</string>
+    <string name="mcp_notification_recording">MCP is available and a recording is running</string>
 </resources>

@@ -10,6 +10,12 @@ the repository root is the authoritative guide for coding agents. These pages
 expand on it with more context.
 :::
 
+## Local MCP
+
+The viewer runs the authenticated loopback service and uses the same log engine, recording manager, and storage as its UI. The Termux package handles MCP stdio and exchanges reports over the pinned TLS connection. The shared tool schema is in `mcp/contract/tools.json`. Change it together with Android dispatch and test with `scripts/package_mcp.sh /tmp/logsleuth-mcp-local.tgz`.
+
+Use the [English setup guide](/guide/local-mcp) or [中文接入指南](/zh/guide/local-mcp) for same-device testing.
+
 ## Repository layout
 
 | Path | Role |

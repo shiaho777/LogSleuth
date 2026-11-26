@@ -41,12 +41,12 @@ class LogImporter @Inject constructor(
         val metadata = SessionLogMetadata()
     }
 
-    suspend fun import(uri: Uri): Result<Long> = withContext(Dispatchers.IO) {
+    suspend fun import(uri: Uri, name: String? = null): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             pruneStalePartDirs()
-            val displayName = queryDisplayName(uri) ?: "import"
+            val displayName = name ?: queryDisplayName(uri) ?: "import"
             val dir = File(context.filesDir, "imports").apply { mkdirs() }
-            val file = File(dir, "import_${System.currentTimeMillis()}.log")
+            val file = File.createTempFile("import_", ".log", dir)
             val counter = Counter()
 
             try {

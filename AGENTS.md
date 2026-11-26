@@ -23,6 +23,7 @@ Instructions for coding agents working in this repository.
 | `app/` | The LogSleuth viewer app: logcat engine, UI, recording, detection. |
 | `sdk/` | `logsleuth-sdk` — the embeddable zero-permission logging library other apps integrate. |
 | `sample/` | Demo app consuming `:sdk`; used for manual verification of the SDK loop. |
+| `mcp/` | Termux MCP bridge and shared Android tool contract. |
 | `scripts/` | Repo gates (`check_string_parity.py`) and release helpers (`draft_release_notes.py`). |
 | `docs/` | Documentation site source (`docs/guide`, `docs/developer`, `docs/zh`) and the per-release notes in `docs/releases/`. |
 | `docs/screenshots/` | Real app screenshots and capture index, shared by both READMEs. |
@@ -135,7 +136,7 @@ Mental model:
 
 Tags are the only release trigger — `.github/workflows/release.yml` runs on
 `v*`, re-runs the string gate and unit tests, builds the sample against the
-staged SDK, and publishes the verified APK and SDK Maven archive to GitHub
+staged SDK, and publishes the verified APK, SDK Maven archive, and Termux MCP bridge to GitHub
 Releases. The docs workflow deploys SDK versions to the public Maven repository.
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` in a PR, and
@@ -232,6 +233,7 @@ python3 scripts/check_string_parity.py   # bilingual string gate
 ./gradlew assembleDebug                   # debug APK
 ```
 
-CI runs the same four. `lint` currently reports warnings only; the bar is
-zero errors.
+CI runs the same four and verifies the Termux bridge package.
+Run `scripts/package_mcp.sh /tmp/logsleuth-mcp-local.tgz` to check that package locally.
+The lint bar is zero errors.
 

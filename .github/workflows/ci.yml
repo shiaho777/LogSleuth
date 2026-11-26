@@ -27,6 +27,16 @@ jobs:
       - name: Download code
         uses: actions/checkout@v4
 
+      - name: Prepare Node for Termux bridge tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: Test and verify the Termux bridge package
+        run: scripts/package_mcp.sh "$RUNNER_TEMP/logsleuth-mcp-ci.tgz"
+
       - name: Prepare Java
         uses: actions/setup-java@v4
         with:

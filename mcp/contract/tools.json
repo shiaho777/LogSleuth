@@ -1,0 +1,1410 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "status",
+      "description": "Get live log access, active source, engine state, and recording status. If Android requires foreground approval, open LogSleuth on the phone.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "list_apps",
+      "description": "List apps available for filtering or reporting on the selected source.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "search_logs",
+      "description": "Search the live buffer or a saved session. References are decimal strings. With no cursor, live queries start at the latest matching page. Supply the same filters when following a cursor.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "minLevel": {
+                "type": "string",
+                "enum": [
+                  "V",
+                  "D",
+                  "I",
+                  "W",
+                  "E",
+                  "F",
+                  "A"
+                ]
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "V",
+                    "D",
+                    "I",
+                    "W",
+                    "E",
+                    "F",
+                    "A"
+                  ]
+                },
+                "maxItems": 7
+              },
+              "query": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "excludeQuery": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tag": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tagExact": {
+                "type": "boolean"
+              },
+              "regex": {
+                "type": "boolean"
+              },
+              "package": {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              "pid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "tid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "uid": {
+                "type": "string",
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false,
+            "required": []
+          },
+          "raw": {
+            "type": "boolean"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "read_log_context",
+      "description": "Read lines around a live sequence or a saved-session line. A live anchor also requires the source ID returned by search_logs.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "sourceId": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "anchor": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "before": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99
+          },
+          "after": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 99
+          },
+          "raw": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "anchor"
+        ]
+      }
+    },
+    {
+      "name": "clear_logs",
+      "description": "Clear the retained live buffer for the specified active source. Saved recordings remain available.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sourceId"
+        ]
+      }
+    },
+    {
+      "name": "save_snapshot",
+      "description": "Save matching lines from the live buffer as a session.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "minLevel": {
+                "type": "string",
+                "enum": [
+                  "V",
+                  "D",
+                  "I",
+                  "W",
+                  "E",
+                  "F",
+                  "A"
+                ]
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "V",
+                    "D",
+                    "I",
+                    "W",
+                    "E",
+                    "F",
+                    "A"
+                  ]
+                },
+                "maxItems": 7
+              },
+              "query": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "excludeQuery": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tag": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tagExact": {
+                "type": "boolean"
+              },
+              "regex": {
+                "type": "boolean"
+              },
+              "package": {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              "pid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "tid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "uid": {
+                "type": "string",
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false,
+            "required": []
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "start_recording",
+      "description": "Start recording through the current source and enabled rules. Returns the recording session ID.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "minLevel": {
+                "type": "string",
+                "enum": [
+                  "V",
+                  "D",
+                  "I",
+                  "W",
+                  "E",
+                  "F",
+                  "A"
+                ]
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "V",
+                    "D",
+                    "I",
+                    "W",
+                    "E",
+                    "F",
+                    "A"
+                  ]
+                },
+                "maxItems": 7
+              },
+              "query": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "excludeQuery": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tag": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tagExact": {
+                "type": "boolean"
+              },
+              "regex": {
+                "type": "boolean"
+              },
+              "package": {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              "pid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "tid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "uid": {
+                "type": "string",
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false,
+            "required": []
+          },
+          "requestId": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "pause_recording",
+      "description": "Pause the recording with the given session ID.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "resume_recording",
+      "description": "Resume the recording with the given session ID.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "stop_recording",
+      "description": "Stop the recording with the given session ID.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "add_bookmark",
+      "description": "Mark the present time in an active recording.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "list_sessions",
+      "description": "List recorded, imported, and example sessions.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "get_session",
+      "description": "Get metadata and the current line count for one session.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "list_bookmarks",
+      "description": "List bookmarks for a session with their times and nearest usable line when available.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "open_example",
+      "description": "Create or reopen the bundled example report.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "rename_session",
+      "description": "Rename a saved session.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId",
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "delete_session",
+      "description": "Delete a saved session, its bookmarks, and linked crash data.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "import_report",
+      "description": "Import a ZIP, TXT, or LOG file by basename from the Termux transfer directory.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filename"
+        ]
+      }
+    },
+    {
+      "name": "export_session",
+      "description": "Export a saved session into the private Termux transfer directory. Returns its local path.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "zip",
+              "txt"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "list_crashes",
+      "description": "List detected crashes and ANRs, optionally scoped to a session or package.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "package": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "get_crash",
+      "description": "Read a crash stack and the saved surrounding logs. Follow nextCursor when available.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "crashId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "crashId"
+        ]
+      }
+    },
+    {
+      "name": "delete_crash",
+      "description": "Delete the specified crash or ANR and its retained context.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "crashId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "crashId"
+        ]
+      }
+    },
+    {
+      "name": "set_crash_ignored",
+      "description": "Update the crash ignore list for an application.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "package": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "ignored": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "package",
+          "ignored"
+        ]
+      }
+    },
+    {
+      "name": "export_crash",
+      "description": "Export a crash and its saved context into the Termux transfer directory.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "crashId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "crashId"
+        ]
+      }
+    },
+    {
+      "name": "start_report",
+      "description": "Record only the selected app. The recording stops when the selected app crashes or the caller finishes the report.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "package": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "package"
+        ]
+      }
+    },
+    {
+      "name": "get_report",
+      "description": "Read the guided report status, captured line count, and any detected crash.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "finish_report",
+      "description": "Finish a guided report and return its saved session.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    {
+      "name": "list_filters",
+      "description": "List saved presets and enablement states.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "save_filter",
+      "description": "Create or replace a filter preset. Supply the full filter when replacing it.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filterId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "filter": {
+            "type": "object",
+            "properties": {
+              "minLevel": {
+                "type": "string",
+                "enum": [
+                  "V",
+                  "D",
+                  "I",
+                  "W",
+                  "E",
+                  "F",
+                  "A"
+                ]
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "V",
+                    "D",
+                    "I",
+                    "W",
+                    "E",
+                    "F",
+                    "A"
+                  ]
+                },
+                "maxItems": 7
+              },
+              "query": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "excludeQuery": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tag": {
+                "type": "string",
+                "maxLength": 512
+              },
+              "tagExact": {
+                "type": "boolean"
+              },
+              "regex": {
+                "type": "boolean"
+              },
+              "package": {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              "pid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "tid": {
+                "type": "string",
+                "maxLength": 12
+              },
+              "uid": {
+                "type": "string",
+                "maxLength": 32
+              }
+            },
+            "additionalProperties": false,
+            "required": []
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "including": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "filter"
+        ]
+      }
+    },
+    {
+      "name": "delete_filter",
+      "description": "Delete a saved filter preset.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filterId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "filterId"
+        ]
+      }
+    },
+    {
+      "name": "list_automation_rules",
+      "description": "List rules that deliver matching logs to an explicit Android app.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "save_automation_rule",
+      "description": "Create or replace an automation rule. The receiving package and broadcast action are explicit.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "package": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "regex": {
+            "type": "boolean"
+          },
+          "tag": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "targetPackage": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          },
+          "cooldownSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "targetPackage",
+          "action"
+        ]
+      }
+    },
+    {
+      "name": "delete_automation_rule",
+      "description": "Delete an automation rule.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "maxLength": 19,
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "ruleId"
+        ]
+      }
+    },
+    {
+      "name": "get_settings",
+      "description": "Read the application settings and states of automation, crash watching, overlays, and Root.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "change_settings",
+      "description": "Change supported application preferences. Omitted fields keep their current values.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "theme": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "light",
+                  "dark"
+                ]
+              },
+              "language": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "en",
+                  "zh-CN"
+                ]
+              },
+              "bufferSize": {
+                "type": "integer",
+                "minimum": 1000,
+                "maximum": 200000
+              },
+              "recordingMaxMb": {
+                "type": "integer",
+                "minimum": 8,
+                "maximum": 512
+              },
+              "recordingMaxHours": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 24
+              },
+              "logTextScale": {
+                "type": "number",
+                "minimum": 0.75,
+                "maximum": 1.5
+              },
+              "logTimeFormat": {
+                "type": "string",
+                "enum": [
+                  "time",
+                  "datetime",
+                  "epoch"
+                ]
+              },
+              "datePattern": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "timePattern": {
+                "type": "string",
+                "maxLength": 60
+              },
+              "crashSort": {
+                "type": "string",
+                "enum": [
+                  "NEWEST",
+                  "COUNT",
+                  "NAME"
+                ]
+              },
+              "crashNotifications": {
+                "type": "boolean"
+              },
+              "liveOnlyOnStart": {
+                "type": "boolean"
+              },
+              "collectJava": {
+                "type": "boolean"
+              },
+              "collectNative": {
+                "type": "boolean"
+              },
+              "collectAnr": {
+                "type": "boolean"
+              },
+              "notifyJava": {
+                "type": "boolean"
+              },
+              "notifyNative": {
+                "type": "boolean"
+              },
+              "notifyAnr": {
+                "type": "boolean"
+              },
+              "separateCrashChannels": {
+                "type": "boolean"
+              },
+              "logsExpanded": {
+                "type": "boolean"
+              },
+              "searchCaseSensitive": {
+                "type": "boolean"
+              },
+              "openCrashesOnStartup": {
+                "type": "boolean"
+              },
+              "includeDeviceInfoInZip": {
+                "type": "boolean"
+              },
+              "includeAppInfoInZip": {
+                "type": "boolean"
+              },
+              "showLogTime": {
+                "type": "boolean"
+              },
+              "showLogDate": {
+                "type": "boolean"
+              },
+              "showLogUid": {
+                "type": "boolean"
+              },
+              "showLogPid": {
+                "type": "boolean"
+              },
+              "showLogTid": {
+                "type": "boolean"
+              },
+              "showLogTag": {
+                "type": "boolean"
+              },
+              "showLogPackage": {
+                "type": "boolean"
+              },
+              "crashSortReversed": {
+                "type": "boolean"
+              },
+              "wrapCrashLogLines": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "required": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "settings"
+        ]
+      }
+    },
+    {
+      "name": "set_automation_enabled",
+      "description": "Change the master automation switch. Android can require LogSleuth in the foreground to start its service.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ]
+      }
+    },
+    {
+      "name": "set_crash_watch",
+      "description": "Change the background crash watch setting.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ]
+      }
+    },
+    {
+      "name": "set_floating_controls",
+      "description": "Change the floating controls setting. Android overlay permission is granted on the phone.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ]
+      }
+    },
+    {
+      "name": "set_log_source",
+      "description": "Change the app log source. Root requires user opt-in on the phone. A remote device must be explicitly configured in LogSleuth.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "adb",
+              "shizuku",
+              "root",
+              "remote_adb"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "refresh_log_source",
+      "description": "Refresh Android's log access and the current source state.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "restart_log_source",
+      "description": "Restart the current LogSleuth source while preserving its resume position.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "disconnect_remote_source",
+      "description": "Disconnect the configured remote ADB device.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "test_remote_source",
+      "description": "Test the remote ADB connection already configured in LogSleuth.",
+      "kind": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "get_update_status",
+      "description": "Read Android app update status.",
+      "kind": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "check_updates",
+      "description": "Check the project's GitHub Releases for a newer Android app build.",
+      "kind": "external",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "reset_settings",
+      "description": "Restore default application settings.",
+      "kind": "destructive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "download_update",
+      "description": "Download an already discovered GitHub release by tag. Install it separately in Android.",
+      "kind": "external",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "name": "pause_update_download",
+      "description": "Pause the active APK download.",
+      "kind": "external",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "resume_update_download",
+      "description": "Resume the paused APK download.",
+      "kind": "external",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    },
+    {
+      "name": "cancel_update_download",
+      "description": "Cancel the current APK download.",
+      "kind": "external",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "required": []
+      }
+    }
+  ]
+}

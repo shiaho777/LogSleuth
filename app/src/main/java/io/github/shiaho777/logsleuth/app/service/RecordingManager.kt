@@ -317,12 +317,12 @@ class RecordingManager @Inject constructor(
         }
     }
 
-    suspend fun addBookmark() = withContext(Dispatchers.IO) {
+    suspend fun addBookmark(note: String = "", expectedId: Long? = null) = withContext(Dispatchers.IO) {
         lifecycleMutex.withLock {
             writeMutex.withLock {
                 val current = capture
-                if (current?.pendingStop != null) return@withLock
-                engine.addBookmark()
+                if (current?.pendingStop != null || (expectedId != null && current?.id != expectedId)) return@withLock
+                engine.addBookmark(note)
                 if (current != null) {
                     try {
                         current.writeLine("===== BOOKMARK ${Instant.now()} =====")
@@ -336,10 +336,10 @@ class RecordingManager @Inject constructor(
         }
     }
 
-    suspend fun pause() = withContext(Dispatchers.IO) {
+    suspend fun pause(expectedId: Long? = null) = withContext(Dispatchers.IO) {
         lifecycleMutex.withLock {
             val current = capture ?: return@withLock
-            if (_state.value.paused) return@withLock
+            if (_state.value.paused || (expectedId != null && current.id != expectedId)) return@withLock
             record(current) {
                 writeBackfill()
                 sequence.recoverThrough(engine.watermark(endpoint))
@@ -349,10 +349,10 @@ class RecordingManager @Inject constructor(
         }
     }
 
-    suspend fun resume() = lifecycleMutex.withLock {
+    suspend fun resume(expectedId: Long? = null) = lifecycleMutex.withLock {
         val current = capture ?: return@withLock
         writeMutex.withLock {
-            if (_state.value.paused && current.pendingStop == null) {
+            if (_state.value.paused && current.pendingStop == null && (expectedId == null || current.id == expectedId)) {
                 current.sequence.discardThrough(engine.watermark(current.endpoint))
                 _state.update { it.copy(paused = false) }
             }

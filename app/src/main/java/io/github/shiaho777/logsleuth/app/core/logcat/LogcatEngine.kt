@@ -249,6 +249,8 @@ class LogcatEngine @Inject constructor(
         if (consumers == 0) stopStream()
     }
 
+    internal fun isInForeground(): Boolean = inForeground
+
     /** Recent entries for consumers attaching later (e.g. opening the screen). */
     fun snapshot(remoteEndpoint: String? = access.value.remoteEndpoint): Snapshot =
         history.snapshot(remoteEndpoint)

@@ -83,6 +83,7 @@ fun SettingsScreen(
     onOpenGuide: () -> Unit,
     onOpenWelcome: () -> Unit,
     onOpenAutomation: () -> Unit,
+    onOpenMcp: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -397,6 +398,11 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+
+            SettingsSectionHeader(stringResource(R.string.mcp_title))
+            TextButton(onClick = onOpenMcp) {
+                Text(stringResource(R.string.mcp_open))
             }
 
             SettingsSectionHeader(stringResource(R.string.settings_section_automation))
