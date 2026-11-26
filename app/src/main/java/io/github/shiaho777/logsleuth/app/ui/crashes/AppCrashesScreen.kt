@@ -22,7 +22,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +38,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import kotlinx.coroutines.launch
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +75,7 @@ fun AppCrashesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            InstrumentTopBar(
                 title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

@@ -4,9 +4,8 @@
 
     <!-- Setup -->
     <string name="setup_title">Set up log access</string>
-    <string name="setup_explainer">Since Android 4.1, apps cannot read other apps\' logs without a grant. Shizuku and the ADB command need no root. Root also works, if this device already has it.</string>
     <string name="setup_shizuku_title">Shizuku (recommended)</string>
-    <string name="setup_shizuku_desc">No root, no PC on Android 11+ via Wireless Debugging. Enables per-app filtering and the most reliable stream.</string>
+    <string name="setup_shizuku_desc">On Android 11+, use Wireless Debugging. No root or computer needed.</string>
     <string name="setup_shizuku_not_installed">Shizuku is not installed</string>
     <string name="setup_shizuku_not_running">Shizuku is installed but not running</string>
     <string name="setup_shizuku_needs_permission">Shizuku is running — permission needed</string>
@@ -15,18 +14,18 @@
     <string name="setup_open_shizuku">Open Shizuku</string>
     <string name="setup_grant_shizuku">Grant permission</string>
     <string name="setup_root_title">Root</string>
-    <string name="setup_root_desc">With Magisk, KernelSU, or APatch, root reads the full log the same way Shizuku does. Nothing runs until you ask.</string>
+    <string name="setup_root_desc">For devices already using Magisk, KernelSU, or APatch.</string>
     <string name="setup_root_grant">Use root</string>
     <string name="setup_root_ready">Root is ready</string>
     <string name="setup_root_denied">Root was denied</string>
     <string name="setup_root_unknown">Not requested</string>
     <string name="setup_root_checking">Waiting for the root manager…</string>
     <string name="setup_adb_title">ADB one-time grant</string>
-    <string name="setup_adb_desc">With a computer, run this command once. The grant stays until you uninstall. On Android 13 and later, Android only shows the log access prompt while LogSleuth is on screen, and a background start is refused for about a minute. Shizuku or root keeps reading in the background.</string>
+    <string name="setup_adb_desc">Run this once on a computer. On Android 13+, keep LogSleuth open to approve the system prompt.</string>
     <string name="setup_copy_command">Copy command</string>
     <string name="setup_recheck">I ran it — re-check</string>
     <string name="setup_adb_granted">READ_LOGS granted</string>
-    <string name="setup_skip">Skip for now</string>
+    <string name="setup_skip">Continue without log access</string>
 
     <!-- Stream -->
     <string name="pause">Pause</string>
@@ -45,8 +44,7 @@
     <string name="empty_logs_waiting">Waiting for logs.</string>
     <string name="empty_logs_filtered">The active filters hide every line. Relax the filter to see the stream.</string>
     <string name="no_access_title">No log access yet</string>
-    <string name="no_access_desc">LogSleuth needs Shizuku, root, or a one-time ADB grant to read device logs.</string>
-    <string name="no_access_action">Open setup</string>
+    <string name="no_access_action">Set up log access</string>
 
     <!-- Filters -->
     <string name="filters_title">Filter presets</string>
@@ -91,7 +89,7 @@
 
     <!-- Crashes -->
     <string name="crashes_title">Crashes &amp; ANRs</string>
-    <string name="crashes_empty">No crashes detected. LogSleuth flags FATAL EXCEPTION, native crash and ANR events while streaming or recording.</string>
+    <string name="crashes_empty">No crashes or ANRs recorded yet</string>
     <string name="unknown_app">Unknown app</string>
     <string name="copy">Copy</string>
     <string name="close">Close</string>
@@ -154,7 +152,7 @@
     <string name="duration_min_sec">%1$dm %2$ds</string>
     <string name="crash_deleted">Crash event deleted</string>
     <string name="settings_about">About</string>
-    <string name="settings_version">LogSleuth %1$s · open source (Apache-2.0)</string>
+    <string name="settings_version">%1$s · Apache-2.0</string>
 
     <!-- Notifications & services -->
     <string name="notif_channel_recording">Recording</string>
@@ -494,4 +492,17 @@
     <string name="log_source_remote_unavailable">Remote device unavailable</string>
     <string name="recording_source_changed">Recording ended because the log source changed.</string>
     <string name="recording_gap_count">Log entries unavailable: %1$d</string>
+    <string name="setup_continue">Open live logs</string>
+    <string name="welcome_example">Open sample report</string>
+    <string name="welcome_import">Import a log file</string>
+    <string name="welcome_capture">Capture device logs</string>
+    <string name="welcome_saved_sessions">View saved sessions</string>
+    <string name="welcome_opening">Opening report…</string>
+    <string name="example_report_name">Sample report · Checkout crash</string>
+    <string name="example_report_bookmark">Tapped Pay</string>
+    <string name="example_report_notice">Sample report with fictional data</string>
+    <string name="example_report_error">Could not open the sample report</string>
+    <string name="settings_notifications_permission_desc">Allow Android notifications to see crash alerts. Crash history is saved according to the options below.</string>
+    <string name="settings_system_notifications">Open system notification settings</string>
+    <string name="welcome_quick_start">Quick start</string>
 </resources>

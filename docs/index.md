@@ -3,18 +3,18 @@ layout: home
 
 hero:
   name: LogSleuth
-  text: Read the whole device log
-  tagline: A root-free logcat viewer with a severity fingerprint of your buffer, plus a zero-permission SDK you can drop into your own app.
+  text: Capture and replay Android crashes
+  tagline: Keep the logs and bookmarks around a failure, then share a report another person can open. Android 8.0 and newer.
   actions:
     - theme: brand
-      text: Get started
+      text: Download Android APK
+      link: https://github.com/shiaho777/LogSleuth/releases/latest
+    - theme: alt
+      text: Open your first report
       link: /guide/
     - theme: alt
-      text: Developer docs
-      link: /developer/
-    - theme: alt
-      text: View on GitHub
-      link: https://github.com/shiaho777/LogSleuth
+      text: Embed the SDK
+      link: https://github.com/shiaho777/LogSleuth#embedding-the-sdk
 
 features:
   - icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg>
@@ -52,13 +52,7 @@ opens those zips directly.
 
 ## Install
 
-| Channel | Where |
-| --- | --- |
-| GitHub Releases | `https://github.com/shiaho777/LogSleuth/releases/latest` |
-| F-Droid | [F-Droid](https://f-droid.org/packages/io.github.shiaho777.logsleuth/) |
-| Google Play | [Play Store](https://play.google.com/store/apps/details?id=io.github.shiaho777.logsleuth) |
-
-Requires Android 8.0 (API 26) or newer.
+[Download the APK from GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest). F-Droid and Google Play distribution are planned.
 
 ## Community
 
@@ -70,7 +64,7 @@ Requires Android 8.0 (API 26) or newer.
 
 ## Where to go next
 
-- [Getting started](/guide/) — install, grant access, read your first lines
+- [Getting started](/guide/) — open a report or capture logs on your device
 - [Log access](/guide/log-access) — Shizuku, root and the ADB grant, compared
 - [Filters & rules](/guide/filters) — levels, queries, rule stacks, presets
 - [Recording & crashes](/guide/recording-and-crashes) — sessions, detection, export

@@ -1,30 +1,30 @@
 package io.github.shiaho777.logsleuth.app
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.IntentCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
@@ -70,9 +70,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by settingsRepository.settings.collectAsState(initial = null)
+            val preferences = settings ?: return@setContent
             val navController = rememberNavController()
-
-            NotificationPermissionEffect()
+            val startDestination = rememberSaveable {
+                when {
+                    intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
+                    !preferences.setupCompleted -> Routes.WELCOME
+                    preferences.openCrashesOnStartup -> Routes.CRASHES
+                    else -> Routes.STREAM
+                }
+            }
 
             LaunchedEffect(importedSessionId) {
                 importedSessionId?.let {
@@ -88,25 +95,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            LogSleuthTheme(themeSetting = settings?.theme ?: "system") {
-                val logScale = settings?.logTextScale ?: 1f
+            LogSleuthTheme(themeSetting = preferences.theme) {
+                val lightSystemBars = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+                SideEffect {
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = lightSystemBars
+                        isAppearanceLightNavigationBars = lightSystemBars
+                    }
+                }
+                val logScale = preferences.logTextScale
                 val iconScope = rememberCoroutineScope()
                 val iconCache = remember {
                     AppIconCache(applicationContext, iconScope)
                 }
                 val rowPrefs = LogRowPrefs(
-                    showTime = settings?.showLogTime ?: true,
-                    showDate = settings?.showLogDate ?: false,
-                    showUid = settings?.showLogUid ?: false,
-                    showPid = settings?.showLogPid ?: true,
-                    showTid = settings?.showLogTid ?: true,
-                    showTag = settings?.showLogTag ?: true,
-                    showPackage = settings?.showLogPackage ?: true,
-                    timeFormat = settings?.logTimeFormat ?: "time",
-                    datePattern = settings?.datePattern ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.DATE_PRESET,
-                    timePattern = settings?.timePattern ?: io.github.shiaho777.logsleuth.app.core.logcat.DateTimePatterns.TIME_PRESET,
-                    logsExpanded = settings?.logsExpanded ?: false,
-                    searchCaseSensitive = settings?.searchCaseSensitive ?: false,
+                    showTime = preferences.showLogTime,
+                    showDate = preferences.showLogDate,
+                    showUid = preferences.showLogUid,
+                    showPid = preferences.showLogPid,
+                    showTid = preferences.showLogTid,
+                    showTag = preferences.showLogTag,
+                    showPackage = preferences.showLogPackage,
+                    timeFormat = preferences.logTimeFormat,
+                    datePattern = preferences.datePattern,
+                    timePattern = preferences.timePattern,
+                    logsExpanded = preferences.logsExpanded,
+                    searchCaseSensitive = preferences.searchCaseSensitive,
                 )
                 CompositionLocalProvider(
                     LocalLogTextScale provides logScale,
@@ -114,19 +128,9 @@ class MainActivity : ComponentActivity() {
                     LocalLogRowPrefs provides rowPrefs,
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
-                        val start = when {
-                            settings?.setupCompleted != true -> Routes.SETUP
-                            intent?.getBooleanExtra(EXTRA_OPEN_CRASHES, false) == true -> Routes.CRASHES
-                            settings?.openCrashesOnStartup == true -> Routes.CRASHES
-                            else -> Routes.STREAM
-                        }
                         LogSleuthNavHost(
                             navController = navController,
-                            startDestination = start,
-                            guideCompleted = settings?.guideCompleted ?: true,
-                            onTourFinished = {
-                                settingsRepository.setGuideCompletedAsync(true)
-                            },
+                            startDestination = startDestination,
                         )
                     }
                 }
@@ -187,17 +191,6 @@ class MainActivity : ComponentActivity() {
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
                 }
-        }
-    }
-
-    @Composable
-    private fun NotificationPermissionEffect() {
-        if (Build.VERSION.SDK_INT < 33) return
-        val launcher = rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission(),
-        ) { /* result ignored: recording still works, just quieter */ }
-        LaunchedEffect(Unit) {
-            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

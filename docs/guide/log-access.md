@@ -33,7 +33,7 @@ LogSleuth can run a shell as `su` through [libsu](https://github.com/topjohnwu/l
 With a computer attached, or from a terminal on the device:
 
 ```bash
-adb shell pm grant io.github.shiaho777.logsleuth android.permission.READ_LOGS
+adb shell pm grant io.github.shiaho777.logsleuth.app android.permission.READ_LOGS
 ```
 
 - No root, no Shizuku, but the grant is tied to the installed build.

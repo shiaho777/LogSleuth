@@ -23,10 +23,6 @@ class TourController {
     var active by mutableStateOf(false)
         private set
 
-    /** Auto-trigger guard: the flag-only auto-start fires at most once. */
-    var hasRun by mutableStateOf(false)
-        private set
-
     /**
      * Current beat index / total steps, published by the overlay as each
      * step starts. Hands-free beats hide the overlay card, so a screen's
@@ -64,7 +60,6 @@ class TourController {
 
     fun start() {
         targets.clear()
-        hasRun = true
         active = true
     }
 

@@ -3,18 +3,18 @@ layout: home
 
 hero:
   name: LogSleuth
-  text: 读懂整台设备的日志
-  tagline: 无需 Root 的 logcat 阅读器，右侧轨道直接画出整个缓冲区的级别指纹；另有一个零权限 SDK，可以直接嵌进你自己的 App。
+  text: 在手机上录制并回放安卓崩溃
+  tagline: 保存故障前后的日志和书签，发一份别人能打开的报告。支持 Android 8.0 及以上。
   actions:
     - theme: brand
-      text: 快速开始
+      text: 下载 Android APK
+      link: https://github.com/shiaho777/LogSleuth/releases/latest
+    - theme: alt
+      text: 打开第一份报告
       link: /zh/guide/
     - theme: alt
-      text: 开发者文档
-      link: /developer/
-    - theme: alt
-      text: 在 GitHub 上查看
-      link: https://github.com/shiaho777/LogSleuth
+      text: 集成 SDK
+      link: https://github.com/shiaho777/LogSleuth/blob/main/README.zh-CN.md#集成-sdk
 
 features:
   - icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg>
@@ -50,13 +50,7 @@ features:
 
 ## 安装
 
-| 渠道 | 地址 |
-| --- | --- |
-| GitHub Releases | `https://github.com/shiaho777/LogSleuth/releases/latest` |
-| F-Droid | [F-Droid](https://f-droid.org/packages/io.github.shiaho777.logsleuth/) |
-| Google Play | [Play 商店](https://play.google.com/store/apps/details?id=io.github.shiaho777.logsleuth) |
-
-需要 Android 8.0（API 26）及以上。
+从 [GitHub Releases 下载 APK](https://github.com/shiaho777/LogSleuth/releases/latest)。F-Droid 和 Google Play 上架仍在计划中。
 
 ## 社区
 
@@ -68,7 +62,7 @@ features:
 
 ## 接下来读什么
 
-- [快速开始](/zh/guide/) —— 安装、授权、读到第一行日志
+- [快速开始](/zh/guide/) —— 打开现成报告，或采集设备日志
 - [日志权限](/zh/guide/log-access) —— Shizuku、root 与 ADB 授权的差别
 - [过滤与规则](/zh/guide/filters) —— 级别、查询、规则栈
 - [录制与崩溃](/zh/guide/recording-and-crashes) —— 会话、侦测、导出

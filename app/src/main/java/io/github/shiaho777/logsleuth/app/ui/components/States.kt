@@ -1,65 +1,51 @@
 package io.github.shiaho777.logsleuth.app.ui.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Article
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthGraphic
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 
-/** Tonal-circle icon + message, centered. The shared "nothing here yet" look. */
 @Composable
 private fun CenteredState(
-    icon: ImageVector,
+    @DrawableRes graphic: Int,
     text: String,
     modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null,
 ) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.size(96.dp),
+    BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val scroll = if (constraints.hasBoundedHeight) Modifier.verticalScroll(rememberScrollState()) else Modifier
+        Column(
+            modifier = Modifier.widthIn(max = 448.dp).fillMaxWidth().then(scroll)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                modifier = Modifier.padding(26.dp),
-                tint = MaterialTheme.colorScheme.outline,
+            SleuthGraphic(graphic, Modifier.size(88.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
-        }
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (action != null) {
-            Spacer(Modifier.height(24.dp))
-            action()
+            action?.invoke()
         }
     }
 }
@@ -68,10 +54,11 @@ private fun CenteredState(
 fun EmptyState(
     text: String,
     modifier: Modifier = Modifier,
+    @DrawableRes graphic: Int = R.drawable.sleuth_search,
     action: (@Composable () -> Unit)? = null,
 ) {
     CenteredState(
-        icon = Icons.Outlined.Article,
+        graphic = graphic,
         text = text,
         modifier = modifier,
         action = action,
@@ -81,9 +68,8 @@ fun EmptyState(
 @Composable
 fun NoAccessState(onOpenSetup: () -> Unit, modifier: Modifier = Modifier) {
     CenteredState(
-        icon = Icons.Outlined.Lock,
-        text = stringResource(R.string.no_access_title) + "\n\n" +
-            stringResource(R.string.no_access_desc),
+        graphic = R.drawable.sleuth_access,
+        text = stringResource(R.string.no_access_title),
         modifier = modifier,
     ) {
         Button(onClick = onOpenSetup) {

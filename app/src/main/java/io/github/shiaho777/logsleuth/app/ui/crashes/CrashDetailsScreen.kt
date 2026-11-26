@@ -47,7 +47,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -76,6 +75,8 @@ import io.github.shiaho777.logsleuth.app.core.crashes.CrashSearchSection
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import kotlinx.coroutines.launch
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentPanel
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +118,7 @@ fun CrashDetailsScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
+            InstrumentTopBar(
                 title = {
                     Text(
                         crash?.appName?.takeIf { it.isNotBlank() }
@@ -193,11 +194,13 @@ fun CrashDetailsScreen(
                             contentDescription = stringResource(R.string.share_logs),
                         )
                     }
-                    IconButton(onClick = { viewModel.delete(onBack) }) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                        )
+                    if (!ui.isExample) {
+                        IconButton(onClick = { viewModel.delete(onBack) }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.delete),
+                            )
+                        }
                     }
                 },
             )
@@ -267,16 +270,18 @@ fun CrashDetailsScreen(
                     Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.copy))
                 }
-                if (crash.remoteEndpoint == null) {
+                if (!ui.isExample && crash.remoteEndpoint == null) {
                     FilledTonalButton(onClick = viewModel::openAppInfo, modifier = Modifier.weight(1f)) {
                         Text(stringResource(R.string.crash_open_app), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-            TextButton(onClick = viewModel::openChannel) {
-                Text(stringResource(R.string.crash_open_channel))
+            if (!ui.isExample) {
+                TextButton(onClick = viewModel::openChannel) {
+                    Text(stringResource(R.string.crash_open_channel))
+                }
             }
-            crash.packageName?.let { pkg ->
+            crash.packageName?.takeUnless { ui.isExample }?.let { pkg ->
                 TextButton(
                     onClick = {
                         val wasIgnored = ui.ignored
@@ -389,18 +394,20 @@ private fun CrashLogText(
         requester.bringIntoView(result.getBoundingBox(start))
     }
     val hScroll = rememberScrollState()
-    SelectionContainer {
-        Text(
-            text = highlighted(text, ranges, currentRange),
-            fontFamily = FontFamily.Monospace,
-            fontSize = fontSize,
-            softWrap = wrap,
-            overflow = TextOverflow.Visible,
-            onTextLayout = { layout = it },
-            modifier = Modifier
-                .then(if (wrap) Modifier.fillMaxWidth() else Modifier.horizontalScroll(hScroll))
-                .bringIntoViewRequester(requester),
-        )
+    InstrumentPanel(Modifier.fillMaxWidth()) {
+        SelectionContainer(Modifier.fillMaxWidth().padding(12.dp)) {
+            Text(
+                text = highlighted(text, ranges, currentRange),
+                fontFamily = FontFamily.Monospace,
+                fontSize = fontSize,
+                softWrap = wrap,
+                overflow = TextOverflow.Visible,
+                onTextLayout = { layout = it },
+                modifier = Modifier
+                    .then(if (wrap) Modifier.fillMaxWidth() else Modifier.horizontalScroll(hScroll))
+                    .bringIntoViewRequester(requester),
+            )
+        }
     }
 }
 

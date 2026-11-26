@@ -1,6 +1,16 @@
 package io.github.shiaho777.logsleuth.app.ui.settings
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -16,6 +27,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.RadioButton
@@ -31,7 +43,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,6 +70,10 @@ import io.github.shiaho777.logsleuth.app.data.prefs.AppLocales
 import io.github.shiaho777.logsleuth.app.ui.components.LanguagePicker
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import kotlin.math.roundToInt
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentPanel
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMark
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthGraphic
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +81,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSetup: () -> Unit,
     onOpenGuide: () -> Unit,
+    onOpenWelcome: () -> Unit,
     onOpenAutomation: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -72,13 +90,30 @@ fun SettingsScreen(
     val rootStatus by viewModel.rootStatus.collectAsState()
     val context = LocalContext.current
     val s = settings ?: return
+    val notificationManager = remember(context) { NotificationManagerCompat.from(context) }
+    var notificationsAllowed by remember(notificationManager) {
+        mutableStateOf(notificationManager.areNotificationsEnabled())
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        notificationsAllowed = notificationManager.areNotificationsEnabled()
+    }
+    val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notificationsAllowed = notificationManager.areNotificationsEnabled()
+    }
+    val openNotificationSettings = {
+        context.startActivity(
+            Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(AndroidSettings.EXTRA_APP_PACKAGE, context.packageName),
+        )
+    }
+    val crashNotifications = s.crashNotifications && notificationsAllowed
 
     // ADB grants have no event stream — refresh when the screen opens.
     LaunchedEffect(Unit) { viewModel.refreshAccess() }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.settings_title)) })
+            InstrumentTopBar(title = { Text(stringResource(R.string.settings_title)) })
         },
     ) { padding ->
         Column(
@@ -92,17 +127,20 @@ fun SettingsScreen(
         ) {
             SettingsSectionHeader(stringResource(R.string.settings_section_access))
 
-            // Access + About share one row — each card wraps its own content,
-            // so without weights they'd both hug the left edge.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Card(Modifier.weight(1f)) {
+            InstrumentPanel(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SleuthGraphic(R.drawable.sleuth_access, Modifier.size(56.dp))
                     Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
                             stringResource(R.string.settings_access),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                         )
                         val accessText = when (access.kind) {
                             AccessKind.SHIZUKU -> stringResource(R.string.settings_access_shizuku)
@@ -113,34 +151,11 @@ fun SettingsScreen(
                         }
                         Text(
                             accessText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (access.granted) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (access.granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         )
                         TextButton(onClick = onOpenSetup) {
                             Text(stringResource(R.string.settings_access_open))
-                        }
-                    }
-                }
-                Card(Modifier.weight(1f)) {
-                    Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_about),
-                            style = MaterialTheme.typography.titleSmall,
-                        )
-                        Text(
-                            stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(onClick = onOpenGuide) {
-                            Text(stringResource(R.string.settings_replay_guide))
                         }
                     }
                 }
@@ -298,9 +313,29 @@ fun SettingsScreen(
                 Column {
                     SettingsSwitchRow(
                         title = stringResource(R.string.settings_crash_notifications),
-                        checked = s.crashNotifications,
-                        onCheckedChange = viewModel::setCrashNotifications,
+                        subtitle = if (notificationsAllowed) null else {
+                            stringResource(R.string.settings_notifications_permission_desc)
+                        },
+                        checked = crashNotifications,
+                        onCheckedChange = { enabled ->
+                            viewModel.setCrashNotifications(enabled)
+                            if (enabled && !notificationsAllowed) {
+                                if (Build.VERSION.SDK_INT >= 33 &&
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                                    PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    openNotificationSettings()
+                                }
+                            }
+                        },
                     )
+                    if (!notificationsAllowed) {
+                        TextButton(onClick = openNotificationSettings, modifier = Modifier.padding(horizontal = 16.dp)) {
+                            Text(stringResource(R.string.settings_system_notifications))
+                        }
+                    }
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -325,7 +360,7 @@ fun SettingsScreen(
                         label = stringResource(R.string.settings_crash_java),
                         save = s.collectJava,
                         notify = s.notifyJava,
-                        notifyEnabled = s.crashNotifications,
+                        notifyEnabled = crashNotifications,
                         onSave = viewModel::setCollectJava,
                         onNotify = viewModel::setNotifyJava,
                     )
@@ -333,7 +368,7 @@ fun SettingsScreen(
                         label = stringResource(R.string.settings_crash_native),
                         save = s.collectNative,
                         notify = s.notifyNative,
-                        notifyEnabled = s.crashNotifications,
+                        notifyEnabled = crashNotifications,
                         onSave = viewModel::setCollectNative,
                         onNotify = viewModel::setNotifyNative,
                     )
@@ -341,7 +376,7 @@ fun SettingsScreen(
                         label = stringResource(R.string.settings_crash_anr),
                         save = s.collectAnr,
                         notify = s.notifyAnr,
-                        notifyEnabled = s.crashNotifications,
+                        notifyEnabled = crashNotifications,
                         onSave = viewModel::setCollectAnr,
                         onNotify = viewModel::setNotifyAnr,
                     )
@@ -616,6 +651,33 @@ fun SettingsScreen(
 
             SettingsSectionHeader(stringResource(R.string.settings_section_updates))
 
+            InstrumentPanel(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SleuthMark(Modifier.size(44.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+            InstrumentPanel(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    TextButton(onClick = onOpenWelcome) {
+                        Text(stringResource(R.string.welcome_quick_start))
+                    }
+                    TextButton(onClick = onOpenGuide) {
+                        Text(stringResource(R.string.settings_replay_guide))
+                    }
+                }
+            }
+
             CommunityCard(
                 onJoinGroup = {
                     context.startActivity(
@@ -649,12 +711,22 @@ fun SettingsScreen(
  *  keeps the title attached to its cards. */
 @Composable
 private fun SettingsSectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f, fill = false).semantics { heading() },
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(0.45f),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
 }
 
 @Composable

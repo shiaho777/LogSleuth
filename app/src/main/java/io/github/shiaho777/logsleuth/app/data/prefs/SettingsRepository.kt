@@ -30,8 +30,6 @@ data class Settings(
     val logTextScale: Float = 1f,
     /** Show the setup wizard until the user has granted some access once. */
     val setupCompleted: Boolean = false,
-    /** Feature tour overlay has been seen once (skip and finish both count). */
-    val guideCompleted: Boolean = false,
     /** In-app language: "system" | "en" | "zh-CN" (see AppLocales). */
     val language: String = AppLocales.SYSTEM,
     /** Recordings auto-stop at this size so a long session can't fill storage. */
@@ -106,7 +104,6 @@ class SettingsRepository(private val context: Context) {
         val LOG_TEXT_SCALE = intPreferencesKey("log_text_scale")
         val LOG_TEXT_SCALE_F = floatPreferencesKey("log_text_scale_f")
         val SETUP_COMPLETED = booleanPreferencesKey("setup_completed")
-        val GUIDE_COMPLETED = booleanPreferencesKey("guide_completed")
         val LANGUAGE = stringPreferencesKey("language")
         val RECORDING_MAX_MB = intPreferencesKey("recording_max_mb")
         val RECORDING_MAX_HOURS = intPreferencesKey("recording_max_hours")
@@ -158,7 +155,6 @@ class SettingsRepository(private val context: Context) {
                 else -> 1f
             },
             setupCompleted = p[Keys.SETUP_COMPLETED] ?: false,
-            guideCompleted = p[Keys.GUIDE_COMPLETED] ?: false,
             language = p[Keys.LANGUAGE] ?: AppLocales.SYSTEM,
             recordingMaxMb = p[Keys.RECORDING_MAX_MB] ?: 64,
             recordingMaxHours = p[Keys.RECORDING_MAX_HOURS] ?: 0,
@@ -225,13 +221,6 @@ class SettingsRepository(private val context: Context) {
      */
     fun setSetupCompletedAsync(value: Boolean) {
         writeScope.launch { setSetupCompleted(value) }
-    }
-
-    suspend fun setGuideCompleted(value: Boolean) =
-        context.dataStore.edit { it[Keys.GUIDE_COMPLETED] = value }
-
-    fun setGuideCompletedAsync(value: Boolean) {
-        writeScope.launch { setGuideCompleted(value) }
     }
 
     suspend fun setRecordingMaxMb(value: Int) =

@@ -1,6 +1,7 @@
 package io.github.shiaho777.logsleuth.app.ui.crashes
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
@@ -42,7 +42,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,6 +68,7 @@ import io.github.shiaho777.logsleuth.app.ui.components.LocalAppIconCache
 import io.github.shiaho777.logsleuth.app.ui.components.levelColor
 import io.github.shiaho777.logsleuth.app.ui.components.onColorFor
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +94,7 @@ fun CrashesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            InstrumentTopBar(
                 title = { Text(stringResource(R.string.crashes_title)) },
                 actions = {
                     IconButton(onClick = viewModel::toggleReversed) {
@@ -142,7 +142,7 @@ fun CrashesScreen(
                 label = { Text(stringResource(R.string.crash_search)) },
             )
             if (groups.isEmpty()) {
-                EmptyState(text = stringResource(R.string.crashes_empty))
+                EmptyState(text = stringResource(R.string.crashes_empty), graphic = R.drawable.sleuth_crash)
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -210,6 +210,7 @@ private fun CrashGroupCard(
     Card(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -228,7 +229,7 @@ private fun CrashGroupCard(
                 )
             } else {
                 Surface(
-                    shape = CircleShape,
+                    shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.errorContainer,
                     modifier = Modifier.size(40.dp),
                 ) {
@@ -336,6 +337,7 @@ fun CrashCard(
     Card(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -345,13 +347,13 @@ fun CrashCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
-                shape = CircleShape,
+                shape = MaterialTheme.shapes.small,
                 color = severity.copy(alpha = 0.15f),
                 modifier = Modifier.size(40.dp),
             ) {
                 Icon(
                     if (isAnr) Icons.Default.HourglassTop else Icons.Default.BugReport,
-                    contentDescription = crash.type,
+                    contentDescription = null,
                     tint = severity,
                     modifier = Modifier.padding(10.dp),
                 )

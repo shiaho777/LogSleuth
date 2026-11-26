@@ -50,6 +50,7 @@ import io.github.shiaho777.logsleuth.app.ui.navigation.LocalSharedTransitionScop
 import kotlinx.coroutines.launch
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
+import io.github.shiaho777.logsleuth.app.data.db.EXAMPLE_SESSION_KIND
 import io.github.shiaho777.logsleuth.app.ui.stream.CaptureNotice
 import io.github.shiaho777.logsleuth.app.ui.crashes.CrashCard
 import java.text.DateFormat
@@ -144,6 +145,9 @@ fun SessionDetailScreen(
                     },
                 ),
         ) {
+            if (ui.session?.accessKind == EXAMPLE_SESSION_KIND) {
+                CaptureNotice(stringResource(R.string.example_report_notice))
+            }
             ui.remoteEndpoint?.let { endpoint ->
                 CaptureNotice(
                     if (endpoint.isBlank()) stringResource(R.string.log_source_remote_unknown)

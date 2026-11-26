@@ -31,6 +31,10 @@ class LogImporter @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val sessionDao: SessionDao,
 ) {
+    companion object {
+        fun documentTypes(): Array<String> = arrayOf("application/zip", "text/plain", "application/octet-stream")
+    }
+
     private class Counter {
         var bytes = 0L
         var entries = 0L

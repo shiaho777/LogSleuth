@@ -7,6 +7,10 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+private const val REAL_CRASHES =
+    "FROM crash_events LEFT JOIN sessions ON sessions.id = crash_events.sessionId " +
+        "WHERE COALESCE(sessions.accessKind, '') != '$EXAMPLE_SESSION_KIND'"
+
 @Dao
 interface SessionDao {
     // id DESC = creation order. Snapshots save a buffer whose startedAt
@@ -16,6 +20,9 @@ interface SessionDao {
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getById(id: Long): SessionEntity?
+
+    @Query("SELECT * FROM sessions WHERE accessKind = '$EXAMPLE_SESSION_KIND' LIMIT 1")
+    suspend fun findExample(): SessionEntity?
 
     @Insert
     suspend fun insert(entity: SessionEntity): Long
@@ -54,7 +61,7 @@ interface FilterDao {
 
 @Dao
 interface CrashEventDao {
-    @Query("SELECT * FROM crash_events ORDER BY time DESC")
+    @Query("SELECT crash_events.* $REAL_CRASHES ORDER BY crash_events.time DESC")
     fun observeAll(): Flow<List<CrashEventEntity>>
 
     @Query("SELECT * FROM crash_events WHERE sessionId = :sessionId ORDER BY time ASC")
@@ -63,13 +70,19 @@ interface CrashEventDao {
     @Query("SELECT * FROM crash_events WHERE id = :id")
     fun observeById(id: Long): Flow<CrashEventEntity?>
 
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM crash_events JOIN sessions ON sessions.id = crash_events.sessionId " +
+            "WHERE crash_events.id = :id AND sessions.accessKind = '$EXAMPLE_SESSION_KIND')",
+    )
+    fun observeIsExample(id: Long): Flow<Boolean>
+
     @Insert
     suspend fun insert(entity: CrashEventEntity): Long
 
     /** Same log line seen again (logcat replays its buffers on every start). */
     @Query(
-        "SELECT id FROM crash_events WHERE time = :time AND pid = :pid AND type = :type " +
-            "AND firstLine = :firstLine AND remoteEndpoint IS :remoteEndpoint LIMIT 1",
+        "SELECT crash_events.id $REAL_CRASHES AND crash_events.time = :time AND pid = :pid AND type = :type " +
+            "AND firstLine = :firstLine AND crash_events.remoteEndpoint IS :remoteEndpoint LIMIT 1",
     )
     suspend fun findExisting(
         time: Long,
@@ -107,7 +120,7 @@ interface CrashEventDao {
     suspend fun deleteByIds(ids: List<Long>)
 
     /** Retention pass over every stored event (bounded by the retention caps). */
-    @Query("SELECT * FROM crash_events")
+    @Query("SELECT crash_events.* $REAL_CRASHES")
     suspend fun all(): List<CrashEventEntity>
 }
 
