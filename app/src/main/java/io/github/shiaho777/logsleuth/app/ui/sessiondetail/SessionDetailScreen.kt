@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -25,10 +25,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
+import io.github.shiaho777.logsleuth.app.ui.components.SpringPagerTabs
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyFilterActions
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
@@ -64,6 +64,7 @@ import io.github.shiaho777.logsleuth.app.ui.crashes.CrashCard
 import java.text.DateFormat
 import java.util.Date
 import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,7 +141,7 @@ fun SessionDetailScreen(
                         IconButton(onClick = {
                             bookmarkedLine = null
                             viewModel.setSearching(true)
-                            scope.launch { pagerState.scrollToPage(0) }
+                            scope.launch { pagerState.animateScrollToPage(0, animationSpec = SleuthMotion.spatial()) }
                         }) {
                             Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
                         }
@@ -188,21 +189,20 @@ fun SessionDetailScreen(
             }
             if (ui.missedEntries > 0) CaptureNotice(stringResource(R.string.recording_gap_count, ui.missedEntries))
             if (ui.sourceChanged) CaptureNotice(stringResource(R.string.recording_source_changed))
-            SecondaryTabRow(selectedTabIndex = pagerState.currentPage) {
-                listOf(
+            SpringPagerTabs(
+                pager = pagerState,
+                labels = listOf(
                     stringResource(R.string.tab_logs, ui.entries.size),
                     stringResource(R.string.tab_crashes, ui.crashes.size),
                     stringResource(R.string.tab_bookmarks, ui.bookmarks.size),
-                ).forEachIndexed { index, label ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                        text = { Text(label) },
-                    )
-                }
-            }
+                ),
+            )
 
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                flingBehavior = PagerDefaults.flingBehavior(pagerState, snapAnimationSpec = SleuthMotion.spatial()),
+            ) { page ->
                 when (page) {
                     0 -> Column {
                         FilterBar(
@@ -298,7 +298,7 @@ fun SessionDetailScreen(
                                             viewModel.setSearching(false)
                                             bookmarkedLine = seq
                                             listState.requestScrollToItem(index)
-                                            pagerState.scrollToPage(0)
+                                            pagerState.animateScrollToPage(0, animationSpec = SleuthMotion.spatial())
                                         }
                                     }
                                 },
@@ -314,7 +314,7 @@ fun SessionDetailScreen(
     }
 
     if (showRename) {
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { showRename = false },
             title = { Text(stringResource(R.string.session_rename)) },
             text = {
@@ -325,14 +325,17 @@ fun SessionDetailScreen(
                     label = { Text(stringResource(R.string.session_rename_hint)) },
                 )
             },
-            confirmButton = {
+            confirmButton = { close ->
                 TextButton(onClick = {
-                    viewModel.rename(renameText)
-                    showRename = false
+                    val name = renameText
+                    close {
+                        viewModel.rename(name)
+                        showRename = false
+                    }
                 }) { Text(stringResource(R.string.session_rename)) }
             },
-            dismissButton = {
-                TextButton(onClick = { showRename = false }) {
+            dismissButton = { close ->
+                TextButton(onClick = { close { showRename = false } }) {
                     Text(stringResource(R.string.close))
                 }
             },
@@ -356,29 +359,36 @@ fun SessionDetailScreen(
                 result.onFailure { scope.launch { snackbar.showSnackbar(saveFailedMsg) } }
             }
         }
-        showShare = false
     }
 
     if (showShare) {
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { showShare = false },
             title = { Text(stringResource(R.string.share_logs)) },
             text = { Text(stringResource(R.string.export_format_prompt)) },
-            confirmButton = {
+            confirmButton = { close ->
                 Column {
                     TextButton(onClick = {
-                        viewModel.share(SessionExporter.Format.ZIP, onShareResult)
-                        showShare = false
+                        close {
+                            showShare = false
+                            viewModel.share(SessionExporter.Format.ZIP, onShareResult)
+                        }
                     }) { Text("ZIP") }
                     TextButton(onClick = {
-                        saveZipLauncher.launch("${ui.session?.name ?: "session"}.zip")
+                        val filename = "${ui.session?.name ?: "session"}.zip"
+                        close {
+                            showShare = false
+                            saveZipLauncher.launch(filename)
+                        }
                     }) { Text(stringResource(R.string.save_to)) }
                 }
             },
-            dismissButton = {
+            dismissButton = { close ->
                 TextButton(onClick = {
-                    viewModel.share(SessionExporter.Format.TXT, onShareResult)
-                    showShare = false
+                    close {
+                        showShare = false
+                        viewModel.share(SessionExporter.Format.TXT, onShareResult)
+                    }
                 }) { Text("TXT") }
             },
         )

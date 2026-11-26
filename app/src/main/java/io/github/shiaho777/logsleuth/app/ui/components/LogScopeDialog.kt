@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,10 +42,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.drawable.toBitmap
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.logcat.LogLevel
 import java.text.SimpleDateFormat
@@ -84,10 +85,10 @@ fun LogScopeDialog(
     val focused = groups?.firstOrNull { it.uid == focusedUid } ?: groups?.firstOrNull()
     val selectedCount = groups?.filter { it.uid in selected }?.sumOf { it.total } ?: 0
 
-    Dialog(
+    SpringDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
+    ) { close ->
         Surface(
             shape = RoundedCornerShape(20.dp),
             tonalElevation = 3.dp,
@@ -135,56 +136,62 @@ fun LogScopeDialog(
                     )
                 }
 
-                if (perApp) {
-                    Spacer(Modifier.height(10.dp))
-                    when {
-                        groups == null -> Box(
-                            Modifier.fillMaxWidth().height(280.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(R.string.scope_loading),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                        }
-                        groups.isEmpty() -> Box(
-                            Modifier.fillMaxWidth().height(280.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                stringResource(R.string.scope_empty),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                        }
-                        else -> Row(Modifier.height(280.dp)) {
-                            LazyColumn(Modifier.weight(1.15f)) {
-                                items(groups.size, key = { groups[it].uid ?: -1 }) { i ->
-                                    AppScopeRow(
-                                        group = groups[i],
-                                        checked = groups[i].uid in selected,
-                                        focused = groups[i].uid == focused?.uid,
-                                        onClick = {
-                                            focusedUid = groups[i].uid
-                                            selected = if (groups[i].uid in selected) {
-                                                selected - groups[i].uid
-                                            } else {
-                                                selected + groups[i].uid
-                                            }
-                                        },
-                                    )
-                                }
+                AnimatedVisibility(
+                    visible = perApp,
+                    enter = SleuthMotion.expand(),
+                    exit = SleuthMotion.collapse(),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        when {
+                            groups == null -> Box(
+                                Modifier.fillMaxWidth().height(280.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(R.string.scope_loading),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                )
                             }
-                            VerticalDivider(Modifier.padding(horizontal = 8.dp))
-                            focused?.let { MetricsPane(it, Modifier.weight(0.85f)) }
+                            groups.isEmpty() -> Box(
+                                Modifier.fillMaxWidth().height(280.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(R.string.scope_empty),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                )
+                            }
+                            else -> Row(Modifier.height(280.dp)) {
+                                LazyColumn(Modifier.weight(1.15f)) {
+                                    items(groups.size, key = { groups[it].uid ?: -1 }) { i ->
+                                        AppScopeRow(
+                                            group = groups[i],
+                                            checked = groups[i].uid in selected,
+                                            focused = groups[i].uid == focused?.uid,
+                                            onClick = {
+                                                focusedUid = groups[i].uid
+                                                selected = if (groups[i].uid in selected) {
+                                                    selected - groups[i].uid
+                                                } else {
+                                                    selected + groups[i].uid
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                                VerticalDivider(Modifier.padding(horizontal = 8.dp))
+                                focused?.let { MetricsPane(it, Modifier.weight(0.85f)) }
+                            }
                         }
                     }
                 }
 
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(onClick = { close(onDismiss) }) {
                         Text(stringResource(R.string.cancel))
                     }
                     Spacer(Modifier.width(6.dp))
@@ -194,7 +201,10 @@ fun LogScopeDialog(
                         } else {
                             totalLines > 0
                         },
-                        onClick = { onConfirm(if (perApp) selected.toSet() else null) },
+                        onClick = {
+                            val scope = if (perApp) selected.toSet() else null
+                            close { onConfirm(scope) }
+                        },
                     ) {
                         Text(
                             text = if (perApp) {

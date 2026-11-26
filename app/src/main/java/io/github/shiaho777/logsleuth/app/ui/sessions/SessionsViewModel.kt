@@ -118,13 +118,13 @@ class SessionsViewModel @Inject constructor(
     }
 
     fun saveToUri(
-        session: SessionEntity,
+        sessionId: Long,
         format: SessionExporter.Format,
         uri: android.net.Uri,
         onResult: (Result<Unit>) -> Unit,
     ) {
         viewModelScope.launch {
-            onResult(exporter.exportToUri(session.id, format, uri))
+            onResult(exporter.exportToUri(sessionId, format, uri))
         }
     }
 

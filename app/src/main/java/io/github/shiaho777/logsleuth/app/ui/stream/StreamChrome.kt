@@ -50,7 +50,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,6 +74,7 @@ import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
 import io.github.shiaho777.logsleuth.app.ui.components.SearchInputBar
+import io.github.shiaho777.logsleuth.app.ui.components.SpringBottomSheet
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
@@ -583,7 +583,7 @@ internal fun RecordingSavedSheet(
     onShare: (SessionExporter.Format) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    SpringBottomSheet(onDismissRequest = onDismiss) { close ->
         Column(
             Modifier
                 .padding(horizontal = 24.dp)
@@ -612,7 +612,7 @@ internal fun RecordingSavedSheet(
                     )
                 }
             }
-            Button(onClick = onOpenSession, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { close(onOpenSession) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.Description, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.report_preview))
@@ -630,7 +630,7 @@ internal fun RecordingSavedSheet(
                     modifier = Modifier.weight(1f),
                 ) { Text(stringResource(R.string.report_share_txt)) }
             }
-            TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 8.dp)) {
+            TextButton(onClick = { close(onDismiss) }, modifier = Modifier.padding(top = 8.dp)) {
                 Text(stringResource(R.string.later))
             }
         }

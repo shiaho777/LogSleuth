@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -19,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
 
 /**
  * "Restore defaults" card. It sits near the bottom of Settings, above the
@@ -51,15 +51,17 @@ fun ResetSettingsCard(onReset: () -> Unit) {
     }
 
     if (confirm) {
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text(stringResource(R.string.settings_reset)) },
             text = { Text(stringResource(R.string.settings_reset_confirm)) },
-            confirmButton = {
+            confirmButton = { close ->
                 TextButton(
                     onClick = {
-                        confirm = false
-                        onReset()
+                        close {
+                            confirm = false
+                            onReset()
+                        }
                     },
                 ) {
                     Text(
@@ -68,8 +70,8 @@ fun ResetSettingsCard(onReset: () -> Unit) {
                     )
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { confirm = false }) {
+            dismissButton = { close ->
+                TextButton(onClick = { close { confirm = false } }) {
                     Text(stringResource(R.string.cancel))
                 }
             },

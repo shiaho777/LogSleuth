@@ -3,7 +3,6 @@ package io.github.shiaho777.logsleuth.app.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialExpressiveTheme
-import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -165,7 +164,7 @@ fun LogSleuthTheme(
     }
     MaterialExpressiveTheme(
         colorScheme = if (dark) DarkColors else LightColors,
-        motionScheme = MotionScheme.standard(),
+        motionScheme = SleuthMotion,
         typography = SleuthTypography,
         shapes = SleuthShapes,
     ) {

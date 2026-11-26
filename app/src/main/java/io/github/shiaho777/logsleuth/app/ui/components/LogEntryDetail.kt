@@ -1,21 +1,17 @@
 package io.github.shiaho777.logsleuth.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -29,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -38,10 +33,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,22 +42,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
 import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentPanel
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLogTextScale
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,27 +70,29 @@ internal fun LogEntryDetail(
     val width = LocalWindowInfo.current.containerSize.width
     val wide = with(LocalDensity.current) { width.toDp() >= 600.dp }
     var raw by remember(entry) { mutableStateOf(false) }
+    val content: @Composable (CloseWithMotion) -> Unit = { close ->
+        val filterAction = onMakeFilter?.let { makeFilter ->
+            { selected: LogcatEntry ->
+                close {
+                    onDismiss()
+                    makeFilter(selected)
+                }
+            }
+        }
+        EntryDetailContent(entry, raw, { raw = it }, { close(onDismiss) }, filterAction)
+    }
     if (!wide) {
-        ModalBottomSheet(
-            onDismissRequest = onDismiss,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        ) {
-            EntryDetailContent(entry, raw, { raw = it }, onDismiss, onMakeFilter)
+        SpringBottomSheet(onDismissRequest = onDismiss, skipPartiallyExpanded = true) { close ->
+            content(close)
         }
     } else {
-        Dialog(
+        SpringDialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)).clickable(onClick = onDismiss))
-                Surface(
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-                        .width((maxWidth * 0.58f).coerceIn(360.dp, 560.dp)),
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    EntryDetailContent(entry, raw, { raw = it }, onDismiss, onMakeFilter)
-                }
+            showAtEnd = true,
+        ) { close ->
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                content(close)
             }
         }
     }
@@ -122,6 +118,8 @@ private fun EntryDetailContent(
     val packageName = if (entry.remoteEndpoint == null) cache?.packageFor(entry.uid) else entry.remotePackage
     val appLabel = if (entry.remoteEndpoint == null) cache?.labelFor(entry.uid) else packageName
     val text = if (raw) entry.raw else entry.message
+    val travel = with(LocalDensity.current) { 24.dp.roundToPx() }
+    val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
 
     Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
         Column(Modifier.fillMaxWidth()) {
@@ -171,9 +169,14 @@ private fun EntryDetailContent(
                     label = { Text(stringResource(R.string.entry_raw)) },
                 )
             }
-            key(raw) {
+            AnimatedContent(
+                targetState = raw,
+                modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+                transitionSpec = { SleuthMotion.swap(travel * direction * if (targetState) 1 else -1) },
+                label = "logEntryFormat",
+            ) { showRaw ->
                 Column(
-                    Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     FlowRow(
@@ -191,7 +194,10 @@ private fun EntryDetailContent(
                     }
                     InstrumentPanel(Modifier.fillMaxWidth()) {
                         SelectionContainer(Modifier.fillMaxWidth().padding(12.dp)) {
-                            Text(text, style = logMessageStyle(LocalLogTextScale.current))
+                            Text(
+                                if (showRaw) entry.raw else entry.message,
+                                style = logMessageStyle(LocalLogTextScale.current),
+                            )
                         }
                     }
                 }
@@ -206,10 +212,7 @@ private fun EntryDetailContent(
                     )
                 }
                 if (onMakeFilter != null) {
-                    TextButton(onClick = {
-                        onMakeFilter(entry)
-                        onDismiss()
-                    }) {
+                    TextButton(onClick = { onMakeFilter(entry) }) {
                         Icon(Icons.Default.FilterAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Text(stringResource(R.string.filter_from_line), modifier = Modifier.padding(start = 6.dp))
                     }

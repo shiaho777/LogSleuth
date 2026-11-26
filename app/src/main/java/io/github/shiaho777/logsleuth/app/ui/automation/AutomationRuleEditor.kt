@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -23,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.automation.AutomationRule
 import io.github.shiaho777.logsleuth.app.core.filter.CompiledFilter
@@ -43,7 +43,7 @@ internal fun AutomationRuleEditor(
     val regexBad = draft.useRegex && CompiledFilter.isInvalidRegex(draft.query)
     val canSave = draft.name.isNotBlank() && draft.targetPackage.isNotBlank() && !regexBad
 
-    AlertDialog(
+    SpringAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -143,14 +143,17 @@ internal fun AutomationRuleEditor(
                 )
             }
         },
-        confirmButton = {
+        confirmButton = { close ->
             TextButton(
                 enabled = canSave,
-                onClick = { onSave(draft) },
+                onClick = {
+                    val rule = draft
+                    close { onSave(rule) }
+                },
             ) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        dismissButton = { close ->
+            TextButton(onClick = { close(onDismiss) }) { Text(stringResource(R.string.cancel)) }
         },
     )
 

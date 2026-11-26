@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -79,6 +78,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.foundation.BorderStroke
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.components.SpringAlertDialog
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.importer.LogImporter
 import io.github.shiaho777.logsleuth.app.data.db.EXAMPLE_SESSION_KIND
@@ -286,7 +286,7 @@ fun SessionsScreen(
     }
 
     renameTarget?.let { session ->
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { renameTarget = null },
             title = { Text(stringResource(R.string.session_rename)) },
             text = {
@@ -297,14 +297,17 @@ fun SessionsScreen(
                     label = { Text(stringResource(R.string.session_rename_hint)) },
                 )
             },
-            confirmButton = {
+            confirmButton = { close ->
                 TextButton(onClick = {
-                    viewModel.rename(session, renameText)
-                    renameTarget = null
+                    val name = renameText
+                    close {
+                        viewModel.rename(session, name)
+                        renameTarget = null
+                    }
                 }) { Text(stringResource(R.string.session_rename)) }
             },
-            dismissButton = {
-                TextButton(onClick = { renameTarget = null }) {
+            dismissButton = { close ->
+                TextButton(onClick = { close { renameTarget = null } }) {
                     Text(stringResource(R.string.close))
                 }
             },
@@ -316,38 +319,47 @@ fun SessionsScreen(
     val onShareResult: (Result<Unit>) -> Unit = { result ->
         result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
     }
+    var exportSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
     val saveZipLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
-        val session = shareTarget ?: return@rememberLauncherForActivityResult
+        val sessionId = exportSessionId ?: return@rememberLauncherForActivityResult
         if (uri != null) {
-            viewModel.saveToUri(session, SessionExporter.Format.ZIP, uri) { result ->
+            viewModel.saveToUri(sessionId, SessionExporter.Format.ZIP, uri) { result ->
                 result.onFailure { scope.launch { snackbar.showSnackbar(saveFailedMsg) } }
             }
         }
-        shareTarget = null
+        exportSessionId = null
     }
 
     shareTarget?.let { session ->
-        AlertDialog(
+        SpringAlertDialog(
             onDismissRequest = { shareTarget = null },
             title = { Text(stringResource(R.string.share_logs)) },
             text = { Text(stringResource(R.string.export_format_prompt)) },
-            confirmButton = {
+            confirmButton = { close ->
                 Column {
                     TextButton(onClick = {
-                        viewModel.share(session, SessionExporter.Format.ZIP, onShareResult)
-                        shareTarget = null
+                        close {
+                            shareTarget = null
+                            viewModel.share(session, SessionExporter.Format.ZIP, onShareResult)
+                        }
                     }) { Text("ZIP") }
                     TextButton(onClick = {
-                        saveZipLauncher.launch("${session.name}.zip")
+                        close {
+                            exportSessionId = session.id
+                            shareTarget = null
+                            saveZipLauncher.launch("${session.name}.zip")
+                        }
                     }) { Text(stringResource(R.string.save_to)) }
                 }
             },
-            dismissButton = {
+            dismissButton = { close ->
                 TextButton(onClick = {
-                    viewModel.share(session, SessionExporter.Format.TXT, onShareResult)
-                    shareTarget = null
+                    close {
+                        shareTarget = null
+                        viewModel.share(session, SessionExporter.Format.TXT, onShareResult)
+                    }
                 }) { Text("TXT") }
             },
         )

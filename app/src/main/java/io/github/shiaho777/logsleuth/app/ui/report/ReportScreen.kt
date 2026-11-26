@@ -1,5 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.report
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
@@ -61,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -70,6 +73,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.github.shiaho777.logsleuth.app.R
@@ -82,6 +86,7 @@ import kotlinx.coroutines.launch
 import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentPanel
 import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 import io.github.shiaho777.logsleuth.app.ui.theme.SleuthGraphic
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 
 /**
  * Guided 3-step bug-report flow: pick app → reproduce while recording →
@@ -143,42 +148,54 @@ fun ReportScreen(
                 .padding(horizontal = 16.dp),
         ) {
             StepHeader(step = ui.step)
-            when (ui.step) {
-                1 -> StepPickApp(
-                    ui = ui,
-                    onSelect = viewModel::selectApp,
-                    onNext = viewModel::nextStep,
-                    onOpenSetup = onOpenSetup,
-                )
+            val direction = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
+            val travel = with(LocalDensity.current) { 24.dp.roundToPx() } * direction
+            AnimatedContent(
+                targetState = ui,
+                modifier = Modifier.weight(1f),
+                transitionSpec = { SleuthMotion.swap(if (targetState.step > initialState.step) travel else -travel) },
+                contentKey = { it.step },
+                label = "reportStep",
+            ) { page ->
+                Column(Modifier.fillMaxSize()) {
+                    when (page.step) {
+                        1 -> StepPickApp(
+                            ui = page,
+                            onSelect = viewModel::selectApp,
+                            onNext = viewModel::nextStep,
+                            onOpenSetup = onOpenSetup,
+                        )
 
-                2 -> StepReproduce(
-                    ui = ui,
-                    onBack = viewModel::prevStep,
-                    onStart = viewModel::startRecording,
-                    onStopShare = viewModel::stopRecording,
-                    onOpenSetup = onOpenSetup,
-                    onOpenStream = onOpenStream,
-                    onOpenTarget = {
-                        if (!viewModel.openTarget()) scope.launch { snackbar.showSnackbar(launchFailedMsg) }
-                    },
-                )
+                        2 -> StepReproduce(
+                            ui = page,
+                            onBack = viewModel::prevStep,
+                            onStart = viewModel::startRecording,
+                            onStopShare = viewModel::stopRecording,
+                            onOpenSetup = onOpenSetup,
+                            onOpenStream = onOpenStream,
+                            onOpenTarget = {
+                                if (!viewModel.openTarget()) scope.launch { snackbar.showSnackbar(launchFailedMsg) }
+                            },
+                        )
 
-                else -> ui.finishedSession?.let { session ->
-                    StepShare(
-                        lineCount = session.lineCount,
-                        crashApp = ui.crashCaught,
-                        exporting = ui.exporting,
-                        onPreview = { onPreviewSession(session.id) },
-                        onShare = { format ->
-                            viewModel.share(format) { result ->
-                                result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
-                            }
-                        },
-                        onKeep = {
-                            viewModel.finishReport()
-                            onOpenSessions()
-                        },
-                    )
+                        else -> page.finishedSession?.let { session ->
+                            StepShare(
+                                lineCount = session.lineCount,
+                                crashApp = page.crashCaught,
+                                exporting = page.exporting,
+                                onPreview = { onPreviewSession(session.id) },
+                                onShare = { format ->
+                                    viewModel.share(format) { result ->
+                                        result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
+                                    }
+                                },
+                                onKeep = {
+                                    viewModel.finishReport()
+                                    onOpenSessions()
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

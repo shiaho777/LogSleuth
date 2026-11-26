@@ -2,10 +2,6 @@ package io.github.shiaho777.logsleuth.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
@@ -27,7 +23,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,6 +57,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.shiaho777.logsleuth.app.R
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMotion
 import io.github.shiaho777.logsleuth.app.core.apps.AppChoice
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.filter.andAbove
@@ -273,8 +269,8 @@ fun FilterBar(
 
             AnimatedVisibility(
                 visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
+                enter = SleuthMotion.expand(),
+                exit = SleuthMotion.collapse(),
             ) {
                 Column(
                     Modifier.tourTarget("filterFields"),
@@ -523,7 +519,7 @@ private fun FilterTextField(
 @Composable
 private fun SavePresetDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
-    AlertDialog(
+    SpringAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.filter_save_preset)) },
         text = {
@@ -534,14 +530,17 @@ private fun SavePresetDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
                 singleLine = true,
             )
         },
-        confirmButton = {
+        confirmButton = { close ->
             TextButton(
-                onClick = { if (name.isNotBlank()) onSave(name.trim()) },
+                onClick = {
+                    val preset = name.trim()
+                    if (preset.isNotEmpty()) close { onSave(preset) }
+                },
                 enabled = name.isNotBlank(),
             ) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        dismissButton = { close ->
+            TextButton(onClick = { close(onDismiss) }) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -560,10 +559,10 @@ internal fun AppPickerDialog(
             it.label.contains(search, true) || it.packageName.contains(search, true)
         }
     }
-    AlertDialog(
+    SpringAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.app_filter_title)) },
-        text = {
+        text = { close ->
             Column {
                 OutlinedTextField(
                     value = search,
@@ -594,7 +593,7 @@ internal fun AppPickerDialog(
                                     )
                                 }
                             },
-                            modifier = Modifier.clickable { onSelect(null) },
+                            modifier = Modifier.clickable { close { onSelect(null) } },
                         )
                     }
                     items(shown.size, key = { shown[it].packageName }) { i ->
@@ -632,15 +631,15 @@ internal fun AppPickerDialog(
                                 }
                             },
                             modifier = Modifier
-                                .clickable { onSelect(app.packageName) }
+                                .clickable { close { onSelect(app.packageName) } }
                                 .animateItem(),
                         )
                     }
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        confirmButton = { close ->
+            TextButton(onClick = { close(onDismiss) }) { Text(stringResource(R.string.close)) }
         },
     )
 }
