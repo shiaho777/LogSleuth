@@ -269,15 +269,6 @@ internal class LogListPipeline(
         all.map { it.entry } + pending
     }
 
-    /** Stable row ids matching [query] in tag or message. */
-    suspend fun hits(query: String, ignoreCase: Boolean): List<Long> = mutex.withLock {
-        if (query.isBlank()) return@withLock emptyList()
-        visible.mapNotNull { row ->
-            val e = row.entry
-            if (e.tag.contains(query, ignoreCase) || e.message.contains(query, ignoreCase)) row.seq else null
-        }
-    }
-
     private fun evictAndCountLocked(): Int {
         val before = visible.size
         evictOverflow(all, visible, cap)

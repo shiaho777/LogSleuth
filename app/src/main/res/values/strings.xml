@@ -26,6 +26,7 @@
     <string name="setup_recheck">I ran it — re-check</string>
     <string name="setup_adb_granted">READ_LOGS granted</string>
     <string name="setup_skip">Continue without log access</string>
+    <string name="setup_continue">Open live logs</string>
 
     <!-- Stream -->
     <string name="pause">Pause</string>
@@ -33,6 +34,10 @@
     <string name="clear">Clear</string>
     <string name="search_hint">Search logs…</string>
     <string name="search_clear">Clear search</string>
+    <string name="search_pending">Searching…</string>
+    <string name="search_no_hits">No matches</string>
+    <string name="search_position">%1$d / %2$d</string>
+    <string name="search_position_accessible">Match %1$d of %2$d</string>
     <string name="record_start">Start recording</string>
     <string name="record_stop">Stop recording</string>
     <string name="scroll_bottom">Scroll to bottom</string>
@@ -42,7 +47,7 @@
     <string name="scrollbar_total">%1$s lines</string>
     <string name="empty_logs">No log lines yet. New entries will appear here in real time.</string>
     <string name="empty_logs_waiting">Waiting for logs.</string>
-    <string name="empty_logs_filtered">The active filters hide every line. Relax the filter to see the stream.</string>
+    <string name="empty_logs_filtered">No logs match the current filters</string>
     <string name="no_access_title">No log access yet</string>
     <string name="no_access_action">Set up log access</string>
 
@@ -78,7 +83,7 @@
 
     <!-- Sessions -->
     <string name="sessions_title">Sessions</string>
-    <string name="sessions_empty">No recordings yet. Tap the record button on the stream screen, or use the quick-settings tile.</string>
+    <string name="sessions_empty">No saved sessions yet</string>
     <string name="session_file_missing">The log file for this session is missing.</string>
     <string name="tab_logs">Logs (%1$d)</string>
     <string name="tab_crashes">Crashes (%1$d)</string>
@@ -278,7 +283,7 @@
     <string name="tour_bubble_title">Floating bubble</string>
     <string name="tour_bubble_desc">Keep an eye on crashes while using other apps — a system-wide bubble shows a live indicator.</string>
     <string name="tour_scope_title">Clear &amp; save</string>
-    <string name="tour_scope_desc">Wipe the buffer or snapshot it into a session — either for everything, or just the apps you pick. Watch it open next.</string>
+    <string name="tour_scope_desc">Save a snapshot here, or clear the buffer from More. Both let you select which apps are included.</string>
     <string name="tour_scope_demo_desc">The scope picker opened by itself — All, or per-app with live log stats on the right.</string>
     <string name="tour_scope_demo_caption">Guided tour %1$d/%2$d · live demo — tap outside the dialog to continue</string>
     <string name="tour_select_title">Multi-select</string>
@@ -488,7 +493,6 @@
     <string name="log_source_remote_unavailable">Remote device unavailable</string>
     <string name="recording_source_changed">Recording ended because the log source changed.</string>
     <string name="recording_gap_count">Log entries unavailable: %1$d</string>
-    <string name="setup_continue">Open live logs</string>
     <string name="welcome_example">Open sample report</string>
     <string name="welcome_import">Import a log file</string>
     <string name="welcome_capture">Capture device logs</string>
@@ -515,10 +519,26 @@
     <string name="report_share_zip">Share ZIP</string>
     <string name="report_share_txt">Share TXT</string>
     <string name="report_exporting">Preparing export…</string>
+    <string name="sessions_search">Search sessions</string>
+    <string name="sessions_no_matches">No sessions match your search.</string>
+    <string name="bookmark_jump">Jump to nearby logs</string>
+    <string name="bookmark_unavailable">No visible timestamped logs for this bookmark.</string>
     <string name="report_open_target">Open target app</string>
     <string name="report_open_target_failed">Could not open the app. You can switch to it manually.</string>
     <string name="report_phase_app">App</string>
     <string name="report_phase_record">Record</string>
     <string name="report_phase_report">Report</string>
     <string name="report_reproduce_on_device">Reproduce the problem on the connected device.</string>
+    <string name="entry_message">Message</string>
+    <string name="entry_raw">Raw log</string>
+    <string name="sessions_category_all">All</string>
+    <string name="sessions_category_captured">Captured</string>
+    <string name="sessions_category_imported">Imported</string>
+    <string name="sessions_category_example">Example</string>
+    <string name="filter_include_short">Include</string>
+    <string name="filter_field_value">%1$s · %2$s</string>
+    <string name="filter_clear_field">Clear %1$s filter, %2$s</string>
+    <string name="filter_state_expanded">Expanded</string>
+    <string name="filter_state_collapsed">Collapsed</string>
+    <string name="filter_clear_active">Reset current filter</string>
 </resources>

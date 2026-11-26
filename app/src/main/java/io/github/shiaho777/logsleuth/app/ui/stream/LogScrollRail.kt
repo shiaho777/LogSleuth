@@ -32,7 +32,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -144,10 +148,10 @@ internal fun LogScrollRail(
 
     // Recompute only when the scroll position actually changes: reading
     // layoutInfo in composition on every frame would be wasteful.
-    val liveProgress by remember {
+    val liveProgress = remember(listState) {
         derivedStateOf { viewportProgress(listState) }
     }
-    val progress = if (scrubbing) scrubProgress else liveProgress
+    fun progress() = if (scrubbing) scrubProgress else liveProgress.value
 
     val bucketCount = with(density) {
         if (railHeight <= 0f) 0 else (railHeight / BandStep.toPx()).toInt().coerceIn(1, 400)
@@ -176,11 +180,11 @@ internal fun LogScrollRail(
     val thumbNow = rememberUpdatedState(thumbPx)
     val totalNow = rememberUpdatedState(total)
 
-    val thumbExtra by animateDpAsState(
+    val thumbExtra = animateDpAsState(
         targetValue = if (scrubbing) ScrubGrow else 0.dp,
         label = "railThumbGrow",
     )
-    val footAlpha by animateFloatAsState(
+    val footAlpha = animateFloatAsState(
         targetValue = if (pillVisible) 0f else 1f,
         label = "railFootAlpha",
     )
@@ -205,7 +209,7 @@ internal fun LogScrollRail(
                 // Nothing to announce when the whole buffer already fits.
                 if (scrollable) {
                     contentDescription = description
-                    progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
+                    progressBarRangeInfo = ProgressBarRangeInfo(progress(), 0f..1f)
                 }
             },
     ) {
@@ -263,47 +267,42 @@ internal fun LogScrollRail(
                         scrubbing = false
                         hidePillSoon()
                     }
-                },
-        ) {
-            val strip = StripWidth.toPx()
-            val stripX = (size.width - strip) / 2f
-            drawRoundRect(
-                color = trackColor,
-                topLeft = Offset(stripX, 0f),
-                size = Size(strip, size.height),
-                cornerRadius = CornerRadius(strip / 2f),
-            )
-
-            // Severity fingerprint: one band per slice of the buffer. The
-            // highest level wins, so a single error is not lost among info.
-            if (buckets.isNotEmpty()) {
-                val bars = buckets.size
-                val railPx = size.height.toInt()
-                var top = 0
-                for (i in 0 until bars) {
-                    // Both edges snapped to whole pixels. Sharing the exact
-                    // edge with the next band is what stops hairline gaps from
-                    // showing between two translucent bands.
-                    val bottom = ((i + 1).toLong() * railPx / bars).toInt()
-                    if (bottom > top) {
+                }
+                .drawWithCache {
+                    val strip = StripWidth.toPx()
+                    val stripX = (size.width - strip) / 2f
+                    val bars = buckets.size
+                    val railPx = size.height.toInt()
+                    val paths = mutableMapOf<Int, Path>()
+                    var top = 0
+                    for (i in 0 until bars) {
+                        val bottom = ((i + 1).toLong() * railPx / bars).toInt()
                         val priority = buckets[i]
-                        if (priority > 0) {
-                            drawRect(
-                                color = colorForPriority(priority, levelPalette).copy(alpha = 0.5f),
-                                topLeft = Offset(stripX, top.toFloat()),
-                                size = Size(strip, (bottom - top).toFloat()),
-                            )
+                        if (bottom > top && priority > 0) {
+                            paths.getOrPut(priority) { Path() }
+                                .addRect(Rect(stripX, top.toFloat(), stripX + strip, bottom.toFloat()))
                         }
                         top = bottom
                     }
-                }
-            }
-
+                    val bands = paths.map { (priority, path) ->
+                        path to colorForPriority(priority, levelPalette).copy(alpha = 0.5f)
+                    }
+                    onDrawBehind {
+                        drawRoundRect(
+                            color = trackColor,
+                            topLeft = Offset(stripX, 0f),
+                            size = Size(strip, size.height),
+                            cornerRadius = CornerRadius(strip / 2f),
+                        )
+                        bands.forEach { (path, color) -> drawPath(path, color) }
+                    }
+                },
+        ) {
             if (scrollable && size.height > 0f) {
-                val top = ScrollRailMath.thumbTop(size.height, thumbPx, progress)
+                val top = ScrollRailMath.thumbTop(size.height, thumbPx, progress())
                 // Wider than the track, so the grip is visible at a glance
                 // even where the fingerprint underneath is the same colour.
-                val width = strip + 2 * ThumbOverhang.toPx() + thumbExtra.toPx()
+                val width = StripWidth.toPx() + 2 * ThumbOverhang.toPx() + thumbExtra.value.toPx()
                 val left = (size.width - width) / 2f
                 val border = 1.dp.toPx()
                 val innerWidth = (width - border * 2).coerceAtLeast(1f)
@@ -329,12 +328,12 @@ internal fun LogScrollRail(
         // It is a solid chip, not loose text — over live log lines bare glyphs
         // read as a rendering glitch. It steps aside while the pill is up so
         // two numbers never compete.
-        if (scrollable && total > 0 && footAlpha > 0.01f) {
+        if (scrollable && total > 0) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = RailWidth + 6.dp, bottom = 6.dp)
-                    .alpha(footAlpha),
+                    .graphicsLayer { alpha = footAlpha.value },
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -350,7 +349,7 @@ internal fun LogScrollRail(
         }
 
         if (pillVisible && total > 0 && railHeight > 0f) {
-            val shown = if (scrubbing) scrubProgress else progress
+            val shown = progress()
             val index = ScrollRailMath.indexForProgress(shown, total)
             val thumbTop = ScrollRailMath.thumbTop(railHeight, thumbPx, shown)
             val pillHeight = with(density) { 54.dp.toPx() }

@@ -72,11 +72,14 @@ import io.github.shiaho777.logsleuth.app.ui.components.LocalLogRowPrefs
 import io.github.shiaho777.logsleuth.app.core.apps.AppLogGroup
 import io.github.shiaho777.logsleuth.app.core.filter.LogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
+import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.ui.components.EmptyFilterActions
 import io.github.shiaho777.logsleuth.app.ui.components.EmptyState
 import io.github.shiaho777.logsleuth.app.ui.components.FilterBar
 import io.github.shiaho777.logsleuth.app.ui.guide.LocalTourController
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
 import io.github.shiaho777.logsleuth.app.ui.filters.FilterEditorDialog
+import io.github.shiaho777.logsleuth.app.ui.components.LogEntryDetail
 import io.github.shiaho777.logsleuth.app.ui.components.LogRow
 import io.github.shiaho777.logsleuth.app.ui.components.LogScopeDialog
 import io.github.shiaho777.logsleuth.app.ui.components.NoAccessState
@@ -119,6 +122,7 @@ fun StreamScreen(
     // "Create a filter from this line" opens the editor prefilled, so the
     // user can drop fields before saving instead of getting a fixed rule.
     var filterDraft by remember { mutableStateOf<LogFilter?>(null) }
+    var detailEntry by remember { mutableStateOf<LogcatEntry?>(null) }
     val selecting = selAnchor >= 0L
     val selectingNow by rememberUpdatedState(selecting)
     LaunchedEffect(ui.remoteEndpoint) {
@@ -306,6 +310,10 @@ fun StreamScreen(
         }
     }
 
+    val startRecordingFailed = stringResource(R.string.recording_start_failed)
+    val stopRecordingFailed = stringResource(R.string.report_stop_failed)
+    BackHandler(enabled = ui.searching) { viewModel.setSearching(false) }
+
     // Back first dismisses an active selection.
     BackHandler(enabled = selecting) {
         selAnchor = -1L
@@ -320,6 +328,7 @@ fun StreamScreen(
                         query = ui.searchQuery,
                         hits = ui.searchHits.size,
                         hitIndex = ui.searchHitIndex,
+                        pending = ui.searchPending,
                         caseSensitive = ui.searchCaseSensitive,
                         onQueryChange = viewModel::setSearchQuery,
                         onCaseSensitiveChange = viewModel::setSearchCaseSensitive,
@@ -332,6 +341,13 @@ fun StreamScreen(
                 StreamTopBar(
                     paused = ui.paused,
                     bubbleEnabled = ui.bubbleEnabled,
+                    recording = ui.recording.isRecording,
+                    canRecord = ui.access?.granted == true,
+                    onStartRecording = {
+                        if (!viewModel.startRecording()) {
+                            scope.launch { snackbar.showSnackbar(startRecordingFailed) }
+                        }
+                    },
                     onPauseToggle = {
                         haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
                         viewModel.setPaused(!ui.paused)
@@ -381,7 +397,11 @@ fun StreamScreen(
                     missedEntries = ui.recording.missedEntries,
                     paused = ui.recording.paused,
                     onPause = viewModel::toggleRecordingPause,
-                    onStop = viewModel::toggleRecording,
+                    onStop = {
+                        if (!viewModel.stopRecording()) {
+                            scope.launch { snackbar.showSnackbar(stopRecordingFailed) }
+                        }
+                    },
                 )
             }
 
@@ -423,6 +443,13 @@ fun StreamScreen(
                     onManageFilters = { onNavigate(Routes.FILTERS) },
                 )
             }
+
+            EngineStatusChip(
+                state = ui.engineState,
+                adbHeld = ui.adbHeld,
+                modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 5.dp)
+                    .tourTarget("engineStatus"),
+            )
 
             StreamListPane(
                 ui = ui,
@@ -485,9 +512,10 @@ fun StreamScreen(
                         }
                     }
                 },
-                onMakeFilter = { filterDraft = viewModel.draftFilterFromLine(it) },
+                onOpenDetail = { detailEntry = it },
                 onOpenSetup = { onNavigate(Routes.SETUP) },
                 onDisableRules = viewModel::disableEnabledRules,
+                onResetFilter = { viewModel.setFilter(LogFilter.DEFAULT) },
                 onRestartLogging = viewModel::restartLogging,
                 rulesActive = ui.presets.any { it.enabled },
                 snackbar = snackbar,
@@ -512,11 +540,10 @@ fun StreamScreen(
         }
     }
 
-    // Search-hit jumping. Leave the tail so the pin does not yank back.
-    LaunchedEffect(ui.searchHitIndex) {
-        // Hits are seqs: a ring-buffer trim shifts list positions, not ids.
-        val targetSeq = ui.searchHits.getOrNull(ui.searchHitIndex) ?: return@LaunchedEffect
-        val target = parkedIndex(viewModel.entries, targetSeq)
+    val selectedSearchHit = ui.searchHits.getOrNull(ui.searchHitIndex)
+    LaunchedEffect(selectedSearchHit) {
+        val rowId = selectedSearchHit ?: return@LaunchedEffect
+        val target = viewModel.entries.binarySearchBy(rowId) { it.seq }
         if (target < 0) return@LaunchedEffect
         parkAt(target, 0)
         listState.scrollToItem(target)
@@ -596,12 +623,24 @@ fun StreamScreen(
             session = session,
             backfill = ui.finishedBackfill,
             isSnapshot = ui.finishedSnapshot,
+            onOpenSession = {
+                viewModel.dismissFinishedSession()
+                onNavigate(Routes.sessionDetail(session.id))
+            },
             onShare = { format ->
                 viewModel.shareFinishedSession(format) { result ->
                     result.onFailure { scope.launch { snackbar.showSnackbar(shareFailedMsg) } }
                 }
             },
             onDismiss = viewModel::dismissFinishedSession,
+        )
+    }
+
+    detailEntry?.let { entry ->
+        LogEntryDetail(
+            entry = entry,
+            onDismiss = { detailEntry = null },
+            onMakeFilter = { filterDraft = viewModel.draftFilterFromLine(it) },
         )
     }
 
@@ -673,9 +712,10 @@ private fun StreamListPane(
     onSaveSelection: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
     onCopy: (String) -> Unit,
     onCopyTooLarge: (List<io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry>) -> Unit,
-    onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit,
+    onOpenDetail: (LogcatEntry) -> Unit,
     onOpenSetup: () -> Unit,
     onDisableRules: () -> Unit,
+    onResetFilter: () -> Unit,
     onRestartLogging: () -> Unit,
     rulesActive: Boolean,
     snackbar: SnackbarHostState,
@@ -739,12 +779,8 @@ private fun StreamListPane(
                     else -> stringResource(R.string.empty_logs)
                 },
                 action = when {
-                    ui.filteredOut && rulesActive -> {
-                        {
-                            TextButton(onClick = onDisableRules) {
-                                Text(stringResource(R.string.filter_rules_clear))
-                            }
-                        }
+                    ui.filteredOut && (ui.filter.hasConstraint || rulesActive) -> {
+                        { EmptyFilterActions(ui.filter.hasConstraint, rulesActive, onResetFilter, onDisableRules) }
                     }
                     // The engine reconnects on its own; a wedged stream needs
                     // a manual kick that keeps the resume stamp, so the ring
@@ -768,23 +804,12 @@ private fun StreamListPane(
                 selEnd = selEnd,
                 onSelectStart = onSelectStart,
                 onSelectExtend = onSelectExtend,
-                onMakeFilter = onMakeFilter,
+                onOpenDetail = onOpenDetail,
                 snackbar = snackbar,
                 onUserTouch = onUserTouch,
                 onUserDrag = onUserDrag,
             )
         }
-
-        EngineStatusChip(
-            state = ui.engineState,
-            adbHeld = ui.adbHeld,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                // Clear of the progress rail on the right edge.
-                .padding(end = 26.dp)
-                .tourTarget("engineStatus"),
-        )
 
         LogScrollRail(
             entries = entries,
@@ -834,7 +859,7 @@ private fun LogList(
     selEnd: Long,
     onSelectStart: (Long) -> Unit,
     onSelectExtend: (Long) -> Unit,
-    onMakeFilter: (io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry) -> Unit = {},
+    onOpenDetail: (LogcatEntry) -> Unit,
     onUserTouch: (Boolean) -> Unit = {},
     onUserDrag: (Float) -> Unit = {},
 ) {
@@ -902,7 +927,7 @@ private fun LogList(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onSelectStart(uiEntry.seq)
                 },
-                onMakeFilter = onMakeFilter,
+                onOpenDetail = onOpenDetail,
             )
         }
     }

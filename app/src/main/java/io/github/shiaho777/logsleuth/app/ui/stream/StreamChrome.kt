@@ -1,10 +1,6 @@
 package io.github.shiaho777.logsleuth.app.ui.stream
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,8 +8,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,12 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Clear
@@ -46,23 +39,23 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,19 +64,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.shiaho777.logsleuth.app.R
 import io.github.shiaho777.logsleuth.app.core.export.SessionExporter
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.data.db.SessionEntity
+import io.github.shiaho777.logsleuth.app.ui.components.SearchInputBar
 import io.github.shiaho777.logsleuth.app.ui.guide.tourTarget
+import io.github.shiaho777.logsleuth.app.ui.theme.InstrumentTopBar
 import io.github.shiaho777.logsleuth.app.ui.theme.LocalLevelColors
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthGraphic
+import io.github.shiaho777.logsleuth.app.ui.theme.SleuthMark
 
 /**
  * Presentational chrome around the live list: top bars, status banners, the
@@ -200,20 +196,10 @@ internal fun EngineStatusChip(
         state == LogcatEngine.State.STOPPED -> stringResource(R.string.engine_stopped) to levels.V
         else -> stringResource(R.string.engine_error) to levels.E
     }
-    val dotAlpha by if (state == LogcatEngine.State.STARTING) {
-        rememberInfiniteTransition(label = "engine").animateFloat(
-            initialValue = 0.3f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-            label = "engineDot",
-        )
-    } else {
-        remember { mutableStateOf(1f) }
-    }
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.small,
-        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier,
     ) {
         Row(
@@ -224,7 +210,7 @@ internal fun EngineStatusChip(
                 Modifier
                     .size(7.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = dotAlpha)),
+                    .background(color),
             )
             Spacer(Modifier.size(5.dp))
             Text(label, style = MaterialTheme.typography.labelSmall)
@@ -237,6 +223,9 @@ internal fun EngineStatusChip(
 internal fun StreamTopBar(
     paused: Boolean,
     bubbleEnabled: Boolean,
+    recording: Boolean,
+    canRecord: Boolean,
+    onStartRecording: () -> Unit,
     onPauseToggle: () -> Unit,
     onSearch: () -> Unit,
     onBubbleToggle: () -> Unit,
@@ -244,16 +233,19 @@ internal fun StreamTopBar(
     onSave: () -> Unit,
     onRestart: () -> Unit,
 ) {
-    TopAppBar(
+    InstrumentTopBar(
         title = {
-            Text(
-                stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SleuthMark(Modifier.size(36.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
         actions = {
             IconButton(onClick = onPauseToggle, modifier = Modifier.tourTarget("pause")) {
                 Icon(
@@ -280,21 +272,8 @@ internal fun StreamTopBar(
                     },
                 )
             }
-            Row(Modifier.tourTarget("scopeActions")) {
-                IconButton(onClick = onClear) {
-                    Icon(
-                        Icons.Default.Clear,
-                        contentDescription = stringResource(R.string.clear),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onSave) {
-                    Icon(
-                        Icons.Default.Save,
-                        contentDescription = stringResource(R.string.save_to_session),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            IconButton(onClick = onSave, modifier = Modifier.tourTarget("scopeActions")) {
+                Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save_to_session))
             }
             // Overflow: the engine reconnects on its own, so a manual restart
             // is only for a stream that looks wedged. It keeps the resume
@@ -312,6 +291,25 @@ internal fun StreamTopBar(
                     expanded = more,
                     onDismissRequest = { more = false },
                 ) {
+                    if (!recording) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.report_start_recording)) },
+                            enabled = canRecord,
+                            leadingIcon = { Icon(Icons.Default.FiberManualRecord, contentDescription = null) },
+                            onClick = {
+                                more = false
+                                onStartRecording()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.clear)) },
+                        leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null) },
+                        onClick = {
+                            more = false
+                            onClear()
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.restart_logging)) },
                         onClick = {
@@ -325,20 +323,12 @@ internal fun StreamTopBar(
     )
 }
 
-/**
- * Search mode's top bar.
- *
- * The query, the hit counter and the prev/next steppers live inside one
- * filled pill; only the case toggle and the close button sit outside it. Four
- * 48dp buttons sharing the row with a stock [TextField] used to squeeze the
- * query down to a couple of characters and left the field with a hard outline
- * that read as a form control, not as search.
- */
 @Composable
 internal fun SearchTopBar(
     query: String,
     hits: Int,
     hitIndex: Int,
+    pending: Boolean,
     caseSensitive: Boolean,
     onQueryChange: (String) -> Unit,
     onCaseSensitiveChange: (Boolean) -> Unit,
@@ -346,145 +336,73 @@ internal fun SearchTopBar(
     onNext: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val colors = MaterialTheme.colorScheme
+    val caseLabel = stringResource(R.string.search_case_sensitive)
+    val previousLabel = stringResource(R.string.search_prev)
+    val nextLabel = stringResource(R.string.search_next)
+    val canNavigate = !pending && hits > 0
 
-    val counter = when {
-        query.isEmpty() -> ""
-        hits <= 0 -> "0/0"
-        else -> "${hitIndex + 1}/$hits"
-    }
-
-    Surface(color = MaterialTheme.colorScheme.surface) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Surface(color = colors.surface) {
+        Column(
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp),
         ) {
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            SearchInputBar(query, stringResource(R.string.search_hint), onQueryChange, onClose)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(start = 14.dp, end = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                IconToggleButton(
+                    checked = caseSensitive,
+                    onCheckedChange = onCaseSensitiveChange,
+                    modifier = Modifier.semantics { contentDescription = caseLabel },
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        Icons.Default.TextFields,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    BasicTextField(
-                        value = query,
-                        onValueChange = onQueryChange,
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { if (hits > 0) onNext() }),
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 10.dp)
-                            .focusRequester(focusRequester),
-                        decorationBox = { field ->
-                            Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) {
-                                    Text(
-                                        text = stringResource(R.string.search_hint),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        // Clear of the caret, which sits at x=0
-                                        // while the field is empty and focused.
-                                        modifier = Modifier.padding(start = 3.dp),
-                                    )
-                                }
-                                field()
-                            }
-                        },
-                    )
-                    if (counter.isNotEmpty()) {
-                        Text(
-                            text = counter,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            // Fixed slot: the pills must not resize per hit.
-                            modifier = Modifier.padding(start = 2.dp, end = 4.dp),
-                        )
-                    }
-                    if (query.isNotEmpty()) {
-                        PillIconButton(
-                            onClick = { onQueryChange("") },
-                            contentDescription = stringResource(R.string.search_clear),
-                            icon = Icons.Default.Close,
-                        )
-                    }
-                    PillIconButton(
-                        onClick = onPrev,
-                        enabled = hits > 0,
-                        contentDescription = stringResource(R.string.search_prev),
-                        icon = Icons.Default.KeyboardArrowUp,
-                    )
-                    PillIconButton(
-                        onClick = onNext,
-                        enabled = hits > 0,
-                        contentDescription = stringResource(R.string.search_next),
-                        icon = Icons.Default.KeyboardArrowDown,
+                        tint = if (caseSensitive) colors.primary else colors.onSurfaceVariant,
                     )
                 }
+                Box(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                    when {
+                        query.isBlank() -> Unit
+                        pending -> Text(
+                            stringResource(R.string.search_pending),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSurfaceVariant,
+                        )
+                        hits == 0 -> Text(
+                            stringResource(R.string.search_no_hits),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSurfaceVariant,
+                        )
+                        else -> {
+                            val description = stringResource(R.string.search_position_accessible, hitIndex + 1, hits)
+                            Text(
+                                stringResource(R.string.search_position, hitIndex + 1, hits),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.onSurfaceVariant,
+                                modifier = Modifier.clearAndSetSemantics { contentDescription = description },
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = onPrev,
+                    enabled = canNavigate,
+                    modifier = Modifier.semantics { contentDescription = previousLabel },
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
+                }
+                IconButton(
+                    onClick = onNext,
+                    enabled = canNavigate,
+                    modifier = Modifier.semantics { contentDescription = nextLabel },
+                ) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+                }
             }
-            IconButton(onClick = { onCaseSensitiveChange(!caseSensitive) }) {
-                Icon(
-                    imageVector = Icons.Default.TextFields,
-                    contentDescription = stringResource(R.string.search_case_sensitive),
-                    tint = if (caseSensitive) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-            IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-            }
+            HorizontalDivider(color = colors.outlineVariant)
         }
-    }
-}
-
-/**
- * Icon button sized to the pill it sits in. [IconButton] enforces a 48dp
- * minimum touch target, which no longer fits once three of them share a 48dp
- * tall bar with the query.
- */
-@Composable
-private fun PillIconButton(
-    onClick: () -> Unit,
-    contentDescription: String,
-    icon: ImageVector,
-    enabled: Boolean = true,
-) {
-    val tint = MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(18.dp),
-            tint = if (enabled) tint else tint.copy(alpha = 0.38f),
-        )
     }
 }
 
@@ -655,13 +573,13 @@ internal fun PausedBanner(incoming: Int, onResume: () -> Unit) {
     }
 }
 
-/** Bottom sheet shown right after a recording stops — one-tap share. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RecordingSavedSheet(
     session: SessionEntity,
     backfill: Long,
     isSnapshot: Boolean = false,
+    onOpenSession: () -> Unit,
     onShare: (SessionExporter.Format) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -672,42 +590,45 @@ internal fun RecordingSavedSheet(
                 .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                Icons.Default.FiberManualRecord,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp),
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(
-                    if (isSnapshot) R.string.snapshot_saved else R.string.recording_saved,
-                ),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                if (backfill > 0) {
-                    stringResource(
-                        R.string.recording_saved_lines_context,
-                        session.lineCount,
-                        backfill,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SleuthGraphic(R.drawable.sleuth_report, Modifier.size(48.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(if (isSnapshot) R.string.snapshot_saved else R.string.recording_saved),
+                        style = MaterialTheme.typography.titleMedium,
                     )
-                } else {
-                    stringResource(R.string.recording_saved_lines, session.lineCount)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
+                    Text(
+                        if (backfill > 0) {
+                            stringResource(R.string.recording_saved_lines_context, session.lineCount, backfill)
+                        } else {
+                            stringResource(R.string.recording_saved_lines, session.lineCount)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Button(onClick = onOpenSession, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Description, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.report_preview))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
                     onClick = { onShare(SessionExporter.Format.ZIP) },
                     modifier = Modifier.weight(1f),
-                ) { Text("ZIP") }
+                ) { Text(stringResource(R.string.report_share_zip)) }
                 OutlinedButton(
                     onClick = { onShare(SessionExporter.Format.TXT) },
                     modifier = Modifier.weight(1f),
-                ) { Text("TXT") }
+                ) { Text(stringResource(R.string.report_share_txt)) }
             }
             TextButton(onClick = onDismiss, modifier = Modifier.padding(top = 8.dp)) {
                 Text(stringResource(R.string.later))

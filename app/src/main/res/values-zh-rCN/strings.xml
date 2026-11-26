@@ -26,6 +26,7 @@
     <string name="setup_recheck">我已执行,重新检测</string>
     <string name="setup_adb_granted">已授予 READ_LOGS</string>
     <string name="setup_skip">继续，无需日志权限</string>
+    <string name="setup_continue">打开实时日志</string>
 
     <!-- 实时流 -->
     <string name="pause">暂停</string>
@@ -33,6 +34,10 @@
     <string name="clear">清空</string>
     <string name="search_hint">搜索日志…</string>
     <string name="search_clear">清除搜索</string>
+    <string name="search_pending">正在搜索…</string>
+    <string name="search_no_hits">无匹配项</string>
+    <string name="search_position">%1$d / %2$d</string>
+    <string name="search_position_accessible">第 %1$d 项，共 %2$d 项</string>
     <string name="record_start">开始录制</string>
     <string name="record_stop">停止录制</string>
     <string name="scroll_bottom">回到底部</string>
@@ -42,7 +47,7 @@
     <string name="scrollbar_total">共 %1$s 行</string>
     <string name="empty_logs">还没有日志。新日志会实时出现在这里。</string>
     <string name="empty_logs_waiting">正在等待日志。</string>
-    <string name="empty_logs_filtered">当前过滤器把所有行都挡掉了。放宽过滤才能看到日志。</string>
+    <string name="empty_logs_filtered">没有符合筛选条件的日志</string>
     <string name="no_access_title">还没有日志访问权限</string>
     <string name="no_access_action">设置日志权限</string>
 
@@ -77,8 +82,8 @@
     <string name="level_assert">Assert</string>
 
     <!-- 会话 -->
-    <string name="sessions_title">录制会话</string>
-    <string name="sessions_empty">还没有录制。在日志流页点录制按钮,或用快捷设置磁贴。</string>
+    <string name="sessions_title">日志会话</string>
+    <string name="sessions_empty">暂无已保存的会话</string>
     <string name="session_file_missing">该会话的日志文件已丢失。</string>
     <string name="tab_logs">日志 (%1$d)</string>
     <string name="tab_crashes">崩溃 (%1$d)</string>
@@ -278,7 +283,7 @@
     <string name="tour_bubble_title">悬浮球</string>
     <string name="tour_bubble_desc">在其他应用里也能盯着崩溃——全局悬浮球会实时提示。</string>
     <string name="tour_scope_title">清理与保存</string>
-    <string name="tour_scope_desc">清空缓冲区，或把当前内容快照成会话——可全部操作，也可只选指定应用。下一步看实际效果。</string>
+    <string name="tour_scope_desc">在这里把日志保存为会话，或在更多菜单中清空缓冲区。两种操作都可以指定应用范围。</string>
     <string name="tour_scope_demo_desc">范围弹窗刚刚自己打开了——可选"全部"，或按应用查看右侧的日志统计。</string>
     <string name="tour_scope_demo_caption">使用引导 %1$d/%2$d · 演示中——点按弹窗外部继续</string>
     <string name="tour_select_title">多选模式</string>
@@ -488,7 +493,6 @@
     <string name="log_source_remote_unavailable">远程设备不可用</string>
     <string name="recording_source_changed">日志来源已切换，录制已结束。</string>
     <string name="recording_gap_count">缺失日志条数：%1$d</string>
-    <string name="setup_continue">打开实时日志</string>
     <string name="welcome_example">打开示例报告</string>
     <string name="welcome_import">导入日志文件</string>
     <string name="welcome_capture">采集设备日志</string>
@@ -515,10 +519,26 @@
     <string name="report_share_zip">分享 ZIP</string>
     <string name="report_share_txt">分享 TXT</string>
     <string name="report_exporting">正在准备导出…</string>
+    <string name="sessions_search">搜索会话</string>
+    <string name="sessions_no_matches">没有符合搜索条件的会话。</string>
+    <string name="bookmark_jump">跳到附近的日志</string>
+    <string name="bookmark_unavailable">当前没有可定位到此书签的带时间日志。</string>
     <string name="report_open_target">打开目标应用</string>
     <string name="report_open_target_failed">无法打开目标应用，可以手动切换过去。</string>
     <string name="report_phase_app">应用</string>
     <string name="report_phase_record">录制</string>
     <string name="report_phase_report">报告</string>
     <string name="report_reproduce_on_device">请在已连接的设备上复现问题。</string>
+    <string name="entry_message">消息</string>
+    <string name="entry_raw">原始日志</string>
+    <string name="sessions_category_all">全部</string>
+    <string name="sessions_category_captured">录制与快照</string>
+    <string name="sessions_category_imported">已导入</string>
+    <string name="sessions_category_example">示例</string>
+    <string name="filter_include_short">包含</string>
+    <string name="filter_field_value">%1$s · %2$s</string>
+    <string name="filter_clear_field">清除 %1$s 筛选，%2$s</string>
+    <string name="filter_state_expanded">已展开</string>
+    <string name="filter_state_collapsed">已收起</string>
+    <string name="filter_clear_active">重置当前筛选</string>
 </resources>

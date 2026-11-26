@@ -19,6 +19,8 @@ import io.github.shiaho777.logsleuth.app.data.db.toLogFilter
 import io.github.shiaho777.logsleuth.app.core.logcat.AccessState
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEngine
 import io.github.shiaho777.logsleuth.app.core.logcat.LogcatEntry
+import io.github.shiaho777.logsleuth.app.core.logcat.matchesLogSearch
+import io.github.shiaho777.logsleuth.app.core.logcat.retainedSearchHitIndex
 import io.github.shiaho777.logsleuth.app.data.db.FilterDao
 import io.github.shiaho777.logsleuth.app.data.prefs.SettingsRepository
 import io.github.shiaho777.logsleuth.app.service.RecordService
@@ -29,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +71,7 @@ data class StreamUiState(
      */
     val searchHits: List<Long> = emptyList(),
     val searchHitIndex: Int = -1,
+    val searchPending: Boolean = false,
     /** Session just finished — prompt the user to share it. */
     val finishedSession: io.github.shiaho777.logsleuth.app.data.db.SessionEntity? = null,
     /** [finishedSession] came from a save-to-session snapshot, not a recording. */
@@ -123,9 +127,9 @@ class StreamViewModel @Inject constructor(
     /** Edits queued by [pipeline], applied in that order on the main thread. */
     private val edits = Channel<ListEdit>(Channel.UNLIMITED)
 
-    /** Mirrors Settings.searchCaseSensitive. Default matches the old search. */
-    @Volatile
-    private var searchIgnoreCase = true
+    private var searchJob: Job? = null
+    private var searchRefreshRequested = false
+
     // Declared before init: SharedFlow emissions run on the emitter's
     // thread, so the collector below can touch these while init is still
     // running — a post-init declaration reads as null there (NPE crash).
@@ -147,24 +151,14 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settings.collect { s ->
                 pipeline.setCap(s.bufferSize)
-                val ignore = !s.searchCaseSensitive
-                val caseChanged = ignore != searchIgnoreCase
-                searchIgnoreCase = ignore
+                val caseChanged = s.searchCaseSensitive != _ui.value.searchCaseSensitive
                 _ui.update {
                     it.copy(
                         bubbleEnabled = s.bubbleEnabled,
                         searchCaseSensitive = s.searchCaseSensitive,
                     )
                 }
-                if (caseChanged) {
-                    val query = _ui.value.searchQuery
-                    if (query.isNotBlank()) {
-                        searchJob?.cancel()
-                        searchJob = viewModelScope.launch(Dispatchers.Default) {
-                            recomputeHits(query, resetIndex = true)
-                        }
-                    }
-                }
+                if (caseChanged) requestSearch(reset = true, delayMs = 0L)
             }
         }
         viewModelScope.launch { engine.access.collect { a -> _ui.update { it.copy(access = a) } } }
@@ -219,11 +213,10 @@ class StreamViewModel @Inject constructor(
                         snapshotSeq = snap.maxSeq
                         staged.clear()
                         _ui.update {
-                            it.copy(remoteEndpoint = endpoint, apps = apps, searchHits = emptyList(), searchHitIndex = -1)
+                            it.copy(remoteEndpoint = endpoint, apps = apps)
                         }
                         pipeline.snapshot(snap.entries, ::currentRules)
                     }
-                    refreshSearchHits()
                 }.collect { entry ->
                     if (entry.remoteEndpoint != endpoint || entry.seq <= snapshotSeq) return@collect
                     stagedMutex.withLock { staged.add(entry) }
@@ -242,13 +235,12 @@ class StreamViewModel @Inject constructor(
     }
 
     private suspend fun drainStaged() {
-        val changed = stagedMutex.withLock {
+        stagedMutex.withLock {
             if (staged.isEmpty()) return
             val batch = ArrayList(staged)
             staged.clear()
             pipeline.append(batch, ::currentRules)
         }
-        if (changed) refreshSearchHitsThrottled()
     }
 
     /** Main thread. [filteredOut] is written only when it changes. */
@@ -267,6 +259,7 @@ class StreamViewModel @Inject constructor(
         if (_ui.value.filteredOut != edit.filteredOut) {
             _ui.update { it.copy(filteredOut = edit.filteredOut) }
         }
+        requestSearch()
     }
 
     /**
@@ -300,7 +293,7 @@ class StreamViewModel @Inject constructor(
         } else {
             pipeline.markRunning()
             viewModelScope.launch(Dispatchers.Default) {
-                if (pipeline.flushPending(::currentRules)) refreshSearchHits()
+                pipeline.flushPending(::currentRules)
             }
         }
     }
@@ -312,7 +305,6 @@ class StreamViewModel @Inject constructor(
                 staged.clear()
                 pipeline.clear()
             }
-            _ui.update { it.copy(searchHits = emptyList(), searchHitIndex = -1) }
         }
     }
 
@@ -358,7 +350,6 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.Default) {
             stagedMutex.withLock { staged.removeAll { it.uid in uids } }
             pipeline.removeUids(uids, ::currentRules)
-            refreshSearchHits()
         }
     }
 
@@ -429,18 +420,29 @@ class StreamViewModel @Inject constructor(
 
     fun restartLogging() = engine.restart()
 
-    fun toggleRecording() {
-        val recording = _ui.value.recording.isRecording
-        if (recording) {
-            context.startService(
-                Intent(context, RecordService::class.java).setAction(RecordService.ACTION_STOP),
-            )
-        } else {
-            // Record what the user currently sees, filters included.
+    fun startRecording(): Boolean {
+        if (recordingManager.state.value.isRecording) return true
+        return try {
             androidx.core.content.ContextCompat.startForegroundService(
                 context,
                 RecordService.startIntent(context, _ui.value.filter),
             )
+            true
+        } catch (_: IllegalStateException) {
+            false
+        } catch (_: SecurityException) {
+            false
+        }
+    }
+
+    fun stopRecording(): Boolean {
+        val sessionId = recordingManager.state.value.sessionId ?: return true
+        return try {
+            context.startService(RecordService.stopRequested(context, sessionId)) != null
+        } catch (_: IllegalStateException) {
+            false
+        } catch (_: SecurityException) {
+            false
         }
     }
 
@@ -494,73 +496,70 @@ class StreamViewModel @Inject constructor(
         viewModelScope.launch { filterDao.delete(preset.toEntity()) }
     }
 
-    // Search
     fun setSearching(searching: Boolean) {
         searchJob?.cancel()
-        _ui.update { it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1) }
+        searchRefreshRequested = false
+        _ui.update { it.copy(searching = searching, searchQuery = "", searchHits = emptyList(), searchHitIndex = -1, searchPending = false) }
     }
 
-    private var searchJob: Job? = null
-
     fun setSearchQuery(query: String) {
-        _ui.update { it.copy(searchQuery = query) }
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch(Dispatchers.Default) {
-            delay(250)
-            recomputeHits(query, resetIndex = true)
+        if (query == _ui.value.searchQuery) return
+        _ui.update {
+            it.copy(
+                searchQuery = query,
+                searchHits = emptyList(),
+                searchHitIndex = -1,
+                searchPending = query.isNotBlank(),
+            )
         }
+        requestSearch(reset = true)
     }
 
     fun setSearchCaseSensitive(value: Boolean) {
         viewModelScope.launch { settingsRepository.setSearchCaseSensitive(value) }
     }
 
-    private suspend fun recomputeHits(query: String, resetIndex: Boolean = false) {
-        val hits = pipeline.hits(query, searchIgnoreCase)
-        _ui.update {
-            // The scan ran off the main thread; the user may have edited the
-            // query or closed search meanwhile. Hits for any other query would
-            // highlight the wrong rows, so only the current one may land.
-            if (!it.searching || it.searchQuery != query) return@update it
-            it.copy(
-                searchHits = hits,
-                searchHitIndex = when {
-                    hits.isEmpty() -> -1
-                    resetIndex -> 0
-                    else -> it.searchHitIndex.coerceIn(0, hits.lastIndex)
-                },
-            )
+    private fun requestSearch(reset: Boolean = false, delayMs: Long = HITS_REFRESH_MS) {
+        if (reset) {
+            searchJob?.cancel()
+            searchRefreshRequested = false
         }
-    }
+        val state = _ui.value
+        if (!state.searching || state.searchQuery.isBlank()) return
+        if (!reset && searchJob?.isActive == true) {
+            searchRefreshRequested = true
+            return
+        }
+        if (reset && !state.searchPending) {
+            _ui.update { it.copy(searchHits = emptyList(), searchHitIndex = -1, searchPending = true) }
+        }
 
-    /** Re-indexes hits after the visible list was rebuilt. */
-    private suspend fun refreshSearchHits() {
-        val s = _ui.value
-        if (s.searching && s.searchQuery.isNotBlank()) recomputeHits(s.searchQuery)
-    }
-
-    private var hitsRefreshJob: Job? = null
-
-    /**
-     * Re-indexes hits after an append, trailing by [HITS_REFRESH_MS]. A full
-     * scan per batch would run up to 60 times a second over the whole visible
-     * list while searching a busy stream, competing with the drain for the
-     * pipeline lock; one debounced scan per window keeps the count accurate and
-     * still covers the last batch of a burst.
-     */
-    private fun refreshSearchHitsThrottled() {
-        val s = _ui.value
-        if (!s.searching || s.searchQuery.isBlank()) return
-        if (hitsRefreshJob?.isActive == true) return
-        hitsRefreshJob = viewModelScope.launch(Dispatchers.Default) {
-            delay(HITS_REFRESH_MS)
-            recomputeHits(_ui.value.searchQuery)
+        searchJob = viewModelScope.launch {
+            delay(delayMs)
+            do {
+                searchRefreshRequested = false
+                val rows = entries.toList()
+                val hits = withContext(Dispatchers.Default) {
+                    rows.mapNotNull { row ->
+                        ensureActive()
+                        row.seq.takeIf { row.entry.matchesLogSearch(state.searchQuery, !state.searchCaseSensitive) }
+                    }
+                }
+                _ui.update {
+                    it.copy(
+                        searchHits = hits,
+                        searchHitIndex = retainedSearchHitIndex(hits, it.searchHits.getOrNull(it.searchHitIndex)),
+                        searchPending = false,
+                    )
+                }
+                if (searchRefreshRequested) delay(HITS_REFRESH_MS)
+            } while (searchRefreshRequested)
         }
     }
 
     fun nextSearchHit(direction: Int) {
         _ui.update { state ->
-            if (state.searchHits.isEmpty()) state
+            if (state.searchPending || state.searchHits.isEmpty()) state
             else state.copy(
                 searchHitIndex = Math.floorMod(state.searchHitIndex + direction, state.searchHits.size),
             )
@@ -574,7 +573,6 @@ class StreamViewModel @Inject constructor(
         // applies the newest rules, so the list never settles on a filter the
         // bar no longer shows.
         pipeline.refilter(::currentRules)
-        refreshSearchHits()
     }
 
     private fun resolveUid(packageName: String?): Int? =
