@@ -1,10 +1,14 @@
 package io.github.shiaho777.logsleuth.app.ui.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -34,8 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -106,7 +112,9 @@ private val topLevelDestinations = listOf(
     TopLevelDestination(Routes.SETTINGS, R.string.nav_settings, Icons.Filled.Settings),
 )
 
-private val topLevelRoutes = topLevelDestinations.map { it.route }.toSet()
+private val topLevelOrder = topLevelDestinations.mapIndexed { index, destination ->
+    destination.route to index
+}.toMap()
 
 /** Shared-element scope from the [SharedTransitionLayout] wrapping the NavHost. */
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -118,9 +126,9 @@ fun LogSleuthNavHost(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val showBottomBar = currentRoute in topLevelRoutes
-    val travelPx = with(LocalDensity.current) { 18.dp.roundToPx() }
-    val forwardOffset = if (LocalLayoutDirection.current == LayoutDirection.Ltr) travelPx else -travelPx
+    val layoutSign = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
+    val tabTravel = with(LocalDensity.current) { 48.dp.roundToPx() } * layoutSign
+    val pageTravel = with(LocalDensity.current) { 32.dp.roundToPx() } * layoutSign
 
     // Coach-mark tour: one controller for the whole graph. Screens mark
     // their highlight elements with Modifier.tourTarget; the overlay sits
@@ -138,12 +146,8 @@ fun LogSleuthNavHost(
             WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
         ),
         bottomBar = {
-            if (showBottomBar) {
-                InstrumentNavigation(topLevelDestinations, currentRoute) { destination ->
-                    if (currentRoute != destination.route) {
-                        navController.openTab(destination.route)
-                    }
-                }
+            InstrumentNavigation(topLevelDestinations, currentRoute ?: startDestination) { destination ->
+                navController.openTab(destination.route)
             }
         },
     ) { padding ->
@@ -159,24 +163,10 @@ fun LogSleuthNavHost(
                     modifier = Modifier
                         .padding(padding)
                         .consumeWindowInsets(padding),
-                    enterTransition = {
-                        if (initialState.destination.route in topLevelRoutes && targetState.destination.route in topLevelRoutes) {
-                            fadeIn(tween(130))
-                        } else {
-                            fadeIn(tween(160)) + slideInHorizontally(tween(200)) { forwardOffset }
-                        }
-                    },
-                    exitTransition = {
-                        if (initialState.destination.route in topLevelRoutes && targetState.destination.route in topLevelRoutes) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(tween(100))
-                        }
-                    },
-                    popEnterTransition = { fadeIn(tween(160)) },
-                    popExitTransition = {
-                        fadeOut(tween(120)) + slideOutHorizontally(tween(180)) { forwardOffset }
-                    },
+                    enterTransition = { enterPage(pageOffset(tabTravel, pageTravel, returning = false)) },
+                    exitTransition = { exitPage(pageOffset(tabTravel, pageTravel, returning = false)) },
+                    popEnterTransition = { enterPage(pageOffset(tabTravel, pageTravel, returning = true)) },
+                    popExitTransition = { exitPage(pageOffset(tabTravel, pageTravel, returning = true)) },
                 ) {
                     composable(Routes.WELCOME) {
                         WelcomeScreen(
@@ -303,8 +293,37 @@ fun LogSleuthNavHost(
     }
 }
 
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.pageOffset(
+    tabTravel: Int,
+    pageTravel: Int,
+    returning: Boolean,
+): Int {
+    val from = initialState.destination.route?.let(topLevelOrder::get)
+    val to = targetState.destination.route?.let(topLevelOrder::get)
+    return when {
+        from != null && to != null && from != to -> if (to > from) tabTravel else -tabTravel
+        returning -> -pageTravel
+        else -> pageTravel
+    }
+}
+
+private fun enterPage(offset: Int): EnterTransition =
+    fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+        slideInHorizontally(
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold),
+            initialOffsetX = { offset },
+        )
+
+private fun exitPage(offset: Int): ExitTransition =
+    fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
+        slideOutHorizontally(
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold),
+            targetOffsetX = { -offset },
+        )
+
 
 private fun NavHostController.openTab(route: String) {
+    if (currentDestination?.route == route) return
     navigate(route) {
         popUpTo(graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true
