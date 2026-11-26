@@ -216,18 +216,14 @@
 
     <!-- 上报向导 -->
     <string name="nav_report">上报</string>
-    <string name="report_step1_title">哪个应用出了问题?</string>
-    <string name="report_step1_hint">选择你要抓取日志的应用。</string>
-    <string name="report_step2_title">重现问题</string>
-    <string name="report_step2_hint">开始录制后切到那个应用,把问题操作出来。我们会在后台持续捕获。</string>
-    <string name="report_step3_title">发送报告</string>
-    <string name="report_step3_hint">日志已抓好了,分享给开发者即可;也可以先保存在会话里。</string>
+    <string name="report_step1_title">选择要录制的应用</string>
+    <string name="report_step2_title">复现问题</string>
     <string name="report_search_apps">搜索应用…</string>
     <string name="report_start_recording">开始录制</string>
-    <string name="report_stop_share">停止并分享</string>
+    <string name="report_stop_share">完成录制</string>
     <string name="report_recording_active">录制中 · %1$d 行</string>
     <string name="report_crash_caught">已捕获 %1$s 的崩溃</string>
-    <string name="report_keep">保存在会话里</string>
+    <string name="report_keep">在会话中查看</string>
     <string name="report_back">上一步</string>
     <string name="report_next">下一步</string>
     <string name="step_counter">第 %1$d / 3 步</string>
@@ -292,7 +288,7 @@
     <string name="tour_sessions_title">会话</string>
     <string name="tour_sessions_desc">所有录制和保存的快照都在这里——点开即可回放，滑动可删除。</string>
     <string name="tour_report_title">报告</string>
-    <string name="tour_report_desc">选择一个应用后，LogSleuth 会聚合它的日志统计——级别分布、高频 tag、错误爆发。</string>
+    <string name="tour_report_desc">选择应用，在录制时复现问题，然后预览并分享采集的日志。</string>
     <string name="tour_crashes_title">崩溃</string>
     <string name="tour_crashes_desc">检测到的崩溃与 ANR 会自动收集在这里——展开卡片可查看完整堆栈。</string>
     <string name="tour_settings_title">设置</string>
@@ -505,4 +501,24 @@
     <string name="settings_notifications_permission_desc">允许 Android 通知后才能收到崩溃提醒。崩溃记录按下方选项保存。</string>
     <string name="settings_system_notifications">打开系统通知设置</string>
     <string name="welcome_quick_start">快速开始</string>
+    <string name="report_access_required">录制需要日志权限</string>
+    <string name="report_other_recording">已有录制正在进行</string>
+    <string name="report_open_recording">查看当前录制</string>
+    <string name="report_no_apps">此设备上没有可供选择的应用。</string>
+    <string name="report_no_matches">没有符合搜索条件的应用。</string>
+    <string name="report_starting">正在启动录制…</string>
+    <string name="report_finishing">正在保存录制…</string>
+    <string name="report_recording_failed">无法完成报告录制，请重试。</string>
+    <string name="report_stop_failed">无法停止录制，请重试。</string>
+    <string name="report_captured_lines">已采集 %1$d 行日志</string>
+    <string name="report_preview">预览日志</string>
+    <string name="report_share_zip">分享 ZIP</string>
+    <string name="report_share_txt">分享 TXT</string>
+    <string name="report_exporting">正在准备导出…</string>
+    <string name="report_open_target">打开目标应用</string>
+    <string name="report_open_target_failed">无法打开目标应用，可以手动切换过去。</string>
+    <string name="report_phase_app">应用</string>
+    <string name="report_phase_record">录制</string>
+    <string name="report_phase_report">报告</string>
+    <string name="report_reproduce_on_device">请在已连接的设备上复现问题。</string>
 </resources>

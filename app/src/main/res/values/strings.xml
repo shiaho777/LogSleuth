@@ -216,18 +216,14 @@
 
     <!-- Report wizard -->
     <string name="nav_report">Report</string>
-    <string name="report_step1_title">Which app is misbehaving?</string>
-    <string name="report_step1_hint">Pick the app you want to capture logs for.</string>
+    <string name="report_step1_title">Choose an app</string>
     <string name="report_step2_title">Reproduce the problem</string>
-    <string name="report_step2_hint">Start recording, switch to the app, and do what triggers the problem. We\'ll keep capturing in the background.</string>
-    <string name="report_step3_title">Send the report</string>
-    <string name="report_step3_hint">Everything is captured. Share it with the developer — or keep it in Sessions.</string>
     <string name="report_search_apps">Search apps…</string>
     <string name="report_start_recording">Start recording</string>
-    <string name="report_stop_share">Stop &amp; share</string>
+    <string name="report_stop_share">Finish recording</string>
     <string name="report_recording_active">Recording · %1$d lines</string>
     <string name="report_crash_caught">Crash detected in %1$s — captured automatically</string>
-    <string name="report_keep">Keep in Sessions</string>
+    <string name="report_keep">View in Sessions</string>
     <string name="report_back">Back</string>
     <string name="report_next">Next</string>
     <string name="step_counter">Step %1$d of 3</string>
@@ -292,7 +288,7 @@
     <string name="tour_sessions_title">Sessions</string>
     <string name="tour_sessions_desc">Every recording and saved snapshot lands here — tap one to replay it, swipe to delete.</string>
     <string name="tour_report_title">Report</string>
-    <string name="tour_report_desc">Pick an app and LogSleuth aggregates its log stats — level mix, noisy tags, error bursts.</string>
+    <string name="tour_report_desc">Choose an app, record while you reproduce the issue, then review and share the captured logs.</string>
     <string name="tour_crashes_title">Crashes</string>
     <string name="tour_crashes_desc">Detected crashes and ANRs are collected automatically — expand a card for the full stack trace.</string>
     <string name="tour_settings_title">Settings</string>
@@ -505,4 +501,24 @@
     <string name="settings_notifications_permission_desc">Allow Android notifications to see crash alerts. Crash history is saved according to the options below.</string>
     <string name="settings_system_notifications">Open system notification settings</string>
     <string name="welcome_quick_start">Quick start</string>
+    <string name="report_access_required">Log access required to record</string>
+    <string name="report_other_recording">Another recording is in progress</string>
+    <string name="report_open_recording">View active recording</string>
+    <string name="report_no_apps">No apps are available on this device.</string>
+    <string name="report_no_matches">No apps match your search.</string>
+    <string name="report_starting">Starting recording…</string>
+    <string name="report_finishing">Saving recording…</string>
+    <string name="report_recording_failed">Could not complete the report recording. Try again.</string>
+    <string name="report_stop_failed">Could not stop the recording. Try again.</string>
+    <string name="report_captured_lines">%1$d lines captured</string>
+    <string name="report_preview">Preview logs</string>
+    <string name="report_share_zip">Share ZIP</string>
+    <string name="report_share_txt">Share TXT</string>
+    <string name="report_exporting">Preparing export…</string>
+    <string name="report_open_target">Open target app</string>
+    <string name="report_open_target_failed">Could not open the app. You can switch to it manually.</string>
+    <string name="report_phase_app">App</string>
+    <string name="report_phase_record">Record</string>
+    <string name="report_phase_report">Report</string>
+    <string name="report_reproduce_on_device">Reproduce the problem on the connected device.</string>
 </resources>
