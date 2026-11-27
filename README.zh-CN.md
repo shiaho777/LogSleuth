@@ -19,8 +19,6 @@
 
 LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest) 下载名为 `LogSleuth-*.APK` 的安装包。
 
-下方图库来自当前源码版。要体验首次启动的示例报告和图中的界面，可以[从源码构建](#构建与贡献)。稳定版 v0.4.2 APK 使用上一版界面。
-
 ## 截图
 
 点击任意截图可查看原图。
@@ -44,9 +42,9 @@ LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub 
 
 ## 快速上手
 
-1. **打开第一份报告。** 源码版首屏可选「打开示例报告」，查看一次虚构的结账崩溃，也可选「导入日志文件」打开 ZIP、TXT 或 LOG。使用 v0.4.2 时，跳过设置向导再从「会话」导入。这两条体验路径都无需设备日志权限。
+1. **打开第一份报告。** 在欢迎页选择「打开示例报告」，查看一次虚构的结账崩溃，也可选「导入日志文件」打开 ZIP、TXT 或 LOG。两种方式都无需设备日志权限。
 2. **沿时间线找故障。** 打开一个会话，在「日志」「崩溃」「书签」间切换。示例里的「点击支付」书签可以跳到附近的日志。点开一行，可在消息和原始日志之间切换。
-3. **开始自己的采集。** 源码版首屏选择「采集设备日志」，也可以从「设置」打开设置向导。先筛选再录制，保存后点「预览日志」，确认内容再分享 TXT 或 ZIP。想跟踪一个特定应用时，可以从「上报」进入引导式录制。
+3. **开始自己的采集。** 在欢迎页选择「采集设备日志」，也可以从「设置」打开设置向导。先筛选再录制，保存后点「预览日志」，确认内容再分享 TXT 或 ZIP。想跟踪一个特定应用时，可以从「上报」进入引导式录制。
 
 ### 选择日志来源
 
@@ -55,7 +53,7 @@ LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub 
 | **Shizuku** | 推荐给无 Root 的手机。启动 Shizuku 后授权 LogSleuth，可以按应用筛选，并在后台持续采集。 |
 | **ADB 授权** | 有电脑时可用来读取本机日志。Android 13 及以上启动或重连日志流时，请让查看器保持在前台，以便确认系统授权。 |
 | **Root** | 适用于已经 Root 的设备。在设置向导中主动开启「使用 Root」。 |
-| **远程 ADB** | 源码版可通过传统 TCP ADB，在可信网络中读取第二台安卓设备的日志。 |
+| **远程 ADB** | 通过传统 TCP ADB，在可信网络中读取第二台安卓设备的日志。 |
 
 详细步骤见[日志权限指南](docs/zh/guide/log-access.md)和[远程设备指南](docs/zh/guide/remote-device.md)。
 
@@ -76,11 +74,19 @@ LogSleuth 支持 **Android 8.0（API 26）及以上**。日常使用从 [GitHub 
 
 SDK 只采集宿主应用的日志、Java 崩溃和 ANR。它不声明安卓权限，不发起网络请求，还可以在落盘前按配置脱敏。用户无需安装 LogSleuth 查看器，也能从你的应用分享 ZIP。
 
-当前稳定版 Release 提供查看器 APK。接入可先看仓库里的[示例应用](sample/)和 [SDK 源码模块](sdk/)。两者位于同一个 Gradle 构建时，在应用中加入模块依赖。
+在 `settings.gradle.kts` 的 `dependencyResolutionManagement.repositories` 中添加 LogSleuth Maven 仓库。
 
 ```kotlin
-implementation(project(":sdk"))
+maven { url = uri("https://shiaho777.github.io/LogSleuth/maven/") }
 ```
+
+在应用模块中添加 SDK 依赖。
+
+```kotlin
+implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:0.4.4")
+```
+
+也可从 [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest) 下载 Maven 归档包。完整接入流程见[示例应用](sample/)。
 
 在 `Application` 里初始化。如果新建了子类，请在 Manifest 的 `<application>` 上设置 `android:name=".MyApp"`。
 

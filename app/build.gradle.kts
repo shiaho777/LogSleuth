@@ -29,8 +29,8 @@ android {
         applicationId = "io.github.shiaho777.logsleuth.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.4.2"
+        versionCode = 15
+        versionName = "0.4.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
