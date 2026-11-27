@@ -19,8 +19,6 @@
 
 LogSleuth runs on **Android 8.0 (API 26) and newer**. For a regular installation, download the `LogSleuth-*.APK` asset from [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest).
 
-The gallery shows the current source build. For the sample report on first launch and the interface shown below, [build from source](#build-and-contribute). The stable v0.4.2 APK uses the previous interface.
-
 ## Screenshots
 
 Select any screenshot to see it at full size.
@@ -44,9 +42,9 @@ Select any screenshot to see it at full size.
 
 ## Quick start
 
-1. **Open a report.** In the source build, choose **Open sample report** to explore a fictional checkout crash, or **Import a log file** to open a ZIP, TXT, or LOG. On v0.4.2, skip the setup wizard and import from **Sessions**. These paths work without device log access.
+1. **Open a report.** On the welcome screen, choose **Open sample report** to explore a fictional checkout crash, or **Import a log file** to open a ZIP, TXT, or LOG. Both work without device log access.
 2. **Read the timeline.** In **Sessions**, open a report and switch between **Logs**, **Crashes**, and **Bookmarks**. In the sample, **Tapped Pay** jumps to the nearby log line. Tap a log to switch between its message and raw line.
-3. **Capture your own logs.** Choose **Capture device logs** on the source build’s start screen, or open the setup guide from **Settings**. Filter the live stream, start a recording, and use **Preview logs** before sharing TXT or ZIP. In **Report**, pick a target app to follow the guided capture flow.
+3. **Capture your own logs.** Choose **Capture device logs** on the welcome screen, or open the setup guide from **Settings**. Filter the live stream, start a recording, and use **Preview logs** before sharing TXT or ZIP. In **Report**, pick a target app to follow the guided capture flow.
 
 ### Choose a log source
 
@@ -55,7 +53,7 @@ Select any screenshot to see it at full size.
 | **Shizuku** | Recommended for an unrooted phone. Start Shizuku and grant LogSleuth access. It supports per-app filtering and background capture. |
 | **ADB grant** | For local device logs with a computer. On Android 13+, keep the viewer on screen when the stream starts or reconnects so Android can show the approval prompt. |
 | **Root** | For a device that already has root. Enable **Use root** explicitly in the setup guide. |
-| **Remote ADB** | On the source build, read a second Android device on a trusted network using classic TCP ADB. |
+| **Remote ADB** | Read a second Android device on a trusted network using classic TCP ADB. |
 
 Read the [log access guide](docs/guide/log-access.md) for setup and [the remote-device guide](docs/guide/remote-device.md) for the second-device flow.
 
@@ -76,11 +74,19 @@ An Agent running in Termux on the same Android phone can operate LogSleuth throu
 
 The SDK captures its host app’s logs, Java crashes, and ANRs. It declares no Android permissions, makes no network requests, and can redact configured patterns before writing logs. A user can share a ZIP from your app even if the LogSleuth viewer is absent.
 
-The current stable Release ships the viewer APK. Start with the included [sample app](sample/) and the [SDK source module](sdk/). When both modules are in the same Gradle build, add the project dependency in your app.
+Add the LogSleuth Maven repository under `dependencyResolutionManagement.repositories` in your `settings.gradle.kts`.
 
 ```kotlin
-implementation(project(":sdk"))
+maven { url = uri("https://shiaho777.github.io/LogSleuth/maven/") }
 ```
+
+Add the SDK to your app module’s dependencies.
+
+```kotlin
+implementation("io.github.shiaho777.logsleuth:logsleuth-sdk:0.4.4")
+```
+
+The Maven archive is also available on [GitHub Releases](https://github.com/shiaho777/LogSleuth/releases/latest). See the [sample app](sample/) for a complete integration.
 
 Initialize from your `Application`. If you create a new subclass, register it with `android:name=".MyApp"` on your manifest’s `<application>` element.
 

@@ -7,12 +7,10 @@ Requires Android 8.0 (API 26) or newer.
 
 ## Open a report
 
-On builds from the current source, tap **Open sample report**. Open **Bookmarks**
-to find when Pay was tapped, then open **Crashes** to see what failed. Use
-**Import a log file** to replay a ZIP, TXT, or LOG from someone else. Both paths
-work without log access. On the stable APK, skip the access wizard and import
-from **Sessions**. **Settings → About → Quick start** reopens the start screen
-on builds that include it.
+Tap **Open sample report**. Open **Bookmarks** to find when Pay was tapped, then
+open **Crashes** to see what failed. Use **Import a log file** to replay a ZIP,
+TXT, or LOG from someone else. Both paths work without log access.
+**Settings → About → Quick start** reopens the welcome screen.
 
 ## Capture device logs
 
@@ -76,3 +74,4 @@ From **Settings → About**, replay the guided tour to try the live controls.
 - [Recording & crashes](/guide/recording-and-crashes) — sessions and detection
 - [Automation broadcasts](/guide/automation) — log matches into Tasker/MacroDroid
 - [Remote device](/guide/remote-device) — read a second device over wireless ADB
+- [Local MCP](/guide/local-mcp) — record and analyze logs using an Agent in Termux
